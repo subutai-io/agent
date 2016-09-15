@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 )
 
 func RateLimit(nic string, rate ...string) string {

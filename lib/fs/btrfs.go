@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 func IsSubvolumeReadonly(path string) bool {

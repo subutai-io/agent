@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/subutai-io/base/agent/agent"
-	"github.com/subutai-io/base/agent/cli"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent"
+	"github.com/subutai-io/agent/cli"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 
 	"github.com/codegangsta/cli"
 )

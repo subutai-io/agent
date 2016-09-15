@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	ovs "github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	ovs "github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
 )
 
 func TunAdd(socket, timeout string, global bool) {

@@ -6,10 +6,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/lib/net/p2p"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/lib/net/p2p"
+	"github.com/subutai-io/agent/log"
 )
 
 func VxlanTunnel(create, del, remoteip, vlan, vni string, list bool) {

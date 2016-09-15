@@ -13,10 +13,10 @@ import (
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/clearsign"
 
-	"github.com/subutai-io/base/agent/agent/utils"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
 )
 
 const (

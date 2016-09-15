@@ -1,9 +1,9 @@
 package lib
 
 import (
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
 )
 
 func LxcDemote(name, ip, vlan string) {

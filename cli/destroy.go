@@ -1,11 +1,11 @@
 package lib
 
 import (
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/lib/template"
+	"github.com/subutai-io/agent/log"
 )
 
 func LxcDestroy(name string) {

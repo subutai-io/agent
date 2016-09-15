@@ -1,10 +1,10 @@
 package lib
 
 import (
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/lib/net/p2p"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/lib/net/p2p"
 )
 
 func Cleanup(vlan string) {

@@ -3,7 +3,7 @@ package lib
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 	"os/exec"
 	"strings"
 )

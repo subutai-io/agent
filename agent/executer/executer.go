@@ -15,9 +15,9 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 
-	"github.com/subutai-io/base/agent/agent/container"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 type EncRequest struct {

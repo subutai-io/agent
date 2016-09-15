@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 	"io"
 	"os"
 )
