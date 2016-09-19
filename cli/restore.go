@@ -19,7 +19,7 @@ import (
 )
 
 func RestoreContainer(container, date, newContainer string) {
-	const backupDir = config.Agent.LxcPrefix + "/backups/"
+	backupDir := config.Agent.LxcPrefix + "/backups/"
 
 	if lxcContainer.IsContainer(newContainer) {
 		log.Fatal("Container " + newContainer + " is already exist!")

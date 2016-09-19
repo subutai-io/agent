@@ -20,7 +20,7 @@ import (
 )
 
 func BackupContainer(container string, full, stop bool) {
-	const backupDir = config.Agent.LxcPrefix + "/backups/"
+	backupDir := config.Agent.LxcPrefix + "/backups/"
 	var changelog []string
 
 	if !lxcContainer.IsContainer(container) {
