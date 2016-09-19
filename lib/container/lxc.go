@@ -219,7 +219,7 @@ func Clone(parent, child string) {
 	SetContainerConf(child, [][]string{
 		{"lxc.network.link", ""},
 		{"lxc.network.veth.pair", strings.Replace(GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up", config.Agent.AppPrefix + "wrappers/create_ovs_interface"},
 		{"subutai.parent", parent},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
@@ -232,7 +232,6 @@ func ResetNet(name string) {
 	SetContainerConf(name, [][]string{
 		{"lxc.network.type", "veth"},
 		{"lxc.network.flags", "up"},
-		{"lxc.network.link", "lxcbr0"},
 		{"lxc.network.ipv4.gateway", ""},
 		{"lxc.network.veth.pair", ""},
 		{"lxc.network.script.up", ""},
