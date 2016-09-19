@@ -26,7 +26,7 @@ func MngInit() {
 	container.SetContainerConf("management", [][]string{
 		{"lxc.network.hwaddr", Mac()},
 		{"lxc.network.veth.pair", "management"},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up", config.Agent.AppPrefix + "wrappers/create_ovs_interface"},
 		{"lxc.network.link", ""},
 		// TODO following lines kept for back compatibility with old templates, should be deleted when all templates will be replaced.
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/home home none bind,rw 0 0"},
