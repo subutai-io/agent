@@ -28,6 +28,7 @@ func MngInit() {
 		{"lxc.network.veth.pair", "management"},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "wrappers/create_ovs_interface"},
 		{"lxc.network.link", ""},
+		{"lxc.rootfs", config.Agent.LxcPrefix + "management/rootfs"},
 		{"lxc.rootfs.mount", config.Agent.LxcPrefix + "management/rootfs"},
 		// TODO following lines kept for back compatibility with old templates, should be deleted when all templates will be replaced.
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/home home none bind,rw 0 0"},
