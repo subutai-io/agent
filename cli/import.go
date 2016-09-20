@@ -340,6 +340,7 @@ func LxcImport(name, version, token string) {
 		{"lxc.mount", config.Agent.LxcPrefix + t.name + "/fstab"},
 		{"lxc.hook.pre-start", ""},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
+		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/common.conf.d/00-lxcfs.conf"},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
 		{"subutai.config.path", config.Agent.AppPrefix + "etc"},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
