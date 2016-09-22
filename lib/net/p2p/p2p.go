@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -19,11 +20,11 @@ func Create(interfaceName, localPeepIPAddr, hash, key, ttl, portRange string) {
 	if len(portRange) > 2 {
 		cmd = append(cmd, "-ports", localPeepIPAddr)
 	}
-	log.Check(log.FatalLevel, "Creating p2p interface", exec.Command("p2p", cmd...).Run())
+	log.Check(log.FatalLevel, "Creating p2p interface", exec.Command(config.Agent.AppPrefix+"bin/p2p", cmd...).Run())
 }
 
 func Remove(hash string) {
-	log.Check(log.WarnLevel, "Removing p2p interface", exec.Command("p2p", "stop", "-hash", hash).Run())
+	log.Check(log.WarnLevel, "Removing p2p interface", exec.Command(config.Agent.AppPrefix+"bin/p2p", "stop", "-hash", hash).Run())
 }
 
 func RemoveByIface(name string) {
@@ -34,7 +35,7 @@ func RemoveByIface(name string) {
 			mac = iface.HardwareAddr.String()
 		}
 	}
-	out, _ := exec.Command("p2p", "show").Output()
+	out, _ := exec.Command(config.Agent.AppPrefix+"bin/p2p", "show").Output()
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
@@ -59,12 +60,12 @@ func IptablesCleanUp(name string) {
 }
 
 func UpdateKey(hash, newkey, ttl string) {
-	err := exec.Command("p2p", "set", "-key", newkey, "-ttl", ttl, "-hash", hash).Run()
+	err := exec.Command(config.Agent.AppPrefix+"bin/p2p", "set", "-key", newkey, "-ttl", ttl, "-hash", hash).Run()
 	log.Check(log.FatalLevel, "Updating p2p key", err)
 }
 
 func Version() {
-	out, err := exec.Command("p2p", "version").CombinedOutput()
+	out, err := exec.Command(config.Agent.AppPrefix+"bin/p2p", "version").CombinedOutput()
 	fmt.Printf("%s", out)
 	log.Check(log.FatalLevel, "Getting p2p version", err)
 }
@@ -74,7 +75,7 @@ func Peers(hash string) {
 	if hash == "" {
 		args = []string{"show"}
 	}
-	out, err := exec.Command("p2p", args...).Output()
+	out, err := exec.Command(config.Agent.AppPrefix+"bin/p2p", args...).Output()
 	log.Check(log.FatalLevel, "Getting list of p2p participants", err)
 	fmt.Println(string(out))
 }

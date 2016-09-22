@@ -16,7 +16,7 @@ import (
 
 var (
 	conftmpl = config.Agent.AppPrefix + "etc/nginx/tmpl/"
-	confinc  = config.Agent.DataPrefix + "nginx-includes/"
+	confinc  = config.Agent.DataPrefix + "nginx/includes/"
 )
 
 func ProxyAdd(vlan, domain, node, policy, cert string) {
@@ -81,7 +81,7 @@ func ProxyCheck(vlan, node string, domain bool) {
 
 func restart() {
 	log.Check(log.FatalLevel, "Reloading nginx",
-		exec.Command("nginx.sh", "-s", "reload").Run())
+		exec.Command(config.Agent.AppPrefix+"wrappers/nginx", "-s", "reload").Run())
 }
 
 func addDomain(vlan, domain, cert string) {
@@ -113,9 +113,9 @@ func addDomain(vlan, domain, cert string) {
 			log.Info("Cannot create key file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".key")
 			os.Exit(1)
 		}
-		addLine(confinc+vlan+".conf", "ssl_certificate /var/lib/apps/subutai/current/web/ssl/UNIXDATE.crt;",
+		addLine(confinc+vlan+".conf", "ssl_certificate "+config.Agent.AppPrefix+"web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate_key /var/lib/apps/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate_key "+config.Agent.AppPrefix+"web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		lib.CopyFile(conftmpl+"vhost.example", confinc+vlan+".conf")

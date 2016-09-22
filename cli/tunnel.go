@@ -13,11 +13,12 @@ import (
 	"time"
 
 	"github.com/subutai-io/agent/config"
-	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
-func TunAdd(socket, timeout string, global bool) {
+func TunAdd(socket, timeout string, g bool) {
+	// "args" here to provide back compatibility with old "-g" flag. Need to remove in future.
+
 	if len(socket) == 0 {
 		log.Error("Please specify socket")
 	}
@@ -26,7 +27,7 @@ func TunAdd(socket, timeout string, global bool) {
 		socket = socket + ":22"
 	}
 
-	args, tunsrv := getArgs(global, socket)
+	args, tunsrv := getArgs(socket)
 	cmd := exec.Command("ssh", args...)
 	if len(timeout) > 0 {
 		args = append([]string{timeout, "ssh"}, args...)
@@ -41,17 +42,13 @@ func TunAdd(socket, timeout string, global bool) {
 	for i := 0; err == nil && i < 10; i++ {
 		if strings.Contains(string(line), "Allocated port") {
 			port := strings.Fields(string(line))
-			tun := "local"
-			if global {
-				tun = "global"
-			}
 			fmt.Println(tunsrv + ":" + port[2])
 			if len(timeout) > 0 {
 				tout, err := strconv.Atoi(timeout)
 				log.Check(log.ErrorLevel, "Converting timeout to int", err)
-				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" "+strconv.Itoa(int(time.Now().Unix())+tout)+" "+strconv.Itoa(cmd.Process.Pid)+" "+tun)
+				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" "+strconv.Itoa(int(time.Now().Unix())+tout)+" "+strconv.Itoa(cmd.Process.Pid))
 			} else {
-				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" -1 "+strconv.Itoa(cmd.Process.Pid)+" "+tun)
+				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" -1 "+strconv.Itoa(cmd.Process.Pid))
 			}
 			return
 		}
@@ -68,7 +65,7 @@ func TunList() {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 {
+		if len(row) == 4 {
 			fmt.Println(row[0] + " " + row[1] + " " + row[2])
 		}
 	}
@@ -82,7 +79,7 @@ func TunDel(socket string, pid ...string) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 && row[1] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && row[3] == pid[0])) {
+		if len(row) == 4 && row[1] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && row[3] == pid[0])) {
 			delEntry(row[3])
 			f, err := ioutil.ReadFile("/proc/" + row[3] + "/cmdline")
 			if err == nil && strings.Contains(string(f), row[1]) {
@@ -103,7 +100,7 @@ func TunCheck() {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 {
+		if len(row) == 4 {
 			ttl, err := strconv.Atoi(row[2])
 			log.Check(log.ErrorLevel, "Checking tunnel "+row[1]+" ttl", err)
 			if ttl <= int(time.Now().Unix()) && ttl != -1 {
@@ -114,11 +111,7 @@ func TunCheck() {
 				if ttl-int(time.Now().Unix()) > 0 {
 					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
 				}
-				if row[4] == "global" {
-					TunAdd(row[1], newttl, true)
-				} else {
-					TunAdd(row[1], newttl, false)
-				}
+				TunAdd(row[1], newttl, false)
 			}
 		}
 	}
@@ -126,9 +119,9 @@ func TunCheck() {
 }
 
 func getList() *os.File {
-	f, err := os.Open(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels")
+	f, err := os.Open(config.Agent.DataPrefix + "subutai-network/ssh-tunnels")
 	if os.IsNotExist(err) {
-		f, err = os.Create(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels")
+		f, err = os.Create(config.Agent.DataPrefix + "subutai-network/ssh-tunnels")
 		log.Check(log.FatalLevel, "Creating tunnel list", err)
 	} else if err != nil {
 		log.Error("Opening tunnel list " + err.Error())
@@ -136,23 +129,18 @@ func getList() *os.File {
 	return f
 }
 
-func getArgs(global bool, socket string) ([]string, string) {
+func getArgs(socket string) ([]string, string) {
 	var tunsrv string
 	var args []string
-	if global {
-		cdn, err := net.LookupIP(config.Cdn.Url)
-		log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
-		tunsrv = cdn[0].String()
-		args = []string{"-i", config.Agent.AppPrefix + "etc/ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
-	} else {
-		tunsrv = ovs.GetIp()
-		args = []string{"-N", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "ubuntu@" + tunsrv}
-	}
+	cdn, err := net.LookupIP(config.Cdn.Url)
+	log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
+	tunsrv = cdn[0].String()
+	args = []string{"-i", config.Agent.AppPrefix + "etc/ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	return args, tunsrv
 }
 
 func addToList(file, line string) {
-	f, err := os.OpenFile(config.Agent.DataPrefix+"var/subutai-network/"+file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(config.Agent.DataPrefix+"subutai-network/"+file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	log.Check(log.ErrorLevel, "Writing tunnel list", err)
 	defer f.Close()
 
@@ -165,19 +153,19 @@ func delEntry(pid string) {
 	f := getList()
 	defer f.Close()
 
-	tmp, err := os.Create(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels.new")
+	tmp, err := os.Create(config.Agent.DataPrefix + "subutai-network/ssh-tunnels.new")
 	log.Check(log.ErrorLevel, "Creating new list", err)
 	tmp.Close()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 && row[3] != pid {
+		if len(row) == 4 && row[3] != pid {
 			addToList("ssh-tunnels.new", scanner.Text())
 		}
 	}
 	log.Check(log.ErrorLevel, "Replacing old list",
-		os.Rename(config.Agent.DataPrefix+"var/subutai-network/ssh-tunnels.new", config.Agent.DataPrefix+"var/subutai-network/ssh-tunnels"))
+		os.Rename(config.Agent.DataPrefix+"subutai-network/ssh-tunnels.new", config.Agent.DataPrefix+"subutai-network/ssh-tunnels"))
 }
 
 func tunOpen(remote, local string) bool {

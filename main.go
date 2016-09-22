@@ -166,9 +166,9 @@ func main() {
 				Name:  "tunnel",
 				Usage: "tunnels operation",
 				Flags: []cli.Flag{
-					cli.StringFlag{Name: "create", Usage: "create tunnel (tunnel -c)"},
-					cli.StringFlag{Name: "delete", Usage: "delete tunnel (tunnel -d)"},
-					cli.BoolFlag{Name: "list", Usage: "list of tunnels (tunnel -l)"},
+					cli.StringFlag{Name: "create", Usage: "create tunnel"},
+					cli.StringFlag{Name: "delete", Usage: "delete tunnel"},
+					cli.BoolFlag{Name: "list", Usage: "list of tunnels)"},
 
 					cli.StringFlag{Name: "remoteip", Usage: "remote ip"},
 					cli.StringFlag{Name: "vlan", Usage: "tunnel vlan"},
@@ -332,7 +332,7 @@ func main() {
 				Name:  "add",
 				Usage: "add ssh tunnel",
 				Flags: []cli.Flag{
-					cli.BoolFlag{Name: "g", Usage: "create tunnel to global proxy"}},
+					cli.BoolFlag{Name: "g", Usage: "deprecated flag"}},
 				Action: func(c *cli.Context) error {
 					lib.TunAdd(c.Args().Get(0), c.Args().Get(1), c.Bool("g"))
 					return nil
