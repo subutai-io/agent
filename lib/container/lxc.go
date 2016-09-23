@@ -370,10 +370,10 @@ func SetContainerUid(c string) {
 	s, _ := os.Stat(config.Agent.LxcPrefix + c + "/rootfs")
 	parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
+	exec.Command(config.Agent.AppPrefix+"bin/uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
+	exec.Command(config.Agent.AppPrefix+"bin/uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
+	exec.Command(config.Agent.AppPrefix+"bin/uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
+	exec.Command(config.Agent.AppPrefix+"bin/uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
 
 	log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
 }

@@ -139,6 +139,8 @@ func download(t templ, kurjun *http.Client, token string) bool {
 	bar.Start()
 	rd := bar.NewProxyReader(response.Body)
 
+	time.Sleep(time.Millisecond * 300) // Added sleep to prevent output collision with progress bar.
+
 	_, err = io.Copy(out, rd)
 	for c := 0; err != nil && c < 5; _, err = io.Copy(out, rd) {
 		log.Info("Download interrupted, retrying")
@@ -308,8 +310,6 @@ func LxcImport(name, version, token string) {
 		}
 	}
 	log.Info("File integrity verified")
-
-	time.Sleep(time.Millisecond * 200) // Added sleep to prevent output collision with progress bar.
 
 	log.Info("Unpacking template " + t.name)
 	tgz := extractor.NewTgz()
