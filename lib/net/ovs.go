@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 )
 
 // RateLimit sets throughput limits for container's network interfaces if "quota" is specified

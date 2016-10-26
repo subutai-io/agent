@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/subutai-io/base/agent/agent/utils"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 
-	cont "github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/gpg"
+	cont "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/gpg"
 
 	lxc "gopkg.in/lxc/go-lxc.v2"
 )

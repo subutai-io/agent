@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 )
 
 // Create adds new P2P interface to the Resource Host. This interface connected to the swarm.

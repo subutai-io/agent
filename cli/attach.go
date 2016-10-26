@@ -8,8 +8,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 	"gopkg.in/lxc/go-lxc.v2"
 )
 

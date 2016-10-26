@@ -3,10 +3,10 @@ package cli
 import (
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/lib/net/p2p"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/lib/net/p2p"
 )
 
 // Cleanup command takes the environment's VLAN tag as its only argument.

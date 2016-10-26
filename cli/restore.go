@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	lxcContainer "github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	lxcContainer "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/template"
+	"github.com/subutai-io/agent/log"
 
 	"github.com/pivotal-golang/archiver/extractor"
 )

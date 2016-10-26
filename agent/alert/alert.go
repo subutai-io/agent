@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/agent/container"
-	"github.com/subutai-io/base/agent/config"
-	cont "github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/config"
+	cont "github.com/subutai-io/agent/lib/container"
 )
 
 type values struct {

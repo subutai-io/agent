@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/agent/container"
-	"github.com/subutai-io/base/agent/agent/utils"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/gpg"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/log"
 )
 
 type rHost struct {

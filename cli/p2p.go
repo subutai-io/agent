@@ -3,8 +3,8 @@ package cli
 import (
 	"strings"
 
-	"github.com/subutai-io/base/agent/lib/net/p2p"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/lib/net/p2p"
+	"github.com/subutai-io/agent/log"
 )
 
 // P2P function controls and configures the peer-to-peer network structure:

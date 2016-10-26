@@ -14,16 +14,16 @@ import (
 
 	gcli "github.com/codegangsta/cli"
 
-	"github.com/subutai-io/base/agent/agent/alert"
-	"github.com/subutai-io/base/agent/agent/connect"
-	"github.com/subutai-io/base/agent/agent/container"
-	"github.com/subutai-io/base/agent/agent/executer"
-	"github.com/subutai-io/base/agent/agent/monitor"
-	"github.com/subutai-io/base/agent/agent/utils"
-	"github.com/subutai-io/base/agent/cli"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/gpg"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/alert"
+	"github.com/subutai-io/agent/agent/connect"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/agent/executer"
+	"github.com/subutai-io/agent/agent/monitor"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/cli"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/log"
 )
 
 //Response covers heartbeat date because of format required by Management server.
