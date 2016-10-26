@@ -1,4 +1,4 @@
-package lib
+package cli
 
 import (
 	"io/ioutil"
@@ -7,14 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/lib/net"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/lib/fs"
+	"github.com/subutai-io/base/agent/lib/net"
+	"github.com/subutai-io/base/agent/log"
 )
 
-// LxcPromote promotes the given container name.
+// LxcPromote turns a Subutai container into container template which may be cloned with "clone" command.
+// Promote executes several simple steps, such as dropping a container's configuration to default values,
+// dumping the list of installed packages (this step requires the target container to still be running),
+// and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name string) {
 	checkSanity(name)
 
@@ -33,7 +36,7 @@ func LxcPromote(name string) {
 	if container.State(name) == "RUNNING" {
 		container.Stop(name)
 	}
-	net.RemoveDefaultGW(name)
+	net.RestoreDefaultConf(name)
 
 	cleanupFS(config.Agent.LxcPrefix+name+"/rootfs/.git", 0000)
 	cleanupFS(config.Agent.LxcPrefix+name+"/var/log/", 0775)
@@ -42,13 +45,12 @@ func LxcPromote(name string) {
 
 	makeDiff(name)
 
-	iface := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.veth.pair")
-	net.ConfigureOVS(iface)
 	container.ResetNet(name)
 	fs.ReadOnly(name, true)
 	log.Info(name + " promoted")
 }
 
+// clearFile writes an empty byte array to specified file
 func clearFile(path string, f os.FileInfo, err error) error {
 	if !f.IsDir() {
 		ioutil.WriteFile(path, []byte{}, 0775)
@@ -56,6 +58,7 @@ func clearFile(path string, f os.FileInfo, err error) error {
 	return nil
 }
 
+// cleanupFS removes files in specified path
 func cleanupFS(path string, perm os.FileMode) {
 	if perm == 0000 {
 		os.RemoveAll(path)
@@ -64,6 +67,7 @@ func cleanupFS(path string, perm os.FileMode) {
 	}
 }
 
+// makeDiff compares specified container mountpoints with his parent's filesystem
 func makeDiff(name string) {
 	parent := container.GetParent(name)
 	if parent == name || len(parent) < 1 {
@@ -76,6 +80,7 @@ func makeDiff(name string) {
 	execDiff(config.Agent.LxcPrefix+parent+"/var", config.Agent.LxcPrefix+name+"/var", config.Agent.LxcPrefix+name+"/diff/var.diff")
 }
 
+// execDiff executes `diff` command for specified directories and writes command output
 func execDiff(dir1, dir2, output string) {
 	var out []byte
 	out, _ = exec.Command("diff", "-Nur", dir1, dir2).Output()
@@ -83,6 +88,7 @@ func execDiff(dir1, dir2, output string) {
 	log.Check(log.FatalLevel, "Writing diff to file"+output, err)
 }
 
+// checkSanity performs different checks before promote command
 func checkSanity(name string) {
 	// check: if name exists
 	if !container.IsContainer(name) {

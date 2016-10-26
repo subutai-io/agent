@@ -1,19 +1,39 @@
-package lib
+package cli
 
 import (
-	"github.com/subutai-io/agent/cli/lib"
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/lib/template"
-	"github.com/subutai-io/agent/log"
 	"os"
 	"runtime"
+
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/lib/fs"
+	"github.com/subutai-io/base/agent/lib/template"
+	"github.com/subutai-io/base/agent/log"
+)
+
+var (
+	allsizes = []string{"tiny", "small", "medium", "large", "huge"}
 )
 
 // cfg declared in promote.go
-// LxcExport exports the given name if it suits the needs.
-func LxcExport(name, version string) {
+
+// LxcExport sub command prepares an archive from a template in the `/mnt/lib/lxc/tmpdir/` path.
+// This archive can be moved to another Subutai peer and deployed as ready-to-use template or uploaded to Subutai's global template repository to make it
+// widely available for others to use.
+//
+// Export consist of two steps if the target is a container:
+// container promotion to template (see "promote" command) and packing the template into the archive.
+// If already a template just the packing of the archive takes place.
+//
+// Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
+// The template's version can also specified on export so the import command can use it to request specific versions.
+func LxcExport(name, version, prefsize string) {
+	size := "tiny"
+	for _, s := range allsizes {
+		if prefsize == s {
+			size = prefsize
+		}
+	}
 	srcver := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
 	if len(version) == 0 {
 		version = srcver
@@ -43,17 +63,18 @@ func LxcExport(name, version string) {
 	container.SetContainerConf(name, [][]string{
 		{"subutai.template.package", dst + ".tar.gz"},
 		{"subutai.template.version", version},
+		{"subutai.template.size", size},
 	})
 
 	src := config.Agent.LxcPrefix + name
-	lib.CopyFile(src+"/fstab", dst+"/fstab")
-	lib.CopyFile(src+"/config", dst+"/config")
-	lib.CopyFile(src+"/packages", dst+"/packages")
+	fs.Copy(src+"/fstab", dst+"/fstab")
+	fs.Copy(src+"/config", dst+"/config")
+	fs.Copy(src+"/packages", dst+"/packages")
 	if parent != name {
-		lib.CopyFile(src+"/diff/var.diff", dst+"/diff/var.diff")
-		lib.CopyFile(src+"/diff/opt.diff", dst+"/diff/opt.diff")
-		lib.CopyFile(src+"/diff/home.diff", dst+"/diff/home.diff")
-		lib.CopyFile(src+"/diff/rootfs.diff", dst+"/diff/rootfs.diff")
+		fs.Copy(src+"/diff/var.diff", dst+"/diff/var.diff")
+		fs.Copy(src+"/diff/opt.diff", dst+"/diff/opt.diff")
+		fs.Copy(src+"/diff/home.diff", dst+"/diff/home.diff")
+		fs.Copy(src+"/diff/rootfs.diff", dst+"/diff/rootfs.diff")
 	}
 
 	container.SetContainerConf(name, [][]string{

@@ -13,36 +13,38 @@ import (
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/clearsign"
 
-	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/agent/utils"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/log"
 )
 
-const (
-	tmpfile = "epub.key"
-)
-
-//ImportPk import PK gpg2 --import pubkey.key
+//ImportPk imports Public Key "gpg2 --import pubkey.key".
 func ImportPk(k []byte) string {
-	err := ioutil.WriteFile(tmpfile, k, 0644)
-	log.Check(log.WarnLevel, "Writing Pubkey to temp file", err)
+	tmpfile, err := ioutil.TempFile("", "subutai-epub")
+	if !log.Check(log.WarnLevel, "Creating Public key file", err) {
 
-	command := exec.Command("gpg", "--import", tmpfile)
-	out, err := command.CombinedOutput()
-	log.Check(log.WarnLevel, "Importing MH public key", err)
+		_, err = tmpfile.Write(k)
+		log.Check(log.WarnLevel, "Writing Management server Public key to "+tmpfile.Name(), err)
+		log.Check(log.WarnLevel, "Closing "+tmpfile.Name(), tmpfile.Close())
 
-	os.Remove(tmpfile)
-	return string(out)
+		out, err := exec.Command("gpg", "--import", tmpfile.Name()).CombinedOutput()
+		log.Check(log.WarnLevel, "Importing MH Public key from "+tmpfile.Name(), err)
+		log.Check(log.WarnLevel, "Removing temp file", os.Remove(tmpfile.Name()))
+		return string(out)
+	}
+	return err.Error()
 }
 
+// GetContainerPk returns GPG Public Key for container.
 func GetContainerPk(name string) string {
-	lxc_path := config.Agent.LxcPrefix + name + "/public.pub"
-	stdout, err := exec.Command("/bin/bash", "-c", "gpg --no-default-keyring --keyring "+lxc_path+" --export -a "+name+"@subutai.io").Output()
+	lxcPath := config.Agent.LxcPrefix + name + "/public.pub"
+	stdout, err := exec.Command("/bin/bash", "-c", "gpg --no-default-keyring --keyring "+lxcPath+" --export -a "+name+"@subutai.io").Output()
 	log.Check(log.WarnLevel, "Getting Container public key", err)
 	return string(stdout)
 }
 
+// GetPk returns GPG Public Key from the Resource Host.
 func GetPk(name string) string {
 	stdout, err := exec.Command("gpg", "--export", "-a", name).Output()
 	log.Check(log.WarnLevel, "Getting public key", err)
@@ -53,6 +55,7 @@ func GetPk(name string) string {
 	return string(stdout)
 }
 
+// DecryptWrapper decrypts GPG message.
 func DecryptWrapper(args ...string) string {
 	gpg := "gpg --passphrase " + config.Agent.GpgPassword + " --no-tty"
 	if len(args) == 3 {
@@ -60,9 +63,11 @@ func DecryptWrapper(args ...string) string {
 	}
 	command := exec.Command("/bin/bash", "-c", gpg)
 	stdin, err := command.StdinPipe()
-	log.Check(log.WarnLevel, "Opening Stdin Pipe", err)
-	stdin.Write([]byte(args[0]))
-	stdin.Close()
+	if err == nil {
+		_, err = stdin.Write([]byte(args[0]))
+		log.Check(log.DebugLevel, "Writing to stdin of gpg", err)
+		log.Check(log.DebugLevel, "Closing stdin of gpg", stdin.Close())
+	}
 
 	output, err := command.Output()
 	log.Check(log.WarnLevel, "Executing command "+gpg, err)
@@ -70,15 +75,19 @@ func DecryptWrapper(args ...string) string {
 	return string(output)
 }
 
+// EncryptWrapper encrypts GPG message.
 func EncryptWrapper(user, recipient string, message []byte, args ...string) string {
 	gpg := "gpg --batch --passphrase " + config.Agent.GpgPassword + " --trust-model always --armor -u " + user + " -r " + recipient + " --sign --encrypt --no-tty"
 	if len(args) >= 2 {
 		gpg = gpg + " --no-default-keyring --keyring " + args[0] + " --secret-keyring " + args[1]
 	}
 	command := exec.Command("/bin/bash", "-c", gpg)
-	stdin, _ := command.StdinPipe()
-	stdin.Write(message)
-	stdin.Close()
+	stdin, err := command.StdinPipe()
+	if err == nil {
+		_, err = stdin.Write(message)
+		log.Check(log.DebugLevel, "Writing to stdin of gpg", err)
+		log.Check(log.DebugLevel, "Closing stdin of gpg", stdin.Close())
+	}
 
 	output, err := command.Output()
 	if log.Check(log.WarnLevel, "Encrypting message", err) {
@@ -88,50 +97,56 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) stri
 	return string(output)
 }
 
+// GenerateKey generates GPG-key for Subutai Agent.
+// This key used for encrypting messages for Subutai Agent.
 func GenerateKey(name string) {
 	path := config.Agent.LxcPrefix + name
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
 	if !container.IsContainer(name) {
-		os.MkdirAll("/root/.gnupg/", 0700)
+		err := os.MkdirAll("/root/.gnupg/", 0700)
+		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
 		path = "/root/.gnupg"
 		email = name
 		pass = config.Agent.GpgPassword
 	}
 	// err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/defaults", ident, 0644)
 	conf, err := os.Create(path + "/defaults")
-	defer conf.Close()
-	conf.WriteString("%echo Generating default keys\n")
-	conf.WriteString("Key-Type: RSA\n")
-	conf.WriteString("Key-Length: 2048\n")
-	conf.WriteString("Name-Real: " + name + "\n")
-	conf.WriteString("Name-Comment: " + name + " GPG key\n")
-	conf.WriteString("Name-Email: " + email + "\n")
-	conf.WriteString("Expire-Date: 0\n")
-	conf.WriteString("Passphrase: " + pass + "\n")
-	conf.WriteString("%pubring " + path + "/public.pub\n")
-	conf.WriteString("%secring " + path + "/secret.sec\n")
-	conf.WriteString("%commit\n")
-	conf.WriteString("%echo Done\n")
+	if log.Check(log.FatalLevel, "Writing default key ident", err) {
+		return
+	}
+	_, err = conf.WriteString("%echo Generating default keys\n" +
+		"Key-Type: RSA\n" +
+		"Key-Length: 2048\n" +
+		"Name-Real: " + name + "\n" +
+		"Name-Comment: " + name + " GPG key\n" +
+		"Name-Email: " + email + "\n" +
+		"Expire-Date: 0\n" +
+		"Passphrase: " + pass + "\n" +
+		"%pubring " + path + "/public.pub\n" +
+		"%secring " + path + "/secret.sec\n" +
+		"%commit\n" +
+		"%echo Done\n")
+	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
+	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	log.Check(log.FatalLevel, "Writing default key ident", err)
-
-	log.Check(log.FatalLevel, "Generating key",
-		exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	log.Check(log.FatalLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
 	if !container.IsContainer(name) {
-		log.Check(log.FatalLevel, "Importing secret key",
-			exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").Run())
-		log.Check(log.FatalLevel, "Importing public key",
-			exec.Command("gpg", "--import", "/root/.gnupg/public.pub").Run())
+		log.Check(log.FatalLevel, "Importing secret key", exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").Run())
+		log.Check(log.FatalLevel, "Importing public key", exec.Command("gpg", "--import", "/root/.gnupg/public.pub").Run())
 	}
 }
 
+// GetFingerprint returns fingerprint of the Subutai container.
 func GetFingerprint(email string) string {
 	var out []byte
+	var err error
 	if email == config.Agent.GpgUser {
-		out, _ = exec.Command("gpg", "--fingerprint", email).Output()
+		out, err = exec.Command("gpg", "--fingerprint", email).Output()
+		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
-		out, _ = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
@@ -154,13 +169,13 @@ func getMngKey(c string) {
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
-	log.Check(log.FatalLevel, "Writing Management public key", err)
+	if body, err := ioutil.ReadAll(resp.Body); err == nil {
+		err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
+		log.Check(log.FatalLevel, "Writing Management public key", err)
+	}
 }
 
-func parseKeyId(s string) string {
+func parseKeyID(s string) string {
 	var id string
 
 	line := strings.Split(s, "\n")
@@ -180,8 +195,9 @@ func parseKeyId(s string) string {
 }
 
 func writeData(c, t, n, m string) {
-	os.Remove(config.Agent.LxcPrefix + c + "/stdin.txt.asc")
-	os.Remove(config.Agent.LxcPrefix + c + "/stdin.txt")
+	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
+	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
+
 	token := []byte(t + "\n" + GetFingerprint(c) + "\n" + n + m)
 	err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/stdin.txt", token, 0644)
 	log.Check(log.FatalLevel, "Writing Management public key", err)
@@ -194,8 +210,8 @@ func sendData(c string) {
 
 	client := utils.TLSConfig()
 	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
-	os.Remove(config.Agent.LxcPrefix + c + "/stdin.txt.asc")
-	os.Remove(config.Agent.LxcPrefix + c + "/stdin.txt")
+	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
+	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
 	log.Check(log.FatalLevel, "Sending registration request to management", err)
 
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
@@ -204,6 +220,9 @@ func sendData(c string) {
 
 }
 
+// ExchageAndEncrypt installing the Management server GPG public key to the container keyring.
+// Sending container's GPG public key to the Management server. It require encrypting and singing message
+// received from the Management server.
 func ExchageAndEncrypt(c, t string) {
 	var impout, expout, imperr, experr bytes.Buffer
 
@@ -215,7 +234,7 @@ func ExchageAndEncrypt(c, t string) {
 	err := impkey.Run()
 	log.Check(log.FatalLevel, "Importing Management public key to keyring", err)
 
-	id := parseKeyId(imperr.String())
+	id := parseKeyID(imperr.String())
 	expkey := exec.Command("gpg", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--export", "--armor", c+"@subutai.io")
 	expkey.Stdout = &expout
 	expkey.Stderr = &experr
@@ -230,34 +249,40 @@ func ExchageAndEncrypt(c, t string) {
 	sendData(c)
 }
 
+// ValidatePem checks if OpenSSL x509 certificate valid.
 func ValidatePem(cert string) bool {
-	out, _ := exec.Command("openssl", "x509", "-in", cert, "-text", "-noout").Output()
-	if strings.Contains(string(out), "Public Key") {
-		return true
-	}
-	return false
+	out, err := exec.Command("openssl", "x509", "-in", cert, "-text", "-noout").Output()
+	log.Check(log.DebugLevel, "Validating OpenSSL x509 certificate", err)
+	return strings.Contains(string(out), "Public Key")
 }
 
+// ParsePem return parsed OpenSSL x509 certificate.
 func ParsePem(cert string) (crt, key []byte) {
-	key, _ = exec.Command("openssl", "pkey", "-in", cert).Output()
-
-	f, err := ioutil.ReadFile(cert)
-	if !log.Check(log.DebugLevel, "Cannot read file "+cert, err) {
-		crt = bytes.Replace(f, key, []byte(""), -1)
+	var err error
+	if key, err = exec.Command("openssl", "pkey", "-in", cert).Output(); err == nil {
+		f, err := ioutil.ReadFile(cert)
+		if !log.Check(log.DebugLevel, "Cannot read file "+cert, err) {
+			crt = bytes.Replace(f, key, []byte(""), -1)
+		}
 	}
 	return crt, key
 }
 
+// KurjunUserPK gets user's public GPG-key from Kurjun.
 func KurjunUserPK(owner string) string {
-	kurjun, _ := config.CheckKurjun()
-	response, err := kurjun.Get(config.Cdn.Kurjun + "/auth/key?user=" + owner)
+	kurjun, err := config.CheckKurjun()
+	log.Check(log.DebugLevel, "Checking Kurjun", err)
+
+	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/key?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
 	defer response.Body.Close()
+
 	key, err := ioutil.ReadAll(response.Body)
 	log.Check(log.FatalLevel, "Reading key body", err)
 	return string(key)
 }
 
+// VerifySignature check if signature retrieved from Kurjun is valid.
 func VerifySignature(key, signature string) string {
 	entity, err := openpgp.ReadArmoredKeyRing(bytes.NewBufferString(key))
 	log.Check(log.WarnLevel, "Reading user public key", err)

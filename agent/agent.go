@@ -8,30 +8,34 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
 	"sync"
 	"time"
 
-	"github.com/codegangsta/cli"
+	gcli "github.com/codegangsta/cli"
 
-	"github.com/subutai-io/agent/agent/alert"
-	"github.com/subutai-io/agent/agent/connect"
-	"github.com/subutai-io/agent/agent/container"
-	"github.com/subutai-io/agent/agent/executer"
-	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/cli"
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/agent/alert"
+	"github.com/subutai-io/base/agent/agent/connect"
+	"github.com/subutai-io/base/agent/agent/container"
+	"github.com/subutai-io/base/agent/agent/executer"
+	"github.com/subutai-io/base/agent/agent/monitor"
+	"github.com/subutai-io/base/agent/agent/utils"
+	"github.com/subutai-io/base/agent/cli"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/gpg"
+	"github.com/subutai-io/base/agent/log"
 )
 
+//Response covers heartbeat date because of format required by Management server.
 type Response struct {
 	Beat Heartbeat `json:"response"`
 }
 
+//Heartbeat describes JSON formated information that Agent sends to Management server.
 type Heartbeat struct {
 	Type       string                `json:"type"`
 	Hostname   string                `json:"hostname"`
-	Id         string                `json:"id"`
+	ID         string                `json:"id"`
 	Arch       string                `json:"arch"`
 	Instance   string                `json:"instance"`
 	Interfaces []utils.Iface         `json:"interfaces,omitempty"`
@@ -53,14 +57,16 @@ var (
 
 func initAgent() {
 	// move .gnupg dir to app home
-	os.Setenv("GNUPGHOME", config.Agent.DataPrefix+".gnupg")
+	err := os.Setenv("GNUPGHOME", config.Agent.DataPrefix+".gnupg")
+	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
 	client = utils.TLSConfig()
 }
 
-func Start(c *cli.Context) {
+//Start starting Subutai Agent daemon, all required goroutines and keep working during all life cycle.
+func Start(c *gcli.Context) {
 	initAgent()
 
 	http.HandleFunc("/trigger", trigger)
@@ -68,9 +74,9 @@ func Start(c *cli.Context) {
 	http.HandleFunc("/heartbeat", heartbeatCall)
 	go http.ListenAndServe(":7070", nil)
 
-	go lib.Collect()
+	go monitor.Collect()
 	go connectionMonitor()
-	go alert.AlertProcessing()
+	go alert.Processing()
 
 	for {
 		if heartbeat() {
@@ -78,7 +84,7 @@ func Start(c *cli.Context) {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		lib.TunCheck()
+		cli.TunCheck()
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
 		}
@@ -88,7 +94,7 @@ func Start(c *cli.Context) {
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
 	if err == nil {
-		resp.Body.Close()
+		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -98,8 +104,7 @@ func checkSS() (status bool) {
 
 func connectionMonitor() {
 	for {
-		container.ContainersRestoreState()
-
+		container.StateRestore()
 		if !checkSS() {
 			time.Sleep(time.Second * 10)
 			continue
@@ -107,15 +112,15 @@ func connectionMonitor() {
 
 		if fingerprint == "" || config.Management.GpgUser == "" {
 			fingerprint = gpg.GetFingerprint("rh@subutai.io")
-			connect.Connect(config.Agent.GpgUser, config.Management.Secret)
+			connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		} else {
 			resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
 			if err == nil && resp.StatusCode == http.StatusOK {
-				resp.Body.Close()
+				log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 				log.Debug("Connection monitor check - success")
 			} else {
 				log.Debug("Connection monitor check - failed")
-				connect.Connect(config.Agent.GpgUser, config.Management.Secret)
+				connect.Request(config.Agent.GpgUser, config.Management.Secret)
 				lastHeartbeat = []byte{}
 				go heartbeat()
 			}
@@ -131,21 +136,26 @@ func heartbeat() bool {
 	if len(lastHeartbeat) > 0 && time.Since(lastHeartbeatTime) < time.Second*5 {
 		return false
 	}
-	hostname, _ = os.Hostname()
-	pool = container.GetActiveContainers(false)
+	var err error
+	hostname, err = os.Hostname()
+	if err != nil {
+		return false
+	}
+
+	pool = container.Active(false)
 	beat := Heartbeat{
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
-		Id:         fingerprint,
+		ID:         fingerprint,
 		Arch:       instanceArch,
 		Instance:   instanceType,
 		Containers: pool,
 		Interfaces: utils.GetInterfaces(),
-		Alert:      alert.CurrentAlerts(pool),
+		Alert:      alert.Current(pool),
 	}
 	res := Response{Beat: beat}
-	jbeat, _ := json.Marshal(&res)
-
+	jbeat, err := json.Marshal(&res)
+	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
 	lastHeartbeatTime = time.Now()
 	if string(jbeat) == string(lastHeartbeat) {
 		return true
@@ -161,7 +171,8 @@ func heartbeat() bool {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 	if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 		log.Debug(resp.Status)
-		resp.Body.Close()
+		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+
 		if resp.StatusCode == http.StatusAccepted {
 			return true
 		}
@@ -174,14 +185,14 @@ func execute(rsp executer.EncRequest) {
 	var req executer.Request
 	var md, contName, pub, keyring, payload string
 
-	if rsp.HostId == fingerprint {
+	if rsp.HostID == fingerprint {
 		md = gpg.DecryptWrapper(rsp.Request)
 	} else {
-		contName = nameById(rsp.HostId)
+		contName = nameByID(rsp.HostID)
 		if contName == "" {
 			lastHeartbeat = []byte{}
 			heartbeat()
-			contName = nameById(rsp.HostId)
+			contName = nameByID(rsp.HostID)
 			if contName == "" {
 				return
 			}
@@ -198,7 +209,7 @@ func execute(rsp executer.EncRequest) {
 
 	//create channels for stdout and stderr
 	sOut := make(chan executer.ResponseOptions)
-	if rsp.HostId == fingerprint {
+	if rsp.HostID == fingerprint {
 		go executer.ExecHost(req.Request, sOut)
 	} else {
 		go executer.AttachContainer(contName, req.Request, sOut)
@@ -210,16 +221,16 @@ func execute(rsp executer.EncRequest) {
 			resp := executer.Response{ResponseOpts: elem}
 			jsonR, err := json.Marshal(resp)
 			log.Check(log.WarnLevel, "Marshal response", err)
-			if rsp.HostId == fingerprint {
+			if rsp.HostID == fingerprint {
 				payload = gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jsonR)
 			} else {
 				payload = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
 			}
 			message, err := json.Marshal(map[string]string{
-				"hostId":   elem.Id,
+				"hostId":   elem.ID,
 				"response": payload,
 			})
-			log.Check(log.WarnLevel, "Marshal response json "+elem.CommandId, err)
+			log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
 			go response(message)
 		} else {
 			sOut = nil
@@ -231,7 +242,7 @@ func execute(rsp executer.EncRequest) {
 func response(msg []byte) {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
-		resp.Body.Close()
+		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 		if resp.StatusCode == http.StatusAccepted {
 			return
 		}
@@ -248,7 +259,6 @@ func command() {
 	if log.Check(log.WarnLevel, "Getting requests", err) {
 		return
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNoContent {
 		return
 	}
@@ -256,10 +266,13 @@ func command() {
 	data, err := ioutil.ReadAll(resp.Body)
 	if !log.Check(log.WarnLevel, "Reading body", err) {
 		log.Check(log.WarnLevel, "Unmarshal payload", json.Unmarshal(data, &rsp))
+
 		for _, request := range rsp {
 			go execute(request)
 		}
 	}
+	log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+
 }
 
 func ping(rw http.ResponseWriter, request *http.Request) {
@@ -289,9 +302,9 @@ func heartbeatCall(rw http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func nameById(id string) string {
+func nameByID(id string) string {
 	for _, c := range pool {
-		if c.Id == id {
+		if c.ID == id {
 			return c.Name
 		}
 	}

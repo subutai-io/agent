@@ -1,4 +1,4 @@
-package lib
+package cli
 
 import (
 	"crypto/tls"
@@ -13,10 +13,10 @@ import (
 
 	"github.com/cheggaaa/pb"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/lib/gpg"
+	"github.com/subutai-io/base/agent/log"
 )
 
 type snap struct {
@@ -27,17 +27,18 @@ type snap struct {
 	Signature map[string]string `json:"signature"`
 }
 
+// ifUpdateable returns hash string of new snap package if it available for download on repository
 func ifUpdateable(installed int) string {
 	var update []snap
 	var hash string
 
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
-	if !config.Cdn.Allowinsecure {
+	if !config.CDN.Allowinsecure {
 		client = &http.Client{}
 	}
-	resp, err := client.Get("https://" + config.Cdn.Url + ":" + config.Cdn.Sslport + "/kurjun/rest/file/info?name=subutai_")
-	log.Check(log.FatalLevel, "GET: https://"+config.Cdn.Url+":"+config.Cdn.Sslport+"/kurjun/rest/file/info?name=subutai_", err)
+	resp, err := client.Get("https://" + config.CDN.URL + ":" + config.CDN.SSLport + "/kurjun/rest/file/info?name=subutai_")
+	log.Check(log.FatalLevel, "GET: https://"+config.CDN.URL+":"+config.CDN.SSLport+"/kurjun/rest/file/info?name=subutai_", err)
 	defer resp.Body.Close()
 	js, err := ioutil.ReadAll(resp.Body)
 	log.Check(log.FatalLevel, "Reading response", err)
@@ -61,6 +62,7 @@ func ifUpdateable(installed int) string {
 	return hash
 }
 
+// verifyAuthor reads update file signature and verifies that file belongs to CI user
 func verifyAuthor(p snap) bool {
 	if _, ok := p.Signature["jenkins"]; !ok {
 		log.Debug("Update is not owned by Subutai team, ignoring")
@@ -75,6 +77,7 @@ func verifyAuthor(p snap) bool {
 	return true
 }
 
+// getInstalled returns timestamp string with date when currently installed snap package was built
 func getInstalled() string {
 	f, err := ioutil.ReadFile(config.Agent.AppPrefix + "/meta/package.yaml")
 	if !log.Check(log.DebugLevel, "Reading file package.yaml", err) {
@@ -91,6 +94,7 @@ func getInstalled() string {
 	return "0"
 }
 
+// upgradeRh gets new snap package by hash from repository and install it over old package
 func upgradeRh(hash string) {
 	log.Info("Updating Resource host")
 	file, err := os.Create("/tmp/" + hash)
@@ -98,11 +102,11 @@ func upgradeRh(hash string) {
 	defer file.Close()
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
-	if !config.Cdn.Allowinsecure {
+	if !config.CDN.Allowinsecure {
 		client = &http.Client{}
 	}
-	resp, err := client.Get("https://" + config.Cdn.Url + ":" + config.Cdn.Sslport + "/kurjun/rest/file/get?id=" + hash)
-	log.Check(log.FatalLevel, "GET: https://"+config.Cdn.Url+":"+config.Cdn.Sslport+"/kurjun/rest/file/get?id="+hash, err)
+	resp, err := client.Get("https://" + config.CDN.URL + ":" + config.CDN.SSLport + "/kurjun/rest/file/get?id=" + hash)
+	log.Check(log.FatalLevel, "GET: https://"+config.CDN.URL+":"+config.CDN.SSLport+"/kurjun/rest/file/get?id="+hash, err)
 	defer resp.Body.Close()
 	log.Info("Downloading snap package")
 	bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
@@ -122,6 +126,14 @@ func upgradeRh(hash string) {
 
 }
 
+// Update operation can be divided into two different types: container updates and Resource Host updates.
+//
+// Container updates simply perform apt-get update and upgrade operations inside target containers without any extra commands.
+// Since SS Management is just another container, the Subutai update command works fine with the management container too.
+//
+// The second type of update, a Resource Host update, checks the Subutai repository and compares available snap packages with those currently installed in the system and,
+// if a newer version is found, it downloads and installs it. Please note, system security policies requires that such commands should be performed by the superuser manually,
+// otherwise an application's attempt to update itself will be blocked.
 func Update(name string, check bool) {
 	if !lockSubutai(name + ".update") {
 		log.Error("Another update process is already running")

@@ -6,16 +6,16 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/fs"
+	"github.com/subutai-io/base/agent/log"
 
 	"github.com/jhoonb/archivex"
 )
 
 func IsRegistered(templateName string) bool {
 	returnValue := true
-	restTemplateURL := config.Cdn.Kurjun + templateName
+	restTemplateURL := config.CDN.Kurjun + templateName
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},

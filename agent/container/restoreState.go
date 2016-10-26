@@ -4,8 +4,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/log"
 )
 
 var (
@@ -16,8 +16,9 @@ func init() {
 	contsStatus = make(map[string]int)
 }
 
-func ContainersRestoreState() {
-	for _, cont := range GetActiveContainers(false) {
+// StateRestore checks container state and starting or stopping containers if required.
+func StateRestore() {
+	for _, cont := range Active(false) {
 		var start, stop bool
 
 		switch contsStatus[cont.Name] {

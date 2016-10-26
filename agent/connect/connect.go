@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/agent/agent/container"
-	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/agent/container"
+	"github.com/subutai-io/base/agent/agent/utils"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/gpg"
+	"github.com/subutai-io/base/agent/log"
 )
 
 type rHost struct {
@@ -31,7 +31,8 @@ type rHost struct {
 	Containers []container.Container `json:"hostInfos"`
 }
 
-func Connect(user, pass string) {
+//Request collecting connection request and sends to the Management server.
+func Request(user, pass string) {
 	log.Debug("Connecting to " + config.Management.Host + ":" + config.Management.Port)
 	hostname, _ := os.Hostname()
 
@@ -43,7 +44,7 @@ func Connect(user, pass string) {
 		Arch:       strings.ToUpper(runtime.GOARCH),
 		Cert:       utils.PublicCert(),
 		Ifaces:     utils.GetInterfaces(),
-		Containers: container.GetActiveContainers(true),
+		Containers: container.Active(true),
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 

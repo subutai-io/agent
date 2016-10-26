@@ -1,17 +1,26 @@
-package lib
+package cli
 
 import (
-	"io/ioutil"
 	"net"
-	"os"
 	"strings"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/lib/gpg"
+	"github.com/subutai-io/base/agent/log"
 )
 
+// LxcClone function creates new `child` container from a Subutai `parent` template.
+//
+// If the specified template argument is not deployed in system, Subutai first tries to import it, and if import succeeds, it then continues to clone from the imported template image.
+// By default, clone will use the NAT-ed network interface with IP address received from the Subutai DHCP server, but this behavior can be changed with command options described below.
+//
+// If `-i` option is defined, separate bridge interface will be created in specified VLAN and new container will receive static IP address.
+// Option `-e` writes the environment ID string inside new container.
+// Option `-t` is intended to check the origin of new container creation request during environment build.
+// This is one of the security checks which makes sure that each container creation request is authorized by registered user.
+//
+// The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envId, addr, token string) {
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
@@ -19,7 +28,7 @@ func LxcClone(parent, child, envId, addr, token string) {
 	}
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, "", token)
+		LxcImport(parent, "", token, false)
 	}
 	if container.IsContainer(child) {
 		log.Error("Container " + child + " already exist")
@@ -33,60 +42,28 @@ func LxcClone(parent, child, envId, addr, token string) {
 	}
 
 	if len(envId) != 0 {
-		setEnvironmentId(child, envId)
+		container.SetEnvID(child, envId)
 	}
 
 	if len(addr) != 0 {
 		addNetConf(child, addr)
 	}
 
-	container.SetContainerUid(child)
+	//Need to change it in parent templates
+	container.SetContainerUID(child)
 	container.SetApt(child)
-	setDns(child)
+	container.SetDNS(child)
+
+	//Security matters workaround. Need to change it in parent templates
+	container.DisableSSHPwd(child)
+
 	LxcStart(child)
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 
 }
 
-func setEnvironmentId(name, envId string) {
-	err := os.MkdirAll(config.Agent.LxcPrefix+name+"/rootfs/etc/subutai", 755)
-	log.Check(log.FatalLevel, "Creating etc/subutai directory", err)
-
-	config, err := os.Create(config.Agent.LxcPrefix + name + "/rootfs/etc/subutai/lxc-config")
-	log.Check(log.FatalLevel, "Creating lxc-config file", err)
-	defer config.Close()
-
-	_, err = config.WriteString("[Subutai-Agent]\n" + envId + "\n")
-	log.Check(log.FatalLevel, "Writing environment id to config", err)
-
-	config.Sync()
-}
-
-func setDns(name string) {
-	dns := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4.gateway")
-	if len(dns) == 0 {
-		dns = "10.10.0.254"
-	}
-
-	resolv := []byte("domain\tintra.lan\nsearch\tintra.lan\nnameserver\t" + dns + "\n")
-	log.Check(log.DebugLevel, "Writing resolv.conf.orig",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/original", resolv, 0644))
-	log.Check(log.DebugLevel, "Writing resolv.conf.tail",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/tail", resolv, 0644))
-	log.Check(log.DebugLevel, "Writing resolv.conf",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
-}
-
-func setStaticNetwork(name string) {
-	data, err := ioutil.ReadFile(config.Agent.LxcPrefix + name + "/rootfs/etc/network/interfaces")
-	log.Check(log.WarnLevel, "Opening /etc/network/interfaces", err)
-
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/network/interfaces",
-		[]byte(strings.Replace(string(data), "dhcp", "manual", 1)), 0644)
-	log.Check(log.WarnLevel, "Setting internal eth0 interface to manual", err)
-}
-
+// addNetConf adds network related configuration values to container config file
 func addNetConf(name, addr string) {
 	ipvlan := strings.Fields(addr)
 	_, network, _ := net.ParseCIDR(ipvlan[0])
@@ -97,5 +74,5 @@ func addNetConf(name, addr string) {
 		{"lxc.network.ipv4.gateway", net.IP(gw).String()},
 		{"#vlan_id", ipvlan[1]},
 	})
-	setStaticNetwork(name)
+	container.SetStaticNet(name)
 }

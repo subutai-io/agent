@@ -1,4 +1,4 @@
-package lib
+package cli
 
 import (
 	"bufio"
@@ -7,12 +7,12 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	"github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/log"
 )
 
-// LxcHostname sets the hostname of container
+// LxcHostname command changes container configs to apply a new name for the container. Used for internal SS purposes.
 func LxcHostname(c, name string) {
 	if !container.IsContainer(c) || container.IsTemplate(c) {
 		log.Error(c + " is not an container")

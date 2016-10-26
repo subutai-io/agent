@@ -1,4 +1,4 @@
-package lib
+package cli
 
 import (
 	"os"
@@ -9,17 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/agent/config"
-	lxcContainer "github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/lib/template"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/base/agent/config"
+	lxcContainer "github.com/subutai-io/base/agent/lib/container"
+	"github.com/subutai-io/base/agent/lib/fs"
+	"github.com/subutai-io/base/agent/lib/template"
+	"github.com/subutai-io/base/agent/log"
 
 	"github.com/pivotal-golang/archiver/extractor"
 )
 
+// RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
 func RestoreContainer(container, date, newContainer string) {
-	backupDir := config.Agent.LxcPrefix + "/backups/"
+	const backupDir = "/mnt/backups/"
 
 	if lxcContainer.IsContainer(newContainer) {
 		log.Fatal("Container " + newContainer + " is already exist!")
@@ -42,13 +43,13 @@ func RestoreContainer(container, date, newContainer string) {
 	tarball, _ := filepath.Glob(backupDir + container + "_" + date + "*.tar.gz")
 
 	if len(tarball) == 0 {
-		log.Fatal("Backup file for found: " + backupDir + container + "_" + date + "*.tar.gz")
+		log.Fatal("Backup file not found: " + backupDir + container + "_" + date + "*.tar.gz")
 	}
 
 	if !strings.Contains(tarball[0], "Full") {
 		// get files for unpack
-		flist = append(flist[:Position(flist, tarball[0])+1])
-		flist = append(flist[Position(flist, "Full"):])
+		flist = append(flist[:position(flist, tarball[0])+1])
+		flist = append(flist[position(flist, "Full"):])
 	} else {
 		flist = tarball
 	}
@@ -63,7 +64,7 @@ func RestoreContainer(container, date, newContainer string) {
 			os.RemoveAll(tmpUnpackDir+container))
 
 		log.Debug("unpacking " + file)
-		Unpack(file, tmpUnpackDir+container)
+		unpack(file, tmpUnpackDir+container)
 		deltas, _ := filepath.Glob(tmpUnpackDir + container + "/*.delta")
 
 		// install deltas
@@ -117,7 +118,6 @@ func RestoreContainer(container, date, newContainer string) {
 		{"lxc.network.veth.pair", strings.Replace(lxcContainer.GetConfigItem(config.Agent.LxcPrefix+newContainer+"/config", "lxc.network.hwaddr"), ":", "", -1)},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + newContainer + "/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + newContainer + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/var var none bind,rw 0 0"},
@@ -127,7 +127,8 @@ func RestoreContainer(container, date, newContainer string) {
 
 }
 
-func Position(slice []string, value string) int {
+// position returns index of string from "slice" which contains "value"
+func position(slice []string, value string) int {
 	for p, v := range slice {
 		if strings.Contains(v, value) {
 			return p
@@ -136,7 +137,8 @@ func Position(slice []string, value string) int {
 	return -1
 }
 
-func Unpack(archive, dir string) {
+// Unpack extract passed archive to directory
+func unpack(archive, dir string) {
 	tgz := extractor.NewTgz()
 	tgz.Extract(archive, dir)
 }
