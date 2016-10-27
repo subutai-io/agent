@@ -1,3 +1,4 @@
+// Monitor package gathers system statistics information and sends it to time-series database
 package monitor
 
 import (

@@ -1,9 +1,12 @@
 package fs
 
 import (
-	"github.com/subutai-io/agent/log"
 	"io"
 	"os"
+
+	"github.com/jhoonb/archivex"
+
+	"github.com/subutai-io/agent/log"
 )
 
 // Copy creates a copy of passed "source" file to "dest" file
@@ -18,4 +21,12 @@ func Copy(source string, dest string) {
 
 	_, err = io.Copy(df, sf)
 	log.Check(log.FatalLevel, "Coping file "+source+" to "+dest, err)
+}
+
+// Tar function creates archive file of specified folder
+func Tar(folder, file string) {
+	archive := new(archivex.TarFile)
+	archive.Create(file)
+	log.Check(log.FatalLevel, "Packing file "+folder, archive.AddAll(folder, false))
+	archive.Close()
 }

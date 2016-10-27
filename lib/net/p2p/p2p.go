@@ -1,3 +1,4 @@
+// p2p package provides control interface for p2p service
 package p2p
 
 import (

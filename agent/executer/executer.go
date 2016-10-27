@@ -1,3 +1,4 @@
+// Package is responsible for both - command execution inside host and container
 package executer
 
 import (

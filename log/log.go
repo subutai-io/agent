@@ -1,3 +1,4 @@
+// Log package purposed for error handling, verbosity level, output formatting, etc.
 package log
 
 import (

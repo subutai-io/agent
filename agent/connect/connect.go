@@ -1,3 +1,4 @@
+// Package connect purposed for initial data exchange between SS Management server and Subutai Agent daemon
 package connect
 
 import (

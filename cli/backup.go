@@ -15,7 +15,6 @@ import (
 	"github.com/subutai-io/agent/config"
 	lxcContainer "github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -121,7 +120,7 @@ func BackupContainer(container string, full, stop bool) {
 		lxcContainer.Start(container)
 	}
 
-	template.Tar(tmpBackupDir, tarballName)
+	fs.Tar(tmpBackupDir, tarballName)
 
 	log.Check(log.WarnLevel, "Remove tmpdir", os.RemoveAll(backupDir+"/tmpdir"))
 	log.Check(log.WarnLevel, "Deleting .backup file to "+container+" container", os.Remove(config.Agent.LxcPrefix+container+"/.backup"))

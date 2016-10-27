@@ -1,3 +1,4 @@
+// All kind of operations related to Subutai PKI are gathered in gpg package
 package gpg
 
 import (

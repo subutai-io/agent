@@ -1,3 +1,4 @@
+// fs package wraps btrfs utilities to manage filesystem snapshots, quotas, access mode, etc.
 package fs
 
 import (

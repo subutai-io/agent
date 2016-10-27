@@ -1,3 +1,4 @@
+// net package purposed to work with Subutai network components and network-related container configuration
 package net
 
 import (

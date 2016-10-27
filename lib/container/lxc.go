@@ -1,3 +1,4 @@
+//Container package main function is to provide control interface for Subutai containers through go-lxc bindings and system-level libraries and executables
 package container
 
 import (

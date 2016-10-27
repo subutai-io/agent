@@ -1,3 +1,4 @@
+// Container package gathers basic information about containers needed by Subutai Agent
 package container
 
 import (
