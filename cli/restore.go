@@ -20,7 +20,7 @@ import (
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
 func RestoreContainer(container, date, newContainer string) {
-	const backupDir = "/mnt/backups/"
+	backupDir := "/mnt/backups/"
 
 	if lxcContainer.IsContainer(newContainer) {
 		log.Fatal("Container " + newContainer + " is already exist!")

@@ -24,7 +24,7 @@ import (
 // All deltas are compressed to archives in `/mnt/backups/` directory (container_datetime.tar.gz or container_datetime_Full.tar.gz for full backup).
 // A changelog file can be found next to backups archive (container_datetime_changelog.txt or container_datetime_Full_changelog.txt) which contains a list of changes made between two backups.
 func BackupContainer(container string, full, stop bool) {
-	const backupDir = "/mnt/backups/"
+	backupDir := "/mnt/backups/"
 	var changelog []string
 
 	if !lxcContainer.IsContainer(container) {
