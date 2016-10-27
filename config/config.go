@@ -1,3 +1,4 @@
+//  Config package provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
 package config
 
 import (
