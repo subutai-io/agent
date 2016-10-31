@@ -1,3 +1,4 @@
+// Monitor package gathers system statistics information and sends it to time-series database
 package monitor
 
 import (
@@ -13,9 +14,9 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
 )
 
 var (

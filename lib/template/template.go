@@ -1,59 +1,16 @@
+// Packag template works with template deployment, configuration and initialisation
 package template
 
 import (
-	"crypto/tls"
-	"io"
-	"net/http"
-	"os"
+	"crypto/rand"
+	"fmt"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/log"
-
-	"github.com/jhoonb/archivex"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
 )
 
-func IsRegistered(templateName string) bool {
-	returnValue := true
-	restTemplateURL := config.CDN.Kurjun + templateName
-
-	client := &http.Client{}
-	if config.Management.Allowinsecure {
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client = &http.Client{Transport: tr}
-	}
-
-	resp, err := client.Get(restTemplateURL)
-	if err != nil {
-		log.Error("IsTemplateRegistered: get rest, " + err.Error())
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		returnValue = false
-	}
-	return returnValue
-}
-
-func Tar(folder, file string) {
-	archive := new(archivex.TarFile)
-	archive.Create(file)
-	log.Check(log.FatalLevel, "Packing template "+folder, archive.AddAll(folder, false))
-	archive.Close()
-}
-
-func copy(src string, dst string) {
-	sf, err := os.Open(src)
-	log.Check(log.FatalLevel, "Opening "+src, err)
-	defer sf.Close()
-
-	df, err := os.Create(dst)
-	log.Check(log.FatalLevel, "Creating "+dst, err)
-	defer df.Close()
-
-	_, err = io.Copy(df, sf)
-	log.Check(log.FatalLevel, "Copying "+dst, err)
-}
-
+// Install deploys downloaded and unpacked templates to the system
 func Install(parent, child string) {
 	delta := map[string][]string{
 		child + "/deltas/rootfs.delta": {parent + "/rootfs", child},
@@ -74,6 +31,14 @@ func Install(parent, child string) {
 	}
 
 	for _, file := range []string{"config", "fstab", "packages"} {
-		copy(config.Agent.LxcPrefix+"tmpdir/"+child+"/"+file, config.Agent.LxcPrefix+child+"/"+file)
+		fs.Copy(config.Agent.LxcPrefix+"tmpdir/"+child+"/"+file, config.Agent.LxcPrefix+child+"/"+file)
 	}
+}
+
+// Mac function generates random mac address for LXC containers
+func Mac() string {
+	buf := make([]byte, 6)
+	_, err := rand.Read(buf)
+	log.Check(log.ErrorLevel, "Generating random mac", err)
+	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 }

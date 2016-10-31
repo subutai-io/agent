@@ -3,8 +3,8 @@ package cli
 import (
 	"time"
 
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
 )
 
 // LxcStart starts a Subutai container and checks if container state changed to "running" or "starting".

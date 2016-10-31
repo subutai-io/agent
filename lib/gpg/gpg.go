@@ -1,3 +1,4 @@
+// All kind of operations related to Subutai PKI are gathered in gpg package
 package gpg
 
 import (
@@ -13,10 +14,10 @@ import (
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/clearsign"
 
-	"github.com/subutai-io/base/agent/agent/utils"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
 )
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".

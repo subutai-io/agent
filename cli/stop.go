@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/template"
+	"github.com/subutai-io/agent/log"
 )
 
 // LxcStop stops a Subutai container with an additional state check.

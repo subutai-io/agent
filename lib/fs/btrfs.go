@@ -1,3 +1,4 @@
+// fs package wraps btrfs utilities to manage filesystem snapshots, quotas, access mode, etc.
 package fs
 
 import (
@@ -8,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 // IsSubvolumeReadonly checks if BTRFS subvolume have "readonly" property.

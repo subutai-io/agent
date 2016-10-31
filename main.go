@@ -1,18 +1,21 @@
+// Subutai binary is consist of two parts: Agent and CLI
+//
+// Both packages placed in relevant directories. Detailed explanation can be found in github Wiki page: https://github.com/subutai-io/subos/wiki
 package main
 
 import (
 	"os"
 
-	"github.com/subutai-io/base/agent/agent"
-	"github.com/subutai-io/base/agent/cli"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent"
+	"github.com/subutai-io/agent/cli"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 
 	gcli "github.com/codegangsta/cli"
 )
 
-var version string = "unknown"
-var commit string = "unknown"
+var version = "unknown"
+var commit = "unknown"
 
 func init() {
 	if os.Getuid() != 0 {

@@ -1,25 +1,17 @@
 package template
 
 import (
-	"crypto/rand"
-	"fmt"
 	"os/exec"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/gpg"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
 )
 
-func Mac() string {
-	buf := make([]byte, 6)
-	_, err := rand.Read(buf)
-	log.Check(log.ErrorLevel, "Generating random mac", err)
-	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
-}
-
+// MngInit performs initial operations for SS Management deployment
 func MngInit() {
 	fs.ReadOnly("management", false)
 	container.SetContainerUID("management")
@@ -45,6 +37,7 @@ func MngInit() {
 	log.Info("********************")
 }
 
+// MngStop drops port forwarding rules needed by Management container
 func MngStop() {
 	for _, iface := range []string{"wan", "eth1", "eth2"} {
 		for _, port := range []string{"8443", "8444"} {
@@ -54,6 +47,7 @@ func MngStop() {
 	}
 }
 
+// MngDel removes Management network interfaces, resets dhcp client
 func MngDel() {
 	exec.Command("ovs-vsctl", "del-port", "wan", "management").Run()
 	exec.Command("ovs-vsctl", "del-port", "wan", "mng-gw").Run()

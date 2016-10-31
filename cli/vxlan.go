@@ -5,8 +5,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
 )
 
 // VxlanTunnel function controls Subutai VXLAN, which is network layer built on top of P2P swarms and intended to be environment communication bridges between physically separate hosts.

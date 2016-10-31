@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	lxcContainer "github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	lxcContainer "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/template"
+	"github.com/subutai-io/agent/log"
 
 	"github.com/pivotal-golang/archiver/extractor"
 )
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
 func RestoreContainer(container, date, newContainer string) {
-	const backupDir = "/mnt/backups/"
+	backupDir := "/mnt/backups/"
 
 	if lxcContainer.IsContainer(newContainer) {
 		log.Fatal("Container " + newContainer + " is already exist!")

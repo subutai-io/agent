@@ -3,9 +3,9 @@ package cli
 import (
 	"os"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
 )
 
 // LxcRename renames a Subutai container impacting filesystem paths, configuration values, etc.

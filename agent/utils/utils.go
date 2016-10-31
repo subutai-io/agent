@@ -1,3 +1,4 @@
+// Utils package contains several function with different purposes which are needed by other packages
 package utils
 
 import (
@@ -15,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 // Iface describes network interfaces of the Resource Host.

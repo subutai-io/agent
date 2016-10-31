@@ -1,3 +1,4 @@
+// Package is responsible for both - command execution inside host and container
 package executer
 
 import (
@@ -15,9 +16,9 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 
-	"github.com/subutai-io/base/agent/agent/container"
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 // EncRequest describes encrypted JSON request from Management server.

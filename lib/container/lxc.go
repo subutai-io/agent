@@ -1,3 +1,4 @@
+//Container package main function is to provide control interface for Subutai containers through go-lxc bindings and system-level libraries and executables
 package container
 
 import (
@@ -12,10 +13,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/net"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
 
 	"gopkg.in/lxc/go-lxc.v2"
 )

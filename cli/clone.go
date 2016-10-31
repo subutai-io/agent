@@ -4,10 +4,10 @@ import (
 	"net"
 	"strings"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/gpg"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/log"
 )
 
 // LxcClone function creates new `child` container from a Subutai `parent` template.

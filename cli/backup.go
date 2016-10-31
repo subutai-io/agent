@@ -12,11 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	lxcContainer "github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	lxcContainer "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
 )
 
 // BackupContainer takes a snapshots of each container's volume and stores it in the `/mnt/backups/container_name/datetime/` directory.
@@ -24,7 +23,7 @@ import (
 // All deltas are compressed to archives in `/mnt/backups/` directory (container_datetime.tar.gz or container_datetime_Full.tar.gz for full backup).
 // A changelog file can be found next to backups archive (container_datetime_changelog.txt or container_datetime_Full_changelog.txt) which contains a list of changes made between two backups.
 func BackupContainer(container string, full, stop bool) {
-	const backupDir = "/mnt/backups/"
+	backupDir := "/mnt/backups/"
 	var changelog []string
 
 	if !lxcContainer.IsContainer(container) {
@@ -121,7 +120,7 @@ func BackupContainer(container string, full, stop bool) {
 		lxcContainer.Start(container)
 	}
 
-	template.Tar(tmpBackupDir, tarballName)
+	fs.Tar(tmpBackupDir, tarballName)
 
 	log.Check(log.WarnLevel, "Remove tmpdir", os.RemoveAll(backupDir+"/tmpdir"))
 	log.Check(log.WarnLevel, "Deleting .backup file to "+container+" container", os.Remove(config.Agent.LxcPrefix+container+"/.backup"))

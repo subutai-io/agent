@@ -1,3 +1,4 @@
+//  Config package provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
 package config
 
 import (
@@ -6,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/log"
 
 	"gopkg.in/gcfg.v1"
 )

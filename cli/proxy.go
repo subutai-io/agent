@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/gpg"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -125,9 +125,9 @@ func addDomain(vlan, domain, cert string) {
 			log.Info("Cannot create key file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".key")
 			os.Exit(1)
 		}
-		addLine(confinc+vlan+".conf", "ssl_certificate /var/lib/apps/subutai/current/web/ssl/UNIXDATE.crt;",
+		addLine(confinc+vlan+".conf", "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate_key /var/lib/apps/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")

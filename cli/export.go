@@ -4,11 +4,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/subutai-io/base/agent/config"
-	"github.com/subutai-io/base/agent/lib/container"
-	"github.com/subutai-io/base/agent/lib/fs"
-	"github.com/subutai-io/base/agent/lib/template"
-	"github.com/subutai-io/base/agent/log"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -83,7 +82,7 @@ func LxcExport(name, version, prefsize string) {
 		{"subutai.template.version", srcver},
 	})
 
-	template.Tar(dst, dst+".tar.gz")
+	fs.Tar(dst, dst+".tar.gz")
 	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
 	log.Info(name + " exported to " + dst + ".tar.gz")
 }
