@@ -11,6 +11,9 @@ import (
 // LxcRename renames a Subutai container impacting filesystem paths, configuration values, etc.
 func LxcRename(src, dst string) {
 	run := false
+	if len(dst) == 0 || container.IsContainer(dst) || container.IsTemplate(dst) {
+		log.Error("Incorrect new name or instance already exist")
+	}
 	if container.State(src) == "RUNNING" {
 		run = true
 		container.Stop(src)
