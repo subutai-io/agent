@@ -294,7 +294,7 @@ func Info(command, host, interval string) {
 		return
 	}
 	if len(host) == 0 {
-		log.Error("Usage: subutai info <quota|system> <hostname> [interval]")
+		log.Error("Usage: subutai info <quota|system> <hostname>")
 	}
 
 	initdb()
