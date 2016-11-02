@@ -1,6 +1,6 @@
 APP=subutai
 CC=go
-VERSION=4.0.5-SNAPSHOT
+VERSION=4.0.5
 COMMIT=$(shell git rev-parse HEAD)
 LDFLAGS=-ldflags "-r /apps/subutai/current/lib -w -s -X main.version=${VERSION} -X main.commit=${COMMIT}"
 
