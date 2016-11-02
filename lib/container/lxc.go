@@ -91,7 +91,7 @@ func State(name string) (state string) {
 // SetApt configures APT configuration inside Subutai container.
 func SetApt(name string) {
 	root := GetParent(name)
-	for parent := name; root != parent; root = GetParent(name) {
+	for parent := name; root != parent; root = GetParent(parent) {
 		parent = root
 	}
 	if root != "master" {
