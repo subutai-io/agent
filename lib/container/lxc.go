@@ -1,4 +1,4 @@
-//Container package main function is to provide control interface for Subutai containers through go-lxc bindings and system-level libraries and executables
+//Package container main function is to provide control interface for Subutai containers through go-lxc bindings and system-level libraries and executables
 package container
 
 import (
@@ -119,8 +119,7 @@ func SetApt(name string) {
 func Start(name string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
-
-	c.Start()
+	log.Check(log.DebugLevel, "Starting LXC container", c.Start())
 
 	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); err == nil {
 		log.Check(log.WarnLevel, "Deleting .stop file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.stop"))
@@ -128,7 +127,7 @@ func Start(name string) {
 	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); os.IsNotExist(err) {
 		f, err := os.Create(config.Agent.LxcPrefix + name + "/.start")
 		log.Check(log.WarnLevel, "Creating .start file to "+name, err)
-		defer f.Close()
+		log.Check(log.WarnLevel, "Closing .start file "+name, f.Close())
 	}
 }
 
@@ -136,8 +135,7 @@ func Start(name string) {
 func Stop(name string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
-
-	c.Stop()
+	log.Check(log.DebugLevel, "Stopping LXC container", c.Stop())
 
 	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); err == nil {
 		log.Check(log.WarnLevel, "Creating .start file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.start"))
@@ -145,7 +143,7 @@ func Stop(name string) {
 	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); os.IsNotExist(err) {
 		f, err := os.Create(config.Agent.LxcPrefix + name + "/.stop")
 		log.Check(log.WarnLevel, "Creating .stop file to "+name, err)
-		defer f.Close()
+		log.Check(log.WarnLevel, "Closing .stop file "+name, f.Close())
 	}
 }
 
@@ -155,25 +153,32 @@ func AttachExec(name string, command []string) (output []string, err error) {
 		return output, errors.New("Container does not exists")
 	}
 
-	container, _ := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if container.State() != lxc.RUNNING {
+	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if container.State() != lxc.RUNNING || err != nil {
 		return output, errors.New("Container is " + container.State().String())
 	}
 
-	bufR, bufW, _ := os.Pipe()
-	bufRErr, bufWErr, _ := os.Pipe()
-	container.RunCommand(command, lxc.AttachOptions{
+	bufR, bufW, err := os.Pipe()
+	if err != nil {
+		return output, errors.New("Failed to create OS pipe")
+	}
+	bufRErr, bufWErr, err := os.Pipe()
+	if err != nil {
+		return output, errors.New("Failed to create OS pipe")
+	}
+	_, err = container.RunCommand(command, lxc.AttachOptions{
 		Namespaces: -1,
 		UID:        0,
 		GID:        0,
 		StdoutFd:   bufW.Fd(),
 		StderrFd:   bufWErr.Fd(),
 	})
+	log.Check(log.DebugLevel, "Executing command inside container", err)
 
-	bufW.Close()
+	log.Check(log.DebugLevel, "Closing write buffer for stdout", bufW.Close())
 	defer bufR.Close()
 
-	bufWErr.Close()
+	log.Check(log.DebugLevel, "Closing write buffer for stderr", bufWErr.Close())
 	defer bufRErr.Close()
 
 	out := bufio.NewScanner(bufR)
@@ -207,7 +212,7 @@ func GetParent(name string) string {
 // Clone create the duplicate container from the Subutai template.
 func Clone(parent, child string) {
 	var backend lxc.BackendStore
-	backend.Set("btrfs")
+	log.Check(log.DebugLevel, "Setting LXC backend to BTRFS", backend.Set("btrfs"))
 
 	c, err := lxc.NewContainer(parent, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+parent, err)
@@ -251,13 +256,16 @@ func ResetNet(name string) {
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, it's just return current value.
 func QuotaRAM(name string, size ...string) int {
-	c, _ := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	i, _ := strconv.Atoi(size[0])
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
+	i, err := strconv.Atoi(size[0])
+	log.Check(log.DebugLevel, "Parsing quota size", err)
 	if i > 0 {
-		c.SetMemoryLimit(lxc.ByteSize(i * 1024 * 1024))
+		log.Check(log.DebugLevel, "Setting memory limit", c.SetMemoryLimit(lxc.ByteSize(i*1024*1024)))
 		SetContainerConf(name, [][]string{{"lxc.cgroup.memory.limit_in_bytes", size[0] + "M"}})
 	}
-	limit, _ := c.MemoryLimit()
+	limit, err := c.MemoryLimit()
+	log.Check(log.DebugLevel, "Getting memory limit of container: "+name, err)
 	return int(limit / 1024 / 1024)
 }
 
@@ -265,21 +273,25 @@ func QuotaRAM(name string, size ...string) int {
 // If passed value < 100, we assume that this value mean percents.
 // If passed value > 100, we assume that this value mean MHz.
 func QuotaCPU(name string, size ...string) int {
-	c, _ := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	c, cErr := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.DebugLevel, "Looking for container: "+name, cErr)
 	cfsPeriod := 100000
-	tmp, _ := strconv.Atoi(size[0])
+	tmp, cErr := strconv.Atoi(size[0])
+	log.Check(log.DebugLevel, "Parsing quota size", cErr)
 	quota := float32(tmp)
 
 	if quota > 100 {
 		out, err := ioutil.ReadFile("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
-		freq, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+		freq, err := strconv.Atoi(strings.TrimSpace(string(out)))
+		log.Check(log.DebugLevel, "Parsing quota size", err)
 		freq = freq / 1000
 		if log.Check(log.DebugLevel, "Getting CPU max frequency", err) {
-			out, _ := ioutil.ReadFile("/proc/cpuinfo")
+			out, err := ioutil.ReadFile("/proc/cpuinfo")
 			scanner := bufio.NewScanner(bytes.NewReader(out))
-			for scanner.Scan() {
+			for scanner.Scan() && err == nil {
 				if strings.HasPrefix(scanner.Text(), "cpu MHz") {
-					freq, _ = strconv.Atoi(strings.TrimSpace(strings.Split(strings.Split(scanner.Text(), ":")[1], ".")[0]))
+					freq, err = strconv.Atoi(strings.TrimSpace(strings.Split(strings.Split(scanner.Text(), ":")[1], ".")[0]))
+					log.Check(log.DebugLevel, "Parsing quota size", err)
 					break
 				}
 			}
@@ -289,19 +301,22 @@ func QuotaCPU(name string, size ...string) int {
 
 	if size[0] != "" && State(name) == "RUNNING" {
 		value := strconv.Itoa(int(float32(cfsPeriod) * float32(runtime.NumCPU()) * quota / 100))
-		c.SetCgroupItem("cpu.cfs_quota_us", value)
+		log.Check(log.DebugLevel, "Setting cpu.cfs_quota_us", c.SetCgroupItem("cpu.cfs_quota_us", value))
+
 		SetContainerConf(name, [][]string{{"lxc.cgroup.cpu.cfs_quota_us", value}})
 	}
 
-	result, _ := strconv.Atoi(c.CgroupItem("cpu.cfs_quota_us")[0])
+	result, err := strconv.Atoi(c.CgroupItem("cpu.cfs_quota_us")[0])
+	log.Check(log.DebugLevel, "Parsing quota size", err)
 	return result * 100 / cfsPeriod / runtime.NumCPU()
 }
 
 // QuotaCPUset sets particular cores that can be used by the Subutai container.
 func QuotaCPUset(name string, size ...string) string {
-	c, _ := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	if size[0] != "" {
-		c.SetCgroupItem("cpuset.cpus", size[0])
+		log.Check(log.DebugLevel, "Setting cpuset.cpus", c.SetCgroupItem("cpuset.cpus", size[0]))
 		SetContainerConf(name, [][]string{{"lxc.cgroup.cpuset.cpus", size[0]}})
 	}
 	return c.CgroupItem("cpuset.cpus")[0]
@@ -309,7 +324,8 @@ func QuotaCPUset(name string, size ...string) string {
 
 // QuotaNet sets network bandwidth for the Subutai container.
 func QuotaNet(name string, size ...string) string {
-	c, _ := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	nic := GetConfigItem(c.ConfigFileName(), "lxc.network.veth.pair")
 	return net.RateLimit(nic, size[0])
 }
@@ -337,7 +353,7 @@ func SetContainerConf(container string, conf [][]string) {
 		}
 		newconf = newconf + newline
 	}
-	file.Close()
+	log.Check(log.DebugLevel, "Closing container configuration file", file.Close())
 
 	for i := range conf {
 		if conf[i][1] != "" {
@@ -350,13 +366,15 @@ func SetContainerConf(container string, conf [][]string) {
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.
 func GetConfigItem(path, item string) string {
-	config, _ := os.Open(path)
-	defer config.Close()
-	scanner := bufio.NewScanner(config)
-	for scanner.Scan() {
-		line := strings.Split(scanner.Text(), "=")
-		if strings.Trim(line[0], " ") == item {
-			return strings.Trim(line[1], " ")
+	if config, err := os.Open(path); err == nil {
+		defer config.Close()
+		scanner := bufio.NewScanner(config)
+		for scanner.Scan() {
+			line := strings.Split(scanner.Text(), "=")
+			if strings.Trim(line[0], " ") == item {
+				log.Debug(strings.Trim(line[1], " "))
+				return strings.Trim(line[1], " ")
+			}
 		}
 	}
 	return ""
@@ -365,14 +383,14 @@ func GetConfigItem(path, item string) string {
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) {
-	var uidlast []byte
+	uidlast, err := ioutil.ReadFile(config.Agent.LxcPrefix + "uidmaplast")
+	log.Check(log.DebugLevel, "Reading uidmaplast file", err)
 
-	uidlast, _ = ioutil.ReadFile(config.Agent.LxcPrefix + "uidmaplast")
-
-	uid, _ := strconv.Atoi(string(uidlast))
+	uid, err := strconv.Atoi(string(uidlast))
+	log.Check(log.DebugLevel, "Parsing uidlast value", err)
 	newuid := strconv.Itoa(uid + 65536)
 
-	err := ioutil.WriteFile(config.Agent.LxcPrefix+"uidmaplast", []byte(newuid), 0644)
+	err = ioutil.WriteFile(config.Agent.LxcPrefix+"uidmaplast", []byte(newuid), 0644)
 	log.Check(log.FatalLevel, "Writing new uid to map", err)
 
 	SetContainerConf(c, [][]string{
@@ -382,15 +400,20 @@ func SetContainerUID(c string) {
 		{"lxc.id_map", "g 0 " + newuid + " 65536"},
 	})
 
-	s, _ := os.Stat(config.Agent.LxcPrefix + c + "/rootfs")
-	parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
+	if s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs"); err == nil {
+		parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
-	exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
+		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
+		log.Check(log.DebugLevel, "uidmapshift home", err)
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
+		log.Check(log.DebugLevel, "uidmapshift opt", err)
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
+		log.Check(log.DebugLevel, "uidmapshift var", err)
 
-	log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
+		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
+	}
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
@@ -415,13 +438,12 @@ func SetEnvID(name, envID string) {
 	log.Check(log.FatalLevel, "Creating etc/subutai directory", err)
 
 	config, err := os.Create(config.Agent.LxcPrefix + name + "/rootfs/etc/subutai/lxc-config")
-	log.Check(log.FatalLevel, "Creating lxc-config file", err)
+	log.Check(log.FatalLevel, "Creating /etc/subutai/lxc-config file", err)
 	defer config.Close()
 
 	_, err = config.WriteString("[Subutai-Agent]\n" + envID + "\n")
 	log.Check(log.FatalLevel, "Writing environment id to config", err)
-
-	config.Sync()
+	log.Check(log.DebugLevel, "Synced /etc/subutai/lxc-config", config.Sync())
 }
 
 // SetStaticNet sets static IP-address for the Subutai container.
