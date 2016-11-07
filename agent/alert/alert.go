@@ -1,4 +1,4 @@
-// Alert package is responsible for resource usage tracking, quota threshold checking and alerting triggers
+// Package alert is responsible for resource usage tracking, quota threshold checking and alerting triggers
 package alert
 
 import (

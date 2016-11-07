@@ -1,4 +1,4 @@
-// Utils package contains several function with different purposes which are needed by other packages
+// Package utils contains several function with different purposes which are needed by other packages
 package utils
 
 import (
