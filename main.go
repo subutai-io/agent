@@ -82,7 +82,7 @@ func main() {
 
 		Name: "cleanup", Usage: "clean Subutai environment",
 		Action: func(c *gcli.Context) error {
-			cli.Cleanup(c.Args().Get(0))
+			cli.LxcDestroy(c.Args().Get(0), true)
 			return nil
 		}}, {
 
@@ -115,8 +115,11 @@ func main() {
 		}}, {
 
 		Name: "destroy", Usage: "destroy Subutai container",
+		Flags: []gcli.Flag{
+			gcli.BoolFlag{Name: "vlan, v", Usage: "destroy environment by passed vlan"},
+		},
 		Action: func(c *gcli.Context) error {
-			cli.LxcDestroy(c.Args().Get(0))
+			cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
 			return nil
 		}}, {
 

@@ -196,8 +196,6 @@ func Destroy(name string) {
 		log.Check(log.FatalLevel, "Stopping container", c.Stop())
 	}
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
-
-	log.Info(name + " destroyed")
 }
 
 // GetParent return a parent of the Subutai container.
