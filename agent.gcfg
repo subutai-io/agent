@@ -26,5 +26,5 @@ db = metrics
 
 [template]
 version = 4.0.7
-branch = dev
+branch = 
 arch = amd64
