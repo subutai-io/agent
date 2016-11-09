@@ -25,6 +25,6 @@ pass = root
 db = metrics
 
 [template]
-version = 4.0.6
+version = 4.0.7
 branch = dev
 arch = amd64
