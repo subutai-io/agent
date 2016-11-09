@@ -39,6 +39,7 @@ try {
 		sh """
 			export GOPATH=${workspace}/${goenvDir}
 			export GOBIN=${workspace}/${goenvDir}/bin
+			export GIT_BRANCH=${env.BRANCH_NAME}
 			make
 		"""
 
