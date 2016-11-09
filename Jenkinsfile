@@ -39,6 +39,7 @@ try {
 		sh """
 			export GOPATH=${workspace}/${goenvDir}
 			export GOBIN=${workspace}/${goenvDir}/bin
+			export GIT_BRANCH=${env.BRANCH_NAME}
 			make
 		"""
 
@@ -70,6 +71,10 @@ try {
 		dir("subutai/etc") {
 			unstash 'agent.gcfg'
 		}
+
+		sh """
+			sed 's/branch =.*/branch = ${env.BRANCH_NAME}/g' -i subutai/etc/agent.gcfg
+		"""
 
 		withCredentials([[$class: 'UsernamePasswordMultiBinding', 
 			credentialsId: 'hub-optdyn-github-auth', 
