@@ -2,7 +2,7 @@ APP=subutai
 CC=go
 CONFIG=agent.gcfg
 VERSION=$(shell grep version ${CONFIG} | awk '{print $$3}')
-BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
 ifneq (${BRANCH}, )
 	VERSION:=${VERSION}-SNAPSHOT
 endif
