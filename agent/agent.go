@@ -1,4 +1,4 @@
-// Subutai Agent is a daemon written in Golang whose main task is to receive commands from the Subutai Social management server and execute them on Resource Hosts.
+// Package agent is a Subutai Agent daemon written in Golang whose main task is to receive commands from the Subutai Social management server and execute them on Resource Hosts.
 // Behind such a seemingly simple task are complex procedures like bidirectional ssl communication, gpg message encryption, different health and security checks, etc.
 package agent
 
@@ -29,12 +29,12 @@ import (
 )
 
 //Response covers heartbeat date because of format required by Management server.
-type Response struct {
-	Beat Heartbeat `json:"response"`
+type response struct {
+	Beat heartbeat `json:"response"`
 }
 
-//Heartbeat describes JSON formated information that Agent sends to Management server.
-type Heartbeat struct {
+//heartbeat describes JSON formated information that Agent sends to Management server.
+type heartbeat struct {
 	Type       string                `json:"type"`
 	Hostname   string                `json:"hostname"`
 	ID         string                `json:"id"`
@@ -81,7 +81,7 @@ func Start(c *gcli.Context) {
 	go alert.Processing()
 
 	for {
-		if heartbeat() {
+		if sendHeartbeat() {
 			time.Sleep(30 * time.Second)
 		} else {
 			time.Sleep(5 * time.Second)
@@ -124,7 +124,7 @@ func connectionMonitor() {
 				log.Debug("Connection monitor check - failed")
 				connect.Request(config.Agent.GpgUser, config.Management.Secret)
 				lastHeartbeat = []byte{}
-				go heartbeat()
+				go sendHeartbeat()
 			}
 		}
 
@@ -132,7 +132,7 @@ func connectionMonitor() {
 	}
 }
 
-func heartbeat() bool {
+func sendHeartbeat() bool {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if len(lastHeartbeat) > 0 && time.Since(lastHeartbeatTime) < time.Second*5 {
@@ -145,7 +145,7 @@ func heartbeat() bool {
 	}
 
 	pool = container.Active(false)
-	beat := Heartbeat{
+	beat := heartbeat{
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
 		ID:         fingerprint,
@@ -155,7 +155,7 @@ func heartbeat() bool {
 		Interfaces: utils.GetInterfaces(),
 		Alert:      alert.Current(pool),
 	}
-	res := Response{Beat: beat}
+	res := response{Beat: beat}
 	jbeat, err := json.Marshal(&res)
 	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
 	lastHeartbeatTime = time.Now()
@@ -193,7 +193,7 @@ func execute(rsp executer.EncRequest) {
 		contName = nameByID(rsp.HostID)
 		if contName == "" {
 			lastHeartbeat = []byte{}
-			heartbeat()
+			sendHeartbeat()
 			contName = nameByID(rsp.HostID)
 			if contName == "" {
 				return
@@ -233,15 +233,15 @@ func execute(rsp executer.EncRequest) {
 				"response": payload,
 			})
 			log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
-			go response(message)
+			go sendResponse(message)
 		} else {
 			sOut = nil
 		}
 	}
-	go heartbeat()
+	go sendHeartbeat()
 }
 
-func response(msg []byte) {
+func sendResponse(msg []byte) {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
@@ -250,7 +250,7 @@ func response(msg []byte) {
 		}
 	}
 	time.Sleep(time.Second * 5)
-	go response(msg)
+	go sendResponse(msg)
 
 }
 
@@ -298,7 +298,7 @@ func heartbeatCall(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusOK)
 		lastHeartbeat = []byte{}
-		heartbeat()
+		sendHeartbeat()
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}

@@ -82,7 +82,7 @@ func main() {
 
 		Name: "cleanup", Usage: "clean Subutai environment",
 		Action: func(c *gcli.Context) error {
-			cli.Cleanup(c.Args().Get(0))
+			cli.LxcDestroy(c.Args().Get(0), true)
 			return nil
 		}}, {
 
@@ -115,8 +115,11 @@ func main() {
 		}}, {
 
 		Name: "destroy", Usage: "destroy Subutai container",
+		Flags: []gcli.Flag{
+			gcli.BoolFlag{Name: "vlan, v", Usage: "destroy environment by passed vlan"},
+		},
 		Action: func(c *gcli.Context) error {
-			cli.LxcDestroy(c.Args().Get(0))
+			cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
 			return nil
 		}}, {
 
@@ -167,51 +170,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "management_network", Usage: "configure management network",
-		Subcommands: []gcli.Command{
-			{
-				Name:  "tunnel",
-				Usage: "tunnels operation",
-				Flags: []gcli.Flag{
-					gcli.StringFlag{Name: "create, c", Usage: "create vxlan tunnel"},
-					gcli.StringFlag{Name: "delete, d", Usage: "delete vxlan tunnel"},
-					gcli.BoolFlag{Name: "list, l", Usage: "list vxlan tunnels"},
-
-					gcli.StringFlag{Name: "remoteip, r", Usage: "vxlan tunnel remote ip"},
-					gcli.StringFlag{Name: "vlan, vl", Usage: "tunnel vlan"},
-					gcli.StringFlag{Name: "vni, v", Usage: "vxlan tunnel vni"},
-				},
-				Action: func(c *gcli.Context) error {
-					cli.VxlanTunnel(c.String("c"), c.String("d"), c.String("r"), c.String("vl"), c.String("v"), c.Bool("l"))
-					return nil
-				}}, {
-
-				Name:  "detect",
-				Usage: "detect resource host IP",
-				Action: func(c *gcli.Context) error {
-					cli.Info("ipaddr", "", "")
-					return nil
-				}}, {
-
-				Name:  "p2p",
-				Usage: "p2p network operation",
-				Flags: []gcli.Flag{
-					gcli.BoolFlag{Name: "create, c", Usage: "create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
-					gcli.BoolFlag{Name: "delete, d", Usage: "delete p2p instance by swarm hash"},
-					gcli.BoolFlag{Name: "update, u", Usage: "update p2p instance encryption key (hash newkey ttl)"},
-					gcli.BoolFlag{Name: "list, l", Usage: "list of p2p instances"},
-					gcli.BoolFlag{Name: "peers, p", Usage: "list of p2p swarm participants by hash"},
-					gcli.BoolFlag{Name: "version, v", Usage: "print p2p version"}},
-				Action: func(c *gcli.Context) error {
-					if c.Bool("v") {
-						cli.P2Pversion()
-					} else {
-						cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
-					}
-					return nil
-				}}},
-	}, {
-
 		Name: "metrics", Usage: "list Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "start, s", Usage: "start time"},
@@ -233,7 +191,6 @@ func main() {
 			if c.Bool("v") {
 				cli.P2Pversion()
 			} else {
-				os.Args = append([]string{""}, os.Args...) //workaround to keep compatibility for management_network and p2p bindings
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
 			}
 			return nil

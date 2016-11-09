@@ -15,36 +15,36 @@ import (
 // It doesn't matter where the containers are physically located.
 func P2P(create, remove, update, list, peers bool, args []string) {
 	if create {
-		if len(args) > 9 {
-			p2p.Create(args[4], args[8], args[5], args[6], args[7], args[9]) //p2p -c interfaceName hash key ttl localPeepIPAddr portRange
+		if len(args) > 8 {
+			p2p.Create(args[3], args[7], args[4], args[5], args[6], args[8]) //p2p -c interfaceName hash key ttl localPeepIPAddr portRange
 
-		} else if len(args) > 8 {
-			if strings.Contains(args[8], "-") {
-				p2p.Create(args[4], "dhcp", args[5], args[6], args[7], args[8]) //p2p -c interfaceName hash key ttl portRange
-			} else {
-				p2p.Create(args[4], args[8], args[5], args[6], args[7], "") //p2p -c interfaceName hash key ttl localPeepIPAddr
-			}
 		} else if len(args) > 7 {
-			p2p.Create(args[4], "dhcp", args[5], args[6], args[7], "") //p2p -c interfaceName hash key ttl
+			if strings.Contains(args[7], "-") {
+				p2p.Create(args[3], "dhcp", args[4], args[5], args[6], args[7]) //p2p -c interfaceName hash key ttl portRange
+			} else {
+				p2p.Create(args[3], args[7], args[4], args[5], args[6], "") //p2p -c interfaceName hash key ttl localPeepIPAddr
+			}
+		} else if len(args) > 6 {
+			p2p.Create(args[3], "dhcp", args[4], args[5], args[6], "") //p2p -c interfaceName hash key ttl
 		} else {
 			log.Error("Wrong usage")
 		}
 
 	} else if update {
-		if len(args) < 7 {
+		if len(args) < 6 {
 			log.Error("Wrong usage")
 		}
-		p2p.UpdateKey(args[4], args[5], args[6])
+		p2p.UpdateKey(args[3], args[4], args[5])
 
 	} else if remove {
-		if len(args) < 5 {
+		if len(args) < 4 {
 			log.Error("Wrong usage")
 		}
-		p2p.Remove(args[4])
+		p2p.Remove(args[3])
 
 	} else if peers {
-		if len(args) < 4 {
-			p2p.Peers(args[4])
+		if len(args) < 3 {
+			p2p.Peers(args[3])
 		} else {
 			p2p.Peers("")
 		}
