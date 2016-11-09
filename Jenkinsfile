@@ -71,6 +71,10 @@ try {
 			unstash 'agent.gcfg'
 		}
 
+		sh """
+			sed 's/branch =.*/branch = ${env.BRANCH_NAME}/g' -i subutai/etc/agent.gcfg
+		"""
+
 		withCredentials([[$class: 'UsernamePasswordMultiBinding', 
 			credentialsId: 'hub-optdyn-github-auth', 
 			passwordVariable: 'GIT_PASSWORD', 
