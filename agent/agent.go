@@ -4,12 +4,15 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"sync"
 	"time"
@@ -79,6 +82,13 @@ func Start(c *gcli.Context) {
 	go monitor.Collect()
 	go connectionMonitor()
 	go alert.Processing()
+
+	go func() {
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
+		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", <-s))
+		forceHeartbeat()
+	}()
 
 	for {
 		if sendHeartbeat() {
@@ -181,6 +191,13 @@ func sendHeartbeat() bool {
 	}
 	lastHeartbeat = []byte{}
 	return false
+}
+
+func forceHeartbeat() {
+	lastHeartbeat = []byte{}
+	lastHeartbeatTime = *new(time.Time)
+	sendHeartbeat()
+	os.Exit(0)
 }
 
 func execute(rsp executer.EncRequest) {
