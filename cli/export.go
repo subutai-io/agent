@@ -53,10 +53,10 @@ func LxcExport(name, version, prefsize string) {
 	os.MkdirAll(dst+"/deltas", 0755)
 	os.MkdirAll(dst+"/diff", 0755)
 
-	fs.Send(config.Agent.LxcPrefix+parent+"/rootfs", config.Agent.LxcPrefix+name+"/rootfs", dst+"/deltas/rootfs.delta")
-	fs.Send(config.Agent.LxcPrefix+parent+"/home", config.Agent.LxcPrefix+name+"/home", dst+"/deltas/home.delta")
-	fs.Send(config.Agent.LxcPrefix+parent+"/opt", config.Agent.LxcPrefix+name+"/opt", dst+"/deltas/opt.delta")
-	fs.Send(config.Agent.LxcPrefix+parent+"/var", config.Agent.LxcPrefix+name+"/var", dst+"/deltas/var.delta")
+	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
+		err := fs.Send(config.Agent.LxcPrefix+parent+"/"+vol, config.Agent.LxcPrefix+name+"/"+vol, dst+"/deltas/"+vol+".delta")
+		log.Check(log.FatalLevel, "Sending delta "+dst+"/deltas/"+vol+".delta", err)
+	}
 
 	// changeConfigFile(name, packageVersion, dst)
 	container.SetContainerConf(name, [][]string{
