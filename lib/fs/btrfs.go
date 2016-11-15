@@ -125,10 +125,7 @@ func Send(src, dst, delta string) error {
 		} else {
 			err = exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
 		}
-
-		if err != nil {
-			return err
-		}
+		return err
 	}
 	return nil
 }
