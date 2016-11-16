@@ -4,6 +4,7 @@ package fs
 import (
 	"bufio"
 	"bytes"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -105,16 +106,28 @@ func Receive(src, dst, delta string, parent bool) {
 }
 
 // Send creates delta-file using BTRFS subvolume, it can depend on some parent.
-func Send(src, dst, delta string) {
-	newdelta, err := os.Create(delta)
-	log.Check(log.FatalLevel, "Creating delta "+delta, err)
-	args := []string{"send", "-p", src, dst}
-	if src == dst {
-		args = []string{"send", dst}
+func Send(src, dst, delta string) error {
+	tmpDir, err := ioutil.TempDir(config.Agent.LxcPrefix+"tmpdir/", "export")
+	if err != nil {
+		return err
 	}
-	send := exec.Command("btrfs", args...)
-	send.Stdout = newdelta
-	log.Check(log.FatalLevel, "Sending delta "+delta, send.Run())
+	defer os.RemoveAll(tmpDir)
+
+	if path := strings.Split(dst, "/"); len(path) > 0 {
+		tmpVolume := tmpDir + "/" + path[len(path)-1]
+
+		SubvolumeClone(dst, tmpVolume)
+		defer SubvolumeDestroy(tmpVolume)
+		SetVolReadOnly(tmpVolume, true)
+
+		if src != dst {
+			err = exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
+		} else {
+			err = exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
+		}
+		return err
+	}
+	return nil
 }
 
 // ReadOnly sets readonly flag for Subutai container.
