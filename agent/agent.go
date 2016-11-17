@@ -245,12 +245,14 @@ func execute(rsp executer.EncRequest) {
 			} else {
 				payload = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
 			}
-			message, err := json.Marshal(map[string]string{
-				"hostId":   elem.ID,
-				"response": payload,
-			})
-			log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
-			go sendResponse(message)
+			if len(payload) != 0 {
+				message, err := json.Marshal(map[string]string{
+					"hostId":   elem.ID,
+					"response": payload,
+				})
+				log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
+				go sendResponse(message)
+			}
 		} else {
 			sOut = nil
 		}
