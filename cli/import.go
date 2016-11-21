@@ -229,6 +229,12 @@ func lockSubutai(file string) bool {
 
 	err = lock.TryLock()
 	if log.Check(log.DebugLevel, "Locking file "+file, err) {
+		if p, err := lock.GetOwner(); err == nil {
+			cmd, err := ioutil.ReadFile(fmt.Sprintf("/proc/%v/cmdline", p.Pid))
+			if err != nil || !(strings.Contains(string(cmd), "subutai") && strings.Contains(string(cmd), "import")) {
+				log.Check(log.DebugLevel, "Removing broken lockfile /var/run/lock/subutai."+file, os.Remove("/var/run/lock/subutai."+file))
+			}
+		}
 		return false
 	}
 
