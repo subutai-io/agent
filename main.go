@@ -196,6 +196,12 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "portmap", Usage: "map external port to the container socket",
+		Action: func(c *gcli.Context) error {
+			cli.PortMap()
+			return nil
+		}}, {
+
 		Name: "promote", Usage: "promote Subutai container",
 		Action: func(c *gcli.Context) error {
 			cli.LxcPromote(c.Args().Get(0))
