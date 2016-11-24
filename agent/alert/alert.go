@@ -207,13 +207,17 @@ func alertLoad() (load map[string]Load) {
 		disk := []hdd{}
 		for _, v := range []string{"rootfs", "opt", "var", "home"} {
 			diskValues := diskQuota(diskIDs["lib/lxc/"+cont.Name()+"/"+v], diskMap)
-			disk = append(disk, hdd{Current: diskValues[0], Quota: diskValues[1], Partition: v})
+			if len(diskValues) > 1 {
+				disk = append(disk, hdd{Current: diskValues[0], Quota: diskValues[1], Partition: v})
+			}
 		}
 
-		load[cont.Name()] = Load{
-			CPU:  &values{Current: cpuValues[0], Quota: cpuValues[1]},
-			RAM:  &values{Current: ramValues[0], Quota: ramValues[1]},
-			Disk: disk,
+		if len(cpuValues) > 1 && len(ramValues) > 1 {
+			load[cont.Name()] = Load{
+				CPU:  &values{Current: cpuValues[0], Quota: cpuValues[1]},
+				RAM:  &values{Current: ramValues[0], Quota: ramValues[1]},
+				Disk: disk,
+			}
 		}
 	}
 	return load
