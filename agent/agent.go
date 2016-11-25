@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -25,7 +26,6 @@ import (
 	"github.com/subutai-io/agent/agent/executer"
 	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
@@ -96,7 +96,7 @@ func Start(c *gcli.Context) {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		cli.TunCheck()
+		exec.Command("subutai", "tunnel", "check").Start()
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
 		}

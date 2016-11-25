@@ -314,6 +314,12 @@ func main() {
 				Action: func(c *gcli.Context) error {
 					cli.TunList()
 					return nil
+				}}, {
+				Name:  "check",
+				Usage: "check active ssh tunnels",
+				Action: func(c *gcli.Context) error {
+					cli.TunCheck()
+					return nil
 				}},
 		}}, {
 
