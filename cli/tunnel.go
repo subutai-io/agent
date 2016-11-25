@@ -98,9 +98,7 @@ func TunDel(socket string, pid ...string) {
 			if err == nil && strings.Contains(string(f), row[1]) {
 				pid, err := strconv.Atoi(row[3])
 				log.Check(log.FatalLevel, "Converting pid to int", err)
-				pgid, err := syscall.Getpgid(pid)
-				log.Check(log.FatalLevel, "Getting process group id", err)
-				log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(-pgid, 15))
+				log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(pid, 15))
 			}
 		}
 	}

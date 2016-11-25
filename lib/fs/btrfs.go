@@ -46,21 +46,25 @@ func SubvolumeClone(src, dst string) {
 // SubvolumeDestroy deletes BTRFS subvolume and all subdirectories.
 // It also destroys quota groups.
 func SubvolumeDestroy(path string) {
+	svol := []string{path}
 	if !IsSubvolume(path) {
-		return
+		svol = []string{path + "/var", path + "/opt", path + "/home", path + "/rootfs"}
 	}
-	nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", path).Output()
-	log.Check(log.DebugLevel, "Getting nested subvolumes in "+path, err)
-	scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 8 {
-			SubvolumeDestroy(GetBtrfsRoot() + line[8])
+	for _, v := range svol {
+		nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", v).Output()
+		log.Check(log.DebugLevel, "Getting nested subvolumes in "+v, err)
+		scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
+		for scanner.Scan() {
+			line := strings.Fields(scanner.Text())
+			if len(line) > 8 {
+				SubvolumeDestroy(GetBtrfsRoot() + line[8])
+			}
 		}
+		qgroupDestroy(v)
+		out, err := exec.Command("btrfs", "subvolume", "delete", v).CombinedOutput()
+		log.Check(log.DebugLevel, "Destroying subvolume "+v+": "+string(out), err)
 	}
-	qgroupDestroy(path)
-	out, err := exec.Command("btrfs", "subvolume", "delete", path).CombinedOutput()
-	log.Check(log.DebugLevel, "Destroying subvolume "+path+": "+string(out), err)
+	log.Check(log.DebugLevel, "Removing path "+path, exec.Command("rm", "-rf", path).Run())
 }
 
 // qgroupDestroy delete quota group for BTRFS subvolume.
@@ -204,7 +208,7 @@ func Quota(path string, size ...string) string {
 // GetBtrfsRoot returns BTRFS root
 func GetBtrfsRoot() string {
 	data, err := exec.Command("findmnt", "-nT", config.Agent.LxcPrefix).Output()
-	log.Check(log.FatalLevel, "Find btrfs mount point", err)
+	log.Check(log.FatalLevel, "Searching btrfs mount point", err)
 
 	line := strings.Fields(string(data))
 	return (line[0] + "/")

@@ -196,6 +196,12 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "portmap", Usage: "map external port to the container socket",
+		Action: func(c *gcli.Context) error {
+			cli.PortMap()
+			return nil
+		}}, {
+
 		Name: "promote", Usage: "promote Subutai container",
 		Action: func(c *gcli.Context) error {
 			cli.LxcPromote(c.Args().Get(0))
@@ -307,6 +313,12 @@ func main() {
 				Usage: "list active ssh tunnels",
 				Action: func(c *gcli.Context) error {
 					cli.TunList()
+					return nil
+				}}, {
+				Name:  "check",
+				Usage: "check active ssh tunnels",
+				Action: func(c *gcli.Context) error {
+					cli.TunCheck()
 					return nil
 				}},
 		}}, {

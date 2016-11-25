@@ -66,13 +66,28 @@ func LxcClone(parent, child, envId, addr, token string) {
 // addNetConf adds network related configuration values to container config file
 func addNetConf(name, addr string) {
 	ipvlan := strings.Fields(addr)
-	_, network, _ := net.ParseCIDR(ipvlan[0])
-	gw := []byte(network.IP)
-	gw[3]++
+	gateway := getEnvGw(ipvlan[1])
+	if len(gateway) == 0 {
+		ipaddr, network, _ := net.ParseCIDR(ipvlan[0])
+		gw := []byte(network.IP)
+		ip := []byte(ipaddr.To4())
+		gw[3] = gw[3] + 255 - ip[3]
+		gateway = net.IP(gw).String()
+	}
+
 	container.SetContainerConf(name, [][]string{
 		{"lxc.network.ipv4", ipvlan[0]},
-		{"lxc.network.ipv4.gateway", net.IP(gw).String()},
+		{"lxc.network.ipv4.gateway", gateway},
 		{"#vlan_id", ipvlan[1]},
 	})
 	container.SetStaticNet(name)
+}
+
+func getEnvGw(vlan string) string {
+	for _, v := range container.Containers() {
+		if container.GetConfigItem(config.Agent.LxcPrefix+v+"/config", "#vlan_id") == vlan {
+			return container.GetConfigItem(config.Agent.LxcPrefix+v+"/config", "lxc.network.ipv4.gateway")
+		}
+	}
+	return ""
 }
