@@ -255,7 +255,7 @@ func ExchageAndEncrypt(c, t string) {
 func ValidatePem(cert string) bool {
 	out, err := exec.Command("openssl", "x509", "-in", cert, "-text", "-noout").Output()
 	log.Check(log.DebugLevel, "Validating OpenSSL x509 certificate", err)
-	return strings.Contains(string(out), "Public Key")
+	return strings.Contains(string(out), "Public Key") && strings.Contains(string(out), "X509")
 }
 
 // ParsePem return parsed OpenSSL x509 certificate.
