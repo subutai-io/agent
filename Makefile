@@ -1,6 +1,6 @@
 APP=subutai
 CC=go
-VERSION=$(shell git describe --abbrev=0 --tags)
+VERSION=$(shell git describe --abbrev=0 --tags | awk -F'.' '{print $$1"."$$2"."$$3+1}')
 ifeq (${GIT_BRANCH}, )
 	GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
 endif
