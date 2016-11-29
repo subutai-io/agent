@@ -25,8 +25,8 @@ try {
 			set +x
 			version=git describe --abbrev=0 --tags | tr -d '\n'
 			[[ "\$version" =~ (.*)([0-9]+)([^0-9]*)\$ ]] && version="\${BASH_REMATCH[1]}\$((\${BASH_REMATCH[2]} + 1))\${BASH_REMATCH[3]}";
-			echo \$version
-			""", returnStdout: true)
+			echo \$version | tr -d '\n'
+			""", returnStdout: true).trim()
 
 		stage("Prepare GOENV")
 		/* Creating GOENV path
