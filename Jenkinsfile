@@ -21,7 +21,12 @@ try {
 		checkout scm
 
 		agentCommitId = sh (script: "git rev-parse HEAD", returnStdout: true)
-		agentVersion = sh (script: "git describe --abbrev=0 --tags | tr -d '\n'", returnStdout: true)
+		agentVersion = sh (script: """
+			set +x
+			version=git describe --abbrev=0 --tags | tr -d '\n'
+			[[ "\$version" =~ (.*)([0-9]+)([^0-9]*)\$ ]] && version="\${BASH_REMATCH[1]}\$((\${BASH_REMATCH[2]} + 1))\${BASH_REMATCH[3]}";
+			echo \$version
+			""", returnStdout: true)
 
 		stage("Prepare GOENV")
 		/* Creating GOENV path
