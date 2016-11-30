@@ -2,6 +2,7 @@
 
 notifyBuildDetails = ""
 agentCommitId = ""
+agentVersion = ""
 
 try {
 	notifyBuild('STARTED')
@@ -20,6 +21,12 @@ try {
 		checkout scm
 
 		agentCommitId = sh (script: "git rev-parse HEAD", returnStdout: true)
+		agentVersion = sh (script: """
+			set +x
+			version=\$(git describe --abbrev=0 --tags | tr -d '\n')
+			[[ "\$version" =~ (.*)([0-9]+)([^0-9]*)\$ ]] && version="\${BASH_REMATCH[1]}\$((\${BASH_REMATCH[2]} + 1))\${BASH_REMATCH[3]}";
+			echo \$version | tr -d '\n'
+			""", returnStdout: true).trim()
 
 		stage("Prepare GOENV")
 		/* Creating GOENV path
@@ -45,7 +52,6 @@ try {
 
 		/* stash subutai binary and agent config file to use it in next node() */
 		stash includes: 'subutai', name: 'subutai'
-		stash includes: 'agent.gcfg', name: 'agent.gcfg'
 	}
 
 	node() {
@@ -62,18 +68,13 @@ try {
 		git branch: "${env.BRANCH_NAME}", changelog: false, credentialsId: 'hub-optdyn-github-auth', poll: false, url: "https://${subosRepoName}"
 
 		/* replace subutai binary */
-		// sh """
-		// 	if test -f subutai/bin/subutai; then rm subutai/bin/subutai; fi
-		// """
 		dir("subutai/bin") {
 			unstash 'subutai'
-		}
-		dir("subutai/etc") {
-			unstash 'agent.gcfg'
 		}
 
 		sh """
 			sed 's/branch =.*/branch = ${env.BRANCH_NAME}/g' -i subutai/etc/agent.gcfg
+			sed 's/version =.*/version = ${agentVersion}/g' -i subutai/etc/agent.gcfg
 		"""
 
 		withCredentials([[$class: 'UsernamePasswordMultiBinding', 
