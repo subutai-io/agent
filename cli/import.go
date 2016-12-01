@@ -63,8 +63,8 @@ func templId(t *templ, kurjun *http.Client, token string) {
 	}
 
 	response, err := kurjun.Get(url)
+	log.Check(log.ErrorLevel, "Retrieving id, get: "+url, err)
 	defer response.Body.Close()
-	log.Debug("Retrieving id, get: " + url)
 
 	if err == nil && response.StatusCode == 404 && t.name == "management" {
 		log.Warn("Requested management version not found, getting latest available")
