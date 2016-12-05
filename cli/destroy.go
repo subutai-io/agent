@@ -29,7 +29,7 @@ func LxcDestroy(id string, vlan bool) {
 
 	if strings.HasPrefix(id, "id:") {
 		for _, c := range container.Containers() {
-			if strings.TrimPrefix(id, "id:") == gpg.GetFingerprint(c) {
+			if strings.ToUpper(strings.TrimPrefix(id, "id:")) == gpg.GetFingerprint(c) {
 				container.Destroy(c)
 				break
 			}
