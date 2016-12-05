@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"strings"
+
 	"github.com/influxdata/influxdb/client/v2"
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/lib/net/p2p"
 	"github.com/subutai-io/agent/lib/template"
@@ -23,6 +26,16 @@ func LxcDestroy(id string, vlan bool) {
 	if len(id) == 0 {
 		log.Error("Please specify container/template name or vlan id")
 	}
+
+	if strings.HasPrefix(id, "id:") {
+		for _, c := range container.Containers() {
+			if strings.TrimPrefix(id, "id:") == gpg.GetFingerprint(c) {
+				container.Destroy(c)
+				break
+			}
+		}
+	}
+
 	if vlan {
 		for _, c := range container.Containers() {
 			if container.GetConfigItem(config.Agent.LxcPrefix+c+"/config", "#vlan_id") == id {
