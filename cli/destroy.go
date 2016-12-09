@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"strings"
 
 	"github.com/influxdata/influxdb/client/v2"
@@ -22,7 +23,7 @@ import (
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
 func LxcDestroy(id string, vlan bool) {
 	var v string
-
+	var msg string
 	if len(id) == 0 {
 		log.Error("Please specify container/template name or vlan id")
 	}
@@ -30,6 +31,10 @@ func LxcDestroy(id string, vlan bool) {
 	if strings.HasPrefix(id, "id:") {
 		for _, c := range container.Containers() {
 			if strings.ToUpper(strings.TrimPrefix(id, "id:")) == gpg.GetFingerprint(c) {
+				msg = id + " is destroyed"
+				if _, err := os.Stat(config.Agent.LxcPrefix + id); os.IsNotExist(err) {
+					msg = id + " not found. Please check if a container name is correct."
+				}
 				container.Destroy(c)
 				break
 			}
@@ -44,6 +49,11 @@ func LxcDestroy(id string, vlan bool) {
 		}
 		cleanupNet(id)
 	} else {
+		if _, err := os.Stat(config.Agent.LxcPrefix + id); os.IsNotExist(err) && len(msg) == 0 {
+			msg = id + " not found. Please check if a container name is correct."
+		} else {
+			msg = id + " is destroyed"
+		}
 		net.DelIface(container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "lxc.network.veth.pair"))
 		container.Destroy(id)
 	}
@@ -66,7 +76,7 @@ func LxcDestroy(id string, vlan bool) {
 		template.MngStop()
 		template.MngDel()
 	}
-	log.Info(id + " is destroyed")
+	log.Info(msg)
 }
 
 func cleanupNet(id string) {
