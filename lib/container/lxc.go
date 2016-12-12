@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
@@ -196,6 +197,11 @@ func Destroy(name string) {
 		log.Check(log.FatalLevel, "Stopping container", c.Stop())
 	}
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+
+	db, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
+	log.Check(log.WarnLevel, "Closing database", db.Close())
 }
 
 // GetParent return a parent of the Subutai container.
@@ -381,15 +387,11 @@ func GetConfigItem(path, item string) string {
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) {
-	uidlast, err := ioutil.ReadFile(config.Agent.LxcPrefix + "uidmaplast")
-	log.Check(log.DebugLevel, "Reading uidmaplast file", err)
-
-	uid, err := strconv.Atoi(string(uidlast))
-	log.Check(log.DebugLevel, "Parsing uidlast value", err)
-	newuid := strconv.Itoa(uid + 65536)
-
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+"uidmaplast", []byte(newuid), 0644)
-	log.Check(log.FatalLevel, "Writing new uid to map", err)
+	db, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	newuid := string(db.GetFreeUuid())
+	log.Check(log.WarnLevel, "Adding new uuid entry", db.AddUuidEntry(c, newuid))
+	log.Check(log.WarnLevel, "Closing database", db.Close())
 
 	SetContainerConf(c, [][]string{
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
