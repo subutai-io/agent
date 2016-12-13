@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	portmap = []byte("portmap")
-	uuidmap = []byte("uuidmap")
+	portmap    = []byte("portmap")
+	uuidmap    = []byte("uuidmap")
+	sshtunnels = []byte("sshtunnels")
 )
 
 type Instance struct {
@@ -31,7 +32,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{portmap, uuidmap} {
+		for _, b := range [][]byte{portmap, uuidmap, sshtunnels} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -76,7 +77,7 @@ func (i *Instance) DelUuidEntry(name string) error {
 	})
 }
 
-func (i *Instance) GetFreeUuid() (uuid []byte) {
+func (i *Instance) GetUuidEntry() (uuid []byte) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(uuidmap); b != nil {
 			if b.Stats().KeyN == 0 {
@@ -96,4 +97,50 @@ func (i *Instance) GetFreeUuid() (uuid []byte) {
 		return nil
 	})
 	return uuid
+}
+
+func (i *Instance) AddTunEntry(options map[string]string) error {
+	return i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(sshtunnels); b != nil {
+			if c, err := b.CreateBucketIfNotExists([]byte(options["pid"])); err == nil {
+				for k, v := range options {
+					if err := c.Put([]byte(k), []byte(v)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func (i *Instance) DelTunEntry(pid string) error {
+	return i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(sshtunnels); b != nil {
+			return b.DeleteBucket([]byte(pid))
+		}
+		return nil
+	})
+}
+
+func (i *Instance) GetTunList() (list []map[string]string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(sshtunnels); b != nil {
+			b.ForEach(func(k, v []byte) error {
+				if c := b.Bucket([]byte(k)); c != nil {
+					item := make(map[string]string)
+					item["pid"] = string(k)
+					c.ForEach(func(n, m []byte) error {
+						item[string(n)] = string(m)
+						return nil
+					})
+					list = append(list, item)
+				}
+				return nil
+			})
+			return nil
+		}
+		return nil
+	})
+	return list
 }

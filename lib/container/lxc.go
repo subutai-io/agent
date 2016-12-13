@@ -389,7 +389,7 @@ func GetConfigItem(path, item string) string {
 func SetContainerUID(c string) {
 	db, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	newuid := string(db.GetFreeUuid())
+	newuid := string(db.GetUuidEntry())
 	log.Check(log.WarnLevel, "Adding new uuid entry", db.AddUuidEntry(c, newuid))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
 
