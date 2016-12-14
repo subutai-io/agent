@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
@@ -54,13 +54,22 @@ func TunAdd(socket, timeout string, global bool) {
 				tun = "global"
 			}
 			fmt.Println(tunsrv + ":" + port[2])
+			tunnel := map[string]string{
+				"pid":    strconv.Itoa(cmd.Process.Pid),
+				"local":  socket,
+				"remote": tunsrv + ":" + port[2],
+				"scope":  tun,
+				"ttl":    "-1",
+			}
 			if len(timeout) > 0 {
 				tout, err := strconv.Atoi(timeout)
 				log.Check(log.ErrorLevel, "Converting timeout to int", err)
-				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" "+strconv.Itoa(int(time.Now().Unix())+tout)+" "+strconv.Itoa(cmd.Process.Pid)+" "+tun)
-			} else {
-				addToList("ssh-tunnels", tunsrv+":"+port[2]+" "+socket+" -1 "+strconv.Itoa(cmd.Process.Pid)+" "+tun)
+				tunnel["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
 			}
+			bolt, err := db.New()
+			log.Check(log.WarnLevel, "Opening database", err)
+			log.Check(log.WarnLevel, "Adding new tunnel entry", bolt.AddTunEntry(tunnel))
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -72,78 +81,64 @@ func TunAdd(socket, timeout string, global bool) {
 // TunList performs tunnel check and shows "alive" tunnels
 func TunList() {
 	TunCheck()
-	f := getList()
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 {
-			fmt.Println(row[0] + " " + row[1] + " " + row[2])
-		}
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	list := bolt.GetTunList()
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	for _, item := range list {
+		fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
 	}
-	log.Check(log.WarnLevel, "Scanning tunnel list", scanner.Err())
 }
 
 // TunDel removes tunnel entry from list and kills running tunnel process
 func TunDel(socket string, pid ...string) {
-	f := getList()
-	defer f.Close()
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	list := bolt.GetTunList()
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 && row[1] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && row[3] == pid[0])) {
-			delEntry(row[3])
-			f, err := ioutil.ReadFile("/proc/" + row[3] + "/cmdline")
-			if err == nil && strings.Contains(string(f), row[1]) {
-				pid, err := strconv.Atoi(row[3])
+	for _, item := range list {
+		if item["local"] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && item["pid"] == pid[0])) {
+			bolt, err := db.New()
+			log.Check(log.WarnLevel, "Opening database", err)
+			log.Check(log.WarnLevel, "Deleting tunnel entry", bolt.DelTunEntry(item["pid"]))
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			f, err := ioutil.ReadFile("/proc/" + item["pid"] + "/cmdline")
+			if err == nil && strings.Contains(string(f), item["local"]) {
+				pid, err := strconv.Atoi(item["pid"])
 				log.Check(log.FatalLevel, "Converting pid to int", err)
 				log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(pid, 15))
 			}
 		}
 	}
-	log.Check(log.WarnLevel, "Scanning tunnel list", scanner.Err())
 }
 
 // TunCheck reads list, checks tunnel ttl, its state and then adds or removes required tunnels
 func TunCheck() {
-	f := getList()
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 {
-			ttl, err := strconv.Atoi(row[2])
-			log.Check(log.ErrorLevel, "Checking tunnel "+row[1]+" ttl", err)
-			if ttl <= int(time.Now().Unix()) && ttl != -1 {
-				TunDel(row[1], row[3])
-			} else if !tunOpen(row[0], row[1]) {
-				TunDel(row[1], row[3])
-				newttl := ""
-				if ttl-int(time.Now().Unix()) > 0 {
-					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
-				}
-				if row[4] == "global" {
-					TunAdd(row[1], newttl, true)
-				} else {
-					TunAdd(row[1], newttl, false)
-				}
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	list := bolt.GetTunList()
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	for _, item := range list {
+		ttl, err := strconv.Atoi(item["ttl"])
+		log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
+		if ttl <= int(time.Now().Unix()) && ttl != -1 {
+			TunDel(item["local"], item["pid"])
+		} else if !tunOpen(item["remote"], item["local"]) {
+			TunDel(item["local"], item["pid"])
+			newttl := ""
+			if ttl-int(time.Now().Unix()) > 0 {
+				newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
+			}
+			if item["scope"] == "global" {
+				TunAdd(item["local"], newttl, true)
+			} else {
+				TunAdd(item["local"], newttl, false)
 			}
 		}
 	}
-	log.Check(log.WarnLevel, "Scanning tunnel list", scanner.Err())
-}
-
-// getList returns file with tunnels list
-func getList() *os.File {
-	f, err := os.Open(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels")
-	if os.IsNotExist(err) {
-		f, err = os.Create(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels")
-		log.Check(log.FatalLevel, "Creating tunnel list", err)
-	} else if err != nil {
-		log.Error("Opening tunnel list " + err.Error())
-	}
-	return f
 }
 
 // getArgs builds command line to execute in system
@@ -160,37 +155,6 @@ func getArgs(global bool, socket string) ([]string, string) {
 		args = []string{"-N", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "ubuntu@" + tunsrv}
 	}
 	return args, tunsrv
-}
-
-// addToList appends new tunnel entry to tunnels list
-func addToList(file, line string) {
-	f, err := os.OpenFile(config.Agent.DataPrefix+"var/subutai-network/"+file, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	log.Check(log.ErrorLevel, "Writing tunnel list", err)
-	defer f.Close()
-
-	if _, err = f.WriteString(line + "\n"); err != nil {
-		log.Error("Appending new line to list")
-	}
-}
-
-// delEntry removes tunnel entry from list in file
-func delEntry(pid string) {
-	f := getList()
-	defer f.Close()
-
-	tmp, err := os.Create(config.Agent.DataPrefix + "var/subutai-network/ssh-tunnels.new")
-	log.Check(log.ErrorLevel, "Creating new list", err)
-	tmp.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		row := strings.Split(scanner.Text(), " ")
-		if len(row) == 5 && row[3] != pid {
-			addToList("ssh-tunnels.new", scanner.Text())
-		}
-	}
-	log.Check(log.ErrorLevel, "Replacing old list",
-		os.Rename(config.Agent.DataPrefix+"var/subutai-network/ssh-tunnels.new", config.Agent.DataPrefix+"var/subutai-network/ssh-tunnels"))
 }
 
 // tunOpen checks tunnel sockets state to define if tunnel is alive
