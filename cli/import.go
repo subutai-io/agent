@@ -395,7 +395,12 @@ func LxcImport(name, version, token string, torrent bool) {
 	}
 
 	container.SetContainerConf(t.name, [][]string{
+		{"lxc.include", ""},
+	})
+
+	container.SetContainerConf(t.name, [][]string{
 		{"lxc.rootfs", config.Agent.LxcPrefix + t.name + "/rootfs"},
+		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.name + "/rootfs"},
 		{"lxc.mount", config.Agent.LxcPrefix + t.name + "/fstab"},
 		{"lxc.hook.pre-start", ""},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
