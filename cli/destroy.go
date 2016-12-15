@@ -31,28 +31,28 @@ func LxcDestroy(id string, vlan bool) {
 	if strings.HasPrefix(id, "id:") {
 		for _, c := range container.Containers() {
 			if strings.ToUpper(strings.TrimPrefix(id, "id:")) == gpg.GetFingerprint(c) {
-				msg = id + " is destroyed"
-				if _, err := os.Stat(config.Agent.LxcPrefix + id); os.IsNotExist(err) {
-					msg = id + " not found. Please check if a container name is correct."
-				}
-				container.Destroy(c)
-				break
+				LxcDestroy(c, false)
+				return
 			}
+			msg = id + " not found. Please check if a container name is correct."
 		}
-	}
-
-	if vlan {
+	} else if vlan {
 		for _, c := range container.Containers() {
 			if container.GetConfigItem(config.Agent.LxcPrefix+c+"/config", "#vlan_id") == id {
+				msg = "Vlan " + id + " is destroyed"
 				LxcDestroy(c, false)
 			}
 		}
 		cleanupNet(id)
 	} else {
-		if _, err := os.Stat(config.Agent.LxcPrefix + id); os.IsNotExist(err) && len(msg) == 0 {
-			msg = id + " not found. Please check if a container name is correct."
-		} else {
+		if _, err := os.Stat(config.Agent.LxcPrefix + id); !os.IsNotExist(err) {
 			msg = id + " is destroyed"
+		}
+		if vlan := container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "#vlan_id"); len(vlan) != 0 {
+			node := strings.Split(container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "lxc.network.ipv4"), "/")
+			if len(node) > 1 {
+				ProxyDel(vlan, node[0], false)
+			}
 		}
 		net.DelIface(container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "lxc.network.veth.pair"))
 		container.Destroy(id)
@@ -70,11 +70,15 @@ func LxcDestroy(id string, vlan bool) {
 				LxcDestroy(c, false)
 			}
 		}
+		msg = id + " is destroyed"
 	}
 
 	if id == "management" || id == "everything" {
 		template.MngStop()
 		template.MngDel()
+	}
+	if len(msg) == 0 {
+		msg = id + " not found. Please check if a container name is correct."
 	}
 	log.Info(msg)
 }
