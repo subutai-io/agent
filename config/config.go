@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/subutai-io/agent/log"
@@ -112,11 +113,14 @@ func init() {
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
-	err = gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg")
-	log.Check(log.WarnLevel, "Opening Agent config file /apps/subutai/current/etc/agent.gcfg", err)
-
-	err = gcfg.ReadFileInto(&config, "/var/lib/apps/subutai/current/agent.gcfg")
-	log.Check(log.DebugLevel, "Opening preserved config file /var/lib/apps/subutai/current/etc/agent.gcfg", err)
+	conf := "/apps/subutai/current/etc/agent.gcfg"
+	extraconf := "/var/lib/apps/subutai/current/agent.gcfg"
+	if _, err := os.Stat(conf); os.IsNotExist(err) {
+		conf = "/snap/subutai/current/etc/agent.gcfg"
+		extraconf = "/var/snap/subutai/current/agent.gcfg"
+	}
+	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
+	log.Check(log.WarnLevel, "Opening user defined Agent config file "+extraconf, gcfg.ReadFileInto(&config, extraconf))
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
