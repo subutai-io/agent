@@ -166,6 +166,7 @@ func delDomain(vlan string) {
 // delNode removes node configuration entries from domain config
 func delNode(vlan, node string) {
 	delLine(confinc+vlan+".conf", "server "+node+";")
+	delLine(confinc+vlan+".conf", "server "+node+":")
 	if nodeCount(vlan) == 0 {
 		addLine(confinc+vlan+".conf", "#Add new host here", "   server localhost:81;", false)
 	}
