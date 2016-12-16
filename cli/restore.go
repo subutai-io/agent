@@ -20,7 +20,7 @@ import (
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
 func RestoreContainer(container, date, newContainer string) {
-	backupDir := "/mnt/backups/"
+	backupDir := config.Agent.LxcPrefix + "/backups/"
 
 	if lxcContainer.IsContainer(newContainer) {
 		log.Fatal("Container " + newContainer + " is already exist!")
@@ -118,6 +118,7 @@ func RestoreContainer(container, date, newContainer string) {
 		{"lxc.network.veth.pair", strings.Replace(lxcContainer.GetConfigItem(config.Agent.LxcPrefix+newContainer+"/config", "lxc.network.hwaddr"), ":", "", -1)},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + newContainer + "/rootfs"},
+		{"lxc.rootfs.mount", config.Agent.LxcPrefix + newContainer + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/var var none bind,rw 0 0"},
