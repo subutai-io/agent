@@ -120,7 +120,7 @@ func init() {
 		extraconf = "/var/snap/subutai/current/agent.gcfg"
 	}
 	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
-	log.Check(log.WarnLevel, "Opening user defined Agent config file "+extraconf, gcfg.ReadFileInto(&config, extraconf))
+	log.Check(log.DebugLevel, "Opening user defined Agent config file "+extraconf, gcfg.ReadFileInto(&config, extraconf))
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
