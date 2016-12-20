@@ -14,8 +14,8 @@ all:
 	$(CC) get
 	$(CC) build ${LDFLAGS} -o $(APP)
 snapcraft:
-	GOBIN=$(shell pwd)/../go/bin $(CC) get
-	GOBIN=$(shell pwd)/../go/bin $(CC) build ${LDFLAGS} -o $(APP)
+	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) get
+	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) build ${LDFLAGS} -o $(APP)
 install: 
 	@mkdir -p $(DESTDIR)/bin
 	@cp $(APP) $(DESTDIR)/bin
