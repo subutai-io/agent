@@ -293,9 +293,6 @@ func Info(command, host, interval string) {
 		fmt.Println(net.GetIp())
 		return
 	}
-	if len(host) == 0 {
-		log.Error("Usage: subutai info <quota|system> <hostname>")
-	}
 
 	initdb()
 	if len(interval) == 0 {
@@ -304,8 +301,13 @@ func Info(command, host, interval string) {
 
 	switch command {
 	case "quota":
+		if len(host) == 0 {
+			log.Error("Usage: subutai info <quota|system> <hostname>")
+		}
 		fmt.Println(quota(host))
 	case "system":
+		host, err := os.Hostname()
+		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))
 	}
 }

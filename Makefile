@@ -13,6 +13,9 @@ LDFLAGS=-ldflags "-r /apps/subutai/current/lib -w -s -X main.version=${VERSION} 
 all:
 	$(CC) get
 	$(CC) build ${LDFLAGS} -o $(APP)
+snapcraft:
+	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) get
+	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) build ${LDFLAGS} -o $(APP)
 install: 
 	@mkdir -p $(DESTDIR)/bin
 	@cp $(APP) $(DESTDIR)/bin
