@@ -40,8 +40,9 @@ type hostStat struct {
 		Used  interface{} `json:"used"`
 	} `json:"Disk"`
 	RAM struct {
-		Free  interface{} `json:"free"`
-		Total interface{} `json:"total"`
+		Free   interface{} `json:"free"`
+		Total  interface{} `json:"total"`
+		Cached interface{} `json:"cached"`
 	} `json:"RAM"`
 }
 
@@ -87,7 +88,7 @@ func queryDB(cmd string) (res []client.Result, err error) {
 	return res, err
 }
 
-func ramLoad(h string) (memfree, memtotal interface{}) {
+func ramLoad(h string) (memfree, memtotal, cached interface{}) {
 	file, err := os.Open("/proc/meminfo")
 	defer file.Close()
 	if log.Check(log.WarnLevel, "Reading /proc/meminfo", err) {
@@ -101,6 +102,8 @@ func ramLoad(h string) (memfree, memtotal interface{}) {
 			memtotal = value * 1024
 		} else if line[0] == "MemFree" {
 			memfree = value * 1024
+		} else if line[0] == "Cached" {
+			cached = value * 1024
 		}
 	}
 	return
@@ -245,7 +248,7 @@ func sysLoad(h string) string {
 	result.CPU.Model = grep("model name", "/proc/cpuinfo")
 	result.CPU.CoreCount = runtime.NumCPU()
 	result.CPU.Frequency = grep("cpu MHz", "/proc/cpuinfo")
-	result.RAM.Free, result.RAM.Total = ramLoad(h)
+	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad(h)
 	result.Disk.Used, result.Disk.Total = diskLoad(h)
 
 	a, err := json.Marshal(result)
