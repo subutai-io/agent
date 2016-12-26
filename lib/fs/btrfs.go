@@ -211,5 +211,5 @@ func GetBtrfsRoot() string {
 	log.Check(log.FatalLevel, "Searching btrfs mount point", err)
 
 	line := strings.Fields(string(data))
-	return (line[0] + "/")
+	return line[0] + "/"
 }
