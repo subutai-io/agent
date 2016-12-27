@@ -132,10 +132,26 @@ func GenerateKey(name string) {
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
 	log.Check(log.FatalLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
-	if !container.IsContainer(name) {
+
+	if container.IsContainer(name) {
+		os.MkdirAll(path+"/rootfs/etc/subutai/key/", 0700)
+		if _, err := os.Stat(path + "/public.pub"); !os.IsNotExist(err) {
+			copyKey(path+"/public.pub", path+"/rootfs/etc/subutai/key/public.pub")
+		}
+		if _, err := os.Stat(path + "/secret.sec"); !os.IsNotExist(err) {
+			copyKey(path+"/secret.sec", path+"/rootfs/etc/subutai/key/secret.sec")
+		}
+	} else {
 		log.Check(log.FatalLevel, "Importing secret key", exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").Run())
 		log.Check(log.FatalLevel, "Importing public key", exec.Command("gpg", "--import", "/root/.gnupg/public.pub").Run())
 	}
+}
+
+func copyKey(src string, dst string) {
+	data, err := ioutil.ReadFile(src)
+	log.Check(log.ErrorLevel, "Reading file "+src, err)
+	err = ioutil.WriteFile(dst, data, 0600)
+	log.Check(log.ErrorLevel, "Writing file "+dst, err)
 }
 
 // GetFingerprint returns fingerprint of the Subutai container.
