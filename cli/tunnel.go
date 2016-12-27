@@ -57,10 +57,6 @@ func TunAdd(socket, timeout string, global bool) {
 
 	args, tunsrv := getArgs(global, socket)
 	cmd := exec.Command("ssh", args...)
-	if len(timeout) > 0 {
-		args = append([]string{timeout, "ssh"}, args...)
-		cmd = exec.Command("timeout", args...)
-	}
 
 	stderr, _ := cmd.StderrPipe()
 	log.Check(log.FatalLevel, "Creating SSH tunnel to "+socket, cmd.Start())
