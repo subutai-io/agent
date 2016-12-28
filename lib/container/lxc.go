@@ -403,8 +403,6 @@ func SetContainerUID(c string) {
 	if s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs"); err == nil {
 		parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", "0", newuid, "65536").Run()
-		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
 		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
 		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
