@@ -34,12 +34,29 @@ func TunAdd(socket, timeout string, global bool) {
 		socket = socket + ":22"
 	}
 
+	tun := "local"
+	if global {
+		tun = "global"
+	}
+	if item := getTunnel(socket, tun); item != nil {
+		if len(timeout) > 0 {
+			tout, err := strconv.Atoi(timeout)
+			log.Check(log.ErrorLevel, "Converting timeout to int", err)
+			item["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
+		} else {
+			item["ttl"] = "-1"
+		}
+		localDB, err := db.New()
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			log.Check(log.WarnLevel, "Updating tunnel entry", localDB.AddTunEntry(item))
+			log.Check(log.WarnLevel, "Closing database", localDB.Close())
+		}
+		fmt.Println(item["remote"])
+		return
+	}
+
 	args, tunsrv := getArgs(global, socket)
 	cmd := exec.Command("ssh", args...)
-	if len(timeout) > 0 {
-		args = append([]string{timeout, "ssh"}, args...)
-		cmd = exec.Command("timeout", args...)
-	}
 
 	stderr, _ := cmd.StderrPipe()
 	log.Check(log.FatalLevel, "Creating SSH tunnel to "+socket, cmd.Start())
@@ -49,10 +66,6 @@ func TunAdd(socket, timeout string, global bool) {
 	for i := 0; err == nil && i < 10; i++ {
 		if strings.Contains(string(line), "Allocated port") {
 			port := strings.Fields(string(line))
-			tun := "local"
-			if global {
-				tun = "global"
-			}
 			fmt.Println(tunsrv + ":" + port[2])
 			tunnel := map[string]string{
 				"pid":    strconv.Itoa(cmd.Process.Pid),
@@ -167,4 +180,19 @@ func tunOpen(remote, local string) bool {
 		return false
 	}
 	return true
+}
+
+func getTunnel(local, scope string) map[string]string {
+	localDB, err := db.New()
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		list := localDB.GetTunList()
+		log.Check(log.WarnLevel, "Closing database", localDB.Close())
+
+		for _, item := range list {
+			if item["local"] == local && item["scope"] == scope {
+				return item
+			}
+		}
+	}
+	return nil
 }
