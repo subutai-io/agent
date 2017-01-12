@@ -17,7 +17,7 @@ import (
 
 var (
 	conftmpl = config.Agent.AppPrefix + "etc/nginx/tmpl/"
-	confinc  = config.Agent.DataPrefix + "nginx-includes/"
+	confinc  = config.Agent.DataPrefix + "nginx-includes/http/"
 )
 
 // The reverse proxy component in Subutai provides and easy way to assign domain name and forward HTTP(S) traffic to certain environment.
@@ -140,7 +140,7 @@ func addDomain(vlan, domain, cert string) {
 // addNode adds configuration lines to domain configuration
 func addNode(vlan, node string) {
 	delLine(confinc+vlan+".conf", "server localhost:81;")
-	addLine(confinc+vlan+".conf", "#Add new host here", "	server "+node+";", false)
+	addLine(confinc+vlan+".conf", "#Add new host here", "	server "+node+"; #$node", false)
 }
 
 // delDomain removes domain configuration file and all related stuff
@@ -165,8 +165,8 @@ func delDomain(vlan string) {
 
 // delNode removes node configuration entries from domain config
 func delNode(vlan, node string) {
-	delLine(confinc+vlan+".conf", "server "+node+";")
-	delLine(confinc+vlan+".conf", "server "+node+":")
+	delLine(confinc+vlan+".conf", "server "+node+"; #$node")
+	delLine(confinc+vlan+".conf", "server "+node+": #$node")
 	if nodeCount(vlan) == 0 {
 		addLine(confinc+vlan+".conf", "#Add new host here", "   server localhost:81;", false)
 	}
@@ -208,7 +208,7 @@ func isNodeExist(vlan, node string) bool {
 func nodeCount(vlan string) int {
 	f, err := ioutil.ReadFile(confinc + vlan + ".conf")
 	if !log.Check(log.DebugLevel, "Cannot read file "+confinc+vlan+".conf", err) {
-		return strings.Count(string(f), "server ")
+		return strings.Count(string(f), "#$node")
 	}
 	return 0
 }
