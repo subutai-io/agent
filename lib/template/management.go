@@ -54,5 +54,4 @@ func MngStop() {
 func MngDel() {
 	exec.Command("ovs-vsctl", "del-port", "wan", "management").Run()
 	exec.Command("ovs-vsctl", "del-port", "wan", "mng-gw").Run()
-	exec.Command("dhclient", "-r", "mng-net").Run()
 }

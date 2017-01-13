@@ -23,6 +23,7 @@ import (
 	"github.com/subutai-io/agent/agent/alert"
 	"github.com/subutai-io/agent/agent/connect"
 	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/agent/discovery"
 	"github.com/subutai-io/agent/agent/executer"
 	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/agent/utils"
@@ -79,6 +80,7 @@ func Start(c *gcli.Context) {
 	http.HandleFunc("/heartbeat", heartbeatCall)
 	go http.ListenAndServe(":7070", nil)
 
+	go discovery.Monitor()
 	go monitor.Collect()
 	go connectionMonitor()
 	go alert.Processing()

@@ -31,6 +31,7 @@ type managementConfig struct {
 	GpgUser       string
 	RestVerify    string
 	RestPublicKey string
+	Fingerprint   string
 	Allowinsecure bool
 }
 
@@ -71,9 +72,9 @@ const defaultConfig = `
 	[management]
 	gpgUser =
 	port = 8443
-	host = 10.10.10.1
+	host =
 	secret = secret
-	restPublicKey = /rest/v1/security/keyman/getpublickeyring	
+	restPublicKey = /rest/v1/security/keyman/getpublickeyring
 	allowinsecure = true
 
     [cdn]
@@ -82,7 +83,7 @@ const defaultConfig = `
     allowinsecure = false
 
 	[influxdb]
-	server = 10.10.10.1
+	server =
 	user = root
 	pass = root
 	db = metrics
@@ -114,12 +115,15 @@ func init() {
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
 	conf := "/apps/subutai/current/etc/agent.gcfg"
+	discoveryconf := "/var/lib/apps/subutai/current/agent.discovery.gcfg"
 	extraconf := "/var/lib/apps/subutai/current/agent.gcfg"
 	if _, err := os.Stat(conf); os.IsNotExist(err) {
 		conf = "/snap/subutai/current/etc/agent.gcfg"
+		discoveryconf = "/var/snap/subutai/current/discovery.gcfg"
 		extraconf = "/var/snap/subutai/current/agent.gcfg"
 	}
 	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
+	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&config, discoveryconf))
 	log.Check(log.DebugLevel, "Opening user defined Agent config file "+extraconf, gcfg.ReadFileInto(&config, extraconf))
 
 	if config.Agent.GpgUser == "" {
