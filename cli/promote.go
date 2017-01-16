@@ -23,9 +23,9 @@ func LxcPromote(name string, source ...string) {
 		checkSanity(source[0])
 		if container.State(source[0]) == "RUNNING" {
 			container.Stop(source[0])
-			defer container.Start(source[0])
 		}
 		container.Clone(source[0], name)
+		container.Start(source[0])
 		container.SetContainerConf(name, [][]string{{"subutai.parent", container.GetParent(source[0])}})
 	}
 	checkSanity(name)
