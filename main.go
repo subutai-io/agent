@@ -203,8 +203,9 @@ func main() {
 		}}, {
 
 		Name: "promote", Usage: "promote Subutai container",
+		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcPromote(c.Args().Get(0))
+			cli.LxcPromote(c.Args().Get(0), c.String("s"))
 			return nil
 		}}, {
 
