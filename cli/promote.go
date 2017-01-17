@@ -19,7 +19,7 @@ import (
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name string, source ...string) {
-	if len(source) > 0 {
+	if len(source) > 0 && len(source[0]) > 0 {
 		checkSanity(source[0])
 		if container.State(source[0]) == "RUNNING" {
 			container.Stop(source[0])
