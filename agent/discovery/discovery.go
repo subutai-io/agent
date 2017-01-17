@@ -3,20 +3,25 @@ package discovery
 import (
 	"crypto/tls"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/fromkeith/gossdp"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
-const (
-	port    = "56734"
-	message = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-)
+type handler struct {
+}
+
+func (h handler) Response(message gossdp.ResponseMessage) {
+	if len(config.Management.Fingerprint) == 0 || config.Management.Fingerprint == message.DeviceId {
+		save(message.Location)
+	}
+}
 
 func Monitor() {
 	for {
@@ -31,93 +36,60 @@ func Monitor() {
 }
 
 func server() error {
-	udpAddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:"+port)
-	if err != nil {
-		return err
-	}
-
-	conn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	for {
-		recvBuff := make([]byte, 15000)
-		n, rmAddr, err := conn.ReadFromUDP(recvBuff)
-		if err != nil {
-			return err
+	s, err := gossdp.NewSsdp(nil)
+	if err == nil {
+		go s.Start()
+		defer s.Stop()
+		s.AdvertiseServer(gossdp.AdvertisableServer{
+			ServiceType: "urn:subutai:management:peer:4",
+			DeviceUuid:  fingerprint(),
+			Location:    net.GetIp(),
+			MaxAge:      3600,
+		})
+		for len(fingerprint()) > 0 {
+			time.Sleep(30 * time.Second)
 		}
-		fingerprint := getFingerprint()
-		if fingerprint == nil {
-			break
-		}
-		if string(recvBuff[:n]) == message || string(recvBuff[:n]) == string(fingerprint) {
-			conn.WriteToUDP(fingerprint, rmAddr)
-		}
-
 	}
-	return nil
+	return err
 }
 
 func client() error {
-	RemoteAddr, err := net.ResolveUDPAddr("udp", "255.255.255.255:"+port)
-	if err != nil {
-		return err
-	}
+	c, err := gossdp.NewSsdpClient(handler{})
+	if err == nil {
+		go c.Start()
+		defer c.Stop()
 
-	conn, err := net.ListenUDP("udp", nil)
-	if err != nil {
-		return err
+		err = c.ListenFor("urn:subutai:management:peer:4")
+		time.Sleep(2 * time.Second)
 	}
-	defer conn.Close()
-
-	msg := message
-	if len(config.Management.Fingerprint) > 0 {
-		msg = config.Management.Fingerprint
-	}
-	_, err = conn.WriteToUDP([]byte(msg), RemoteAddr)
-	if err != nil {
-		return err
-	}
-	conn.SetDeadline(time.Now().Add(2 * time.Second))
-	for {
-		buf := make([]byte, 15000)
-		_, remAddr, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			break
-		} else {
-			save(remAddr.IP.String())
-		}
-	}
-	return nil
+	return err
 }
 
-func getFingerprint() []byte {
+func fingerprint() string {
 	client := &http.Client{Timeout: time.Second * 5}
 	if config.Management.Allowinsecure {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
 	}
 	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if log.Check(log.WarnLevel, "Getting Management host GPG fingerprint", err) {
-		return nil
+		return ""
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
 		key, err := ioutil.ReadAll(resp.Body)
 		if err == nil {
-			return key
+			return string(key)
 		}
 	}
 
 	log.Warn("Failed to fetch GPG fingerprint from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
-	return nil
+	return ""
 }
 
 func save(ip string) {
 	if config.Management.Host != ip {
-		ioutil.WriteFile("/var/lib/apps/subutai/current/agent.discovery.gcfg", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
+		ioutil.WriteFile(config.Agent.DataPrefix+"agent.discovery.gcfg", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
 	}
 	config.Management.Host = ip
 	config.Influxdb.Server = ip
