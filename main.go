@@ -126,9 +126,11 @@ func main() {
 		Name: "export", Usage: "export Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "version, v", Usage: "template version"},
-			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"}},
+			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"},
+			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"},
+			gcli.BoolFlag{Name: "private, p", Usage: "use private repo for uploading template"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"))
+			cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"), c.String("t"), c.Bool("p"))
 			return nil
 		}}, {
 
