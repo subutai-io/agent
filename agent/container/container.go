@@ -29,6 +29,17 @@ type Container struct {
 	Parent     string        `json:"templateName,omitempty"`
 	Vlan       int           `json:"vlan,omitempty"`
 	Pk         string        `json:"publicKey,omitempty"`
+	Quota      Quota         `json:"quota,omitempty"`
+}
+
+//Quota describes container quota value.
+type Quota struct {
+	CPU  int `json:"cpu,omitempty"`
+	RAM  int `json:"ram,omitempty"`
+	Root int `json:"root,omitempty"`
+	Home int `json:"home,omitempty"`
+	Opt  int `json:"opt,omitempty"`
+	Var  int `json:"var,omitempty"`
 }
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.

@@ -379,7 +379,6 @@ func GetConfigItem(path, item string) string {
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "=")
 			if strings.Trim(line[0], " ") == item {
-				log.Debug(strings.Trim(line[1], " "))
 				return strings.Trim(line[1], " ")
 			}
 		}

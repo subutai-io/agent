@@ -163,9 +163,9 @@ func sendHeartbeat() bool {
 		ID:         fingerprint,
 		Arch:       instanceArch,
 		Instance:   instanceType,
-		Containers: pool,
-		Interfaces: utils.GetInterfaces(),
+		Containers: alert.Quota(pool),
 		Alert:      alert.Current(pool),
+		Interfaces: utils.GetInterfaces(),
 	}
 	res := response{Beat: beat}
 	jbeat, err := json.Marshal(&res)

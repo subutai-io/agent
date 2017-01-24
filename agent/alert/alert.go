@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -74,6 +75,23 @@ func stat() string {
 	return string(out)
 }
 
+func ramMax() (int, error) {
+	file, err := os.Open("/sys/fs/cgroup/memory/memory.stat")
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(bufio.NewReader(file))
+	for scanner.Scan() {
+		line := strings.Fields(scanner.Text())
+		if len(line) > 1 && line[0] == "hierarchical_memory_limit" {
+			return strconv.Atoi(strings.TrimSpace(line[1]))
+		}
+	}
+	return 0, nil
+}
+
 func ramQuota(cont string) []int {
 	u, err := read("/sys/fs/cgroup/memory/lxc/" + cont + "/memory.usage_in_bytes")
 	if err != nil {
@@ -90,6 +108,9 @@ func ramQuota(cont string) []int {
 		ramUsage[0] = u * 100 / l
 	}
 
+	if mlimit, err := ramMax(); err == nil && l == mlimit {
+		ramUsage[1] = 0
+	}
 	return ramUsage
 }
 
@@ -109,7 +130,7 @@ func quotaCPU(name string) int {
 }
 
 func cpuLoad(cont string) []int {
-	avgload := []int{0, 0}
+	avgload := []int{0, quotaCPU(cont)}
 	if len(cpu[cont]) == 0 {
 		cpu[cont] = []int{0, 0, 0, 0, 0}
 	}
@@ -134,12 +155,10 @@ func cpuLoad(cont string) []int {
 	}
 
 	cpu[cont] = append([]int{usertick + systick}, cpu[cont][0:4]...)
-
 	if cpu[cont][4] == 0 {
 		return avgload
 	}
 	avgload[0] = (cpu[cont][0] - cpu[cont][4]) / runtime.NumCPU() / 20
-	avgload[1] = quotaCPU(cont)
 	if avgload[1] != 0 {
 		avgload[0] = avgload[0] * 100 / avgload[1]
 	}
@@ -252,4 +271,27 @@ func Current(list []container.Container) []Load {
 		}
 	}
 	return loadList
+}
+
+func Quota(list []container.Container) (output []container.Container) {
+	for _, v := range list {
+		if c, ok := stats[v.Name]; ok {
+			v.Quota.CPU = c.CPU.Quota
+			v.Quota.RAM = c.RAM.Quota
+			for _, value := range stats[v.Name].Disk {
+				switch value.Partition {
+				case "rootfs":
+					v.Quota.Root = value.Quota
+				case "home":
+					v.Quota.Home = value.Quota
+				case "var":
+					v.Quota.Var = value.Quota
+				case "opt":
+					v.Quota.Opt = value.Quota
+				}
+			}
+		}
+		output = append(output, v)
+	}
+	return
 }
