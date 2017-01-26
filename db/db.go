@@ -9,13 +9,28 @@ import (
 )
 
 var (
-	portmap    = []byte("portmap")
-	uuidmap    = []byte("uuidmap")
-	sshtunnels = []byte("sshtunnels")
+	portmap     = []byte("portmap")
+	uuidmap     = []byte("uuidmap")
+	sshtunnels  = []byte("sshtunnels")
+	environment = []byte("environment")
 )
 
 type Instance struct {
 	db *bolt.DB
+}
+
+type Environment struct {
+	id struct {
+		p2p        *bolt.Bucket
+		containers *[]container
+	}
+}
+
+type container struct {
+	quota *bolt.Bucket
+}
+
+type p2p struct {
 }
 
 func New() (*Instance, error) {
@@ -32,7 +47,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{portmap, uuidmap, sshtunnels} {
+		for _, b := range [][]byte{portmap, uuidmap, sshtunnels, environment} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -144,3 +159,40 @@ func (i *Instance) GetTunList() (list []map[string]string) {
 	})
 	return list
 }
+
+func (i *Instance) Environment(id string) (env Environment, err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(environment); b != nil {
+			env.id, err = b.CreateBucketIfNotExists([]byte(id))
+		}
+		return nil
+	})
+	return env, err
+}
+
+func (env *Environment) P2P(dev, ip string) (err error) {
+	if env.p2p, err = env.bucket.CreateBucketIfNotExists([]byte("p2p")); err == nil {
+		env.p2p.Put([]byte("dev"), []byte(dev))
+		env.p2p.Put([]byte("ip"), []byte(ip))
+	}
+	return err
+}
+
+func (env *Environment) Container(name string, args ...map[string]string) (err error) {
+	if env.containers.b0ucket, err = env.bucket.CreateBucketIfNotExists([]byte("containers")); err == nil {
+		env.containers.c, err = env.containers.CreateBucketIfNotExists([]byte(name))
+		if err == nil {
+			if len(args) != 0 {
+				for k, v := range args[0] {
+					container.Put([]byte(k), []byte(v))
+				}
+			}
+		}
+	}
+	return err
+}
+
+// func (env *Environment) Quota() error {
+// if quota, err := env.containers .CreateBucketIfNotExists(key); err == nil {
+// }
+// }
