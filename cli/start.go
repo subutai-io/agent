@@ -23,6 +23,7 @@ func LxcStart(name string) {
 		}
 		log.Info("Waiting for container start (60 sec)")
 		time.Sleep(time.Second)
+		container.Start(name)
 		state = container.State(name)
 	}
 	log.Error(name + " start failed.")

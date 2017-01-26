@@ -11,11 +11,15 @@ COMMIT=$(shell git rev-parse HEAD)
 LDFLAGS=-ldflags "-r /apps/subutai/current/lib -w -s -X main.version=${VERSION} -X main.commit=${COMMIT}"
 
 all:
-	$(CC) get
+	@if [ ! -d "$(GOPATH)/src/github.com/subutai-io/agent" ]; then mkdir -p $(GOPATH)/src/github.com/subutai-io/; ln -s $(shell pwd) $(GOPATH)/src/github.com/subutai-io/agent; fi
+	$(CC) get -d
 	$(CC) build ${LDFLAGS} -o $(APP)
 snapcraft:
-	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) get
-	GOPATH=$(shell pwd)/../go GOBIN=$(shell pwd)/../go/bin $(CC) build ${LDFLAGS} -o $(APP)
+	$(eval export GOPATH=$(shell pwd)/../go)
+	$(eval export GOBIN=$(shell pwd)/../go/bin)
+	@if [ ! -d "$(GOPATH)/src/github.com/subutai-io/agent" ]; then mkdir -p $(GOPATH)/src/github.com/subutai-io/; ln -s $(shell pwd) $(GOPATH)/src/github.com/subutai-io/agent; fi
+	$(CC) get -d
+	$(CC) build ${LDFLAGS} -o $(APP)
 install: 
 	@mkdir -p $(DESTDIR)/bin
 	@cp $(APP) $(DESTDIR)/bin
