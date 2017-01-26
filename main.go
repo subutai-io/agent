@@ -74,9 +74,10 @@ func main() {
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
 			gcli.StringFlag{Name: "ipaddr, i", Usage: "set container IP address and VLAN"},
-			gcli.StringFlag{Name: "token, t", Usage: "token to verify with MH"}},
+			gcli.StringFlag{Name: "token, t", Usage: "token to verify with MH"},
+			gcli.StringFlag{Name: "kurjun, k", Usage: "kurjun token to clone private and shared templates"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"))
+			cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"), c.String("k"))
 			return nil
 		}}, {
 
