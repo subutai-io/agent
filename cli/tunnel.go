@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -162,7 +163,11 @@ func getArgs(global bool, socket string) ([]string, string) {
 		cdn, err := net.LookupIP(config.CDN.URL)
 		log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
 		tunsrv = cdn[0].String()
-		args = []string{"-i", config.Agent.AppPrefix + "etc/ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
+		key := config.Agent.AppPrefix + "etc/ssh.pem"
+		if _, err := os.Stat(config.Agent.DataPrefix + "ssh.pem"); err == nil {
+			key = config.Agent.DataPrefix + "ssh.pem"
+		}
+		args = []string{"-i", key, "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	} else {
 		tunsrv = ovs.GetIp()
 		args = []string{"-N", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "ubuntu@" + tunsrv}
