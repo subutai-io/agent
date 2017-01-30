@@ -119,7 +119,7 @@ func init() {
 	extraconf := "/var/lib/apps/subutai/current/agent.gcfg"
 	if _, err := os.Stat(conf); os.IsNotExist(err) {
 		conf = "/snap/subutai/current/etc/agent.gcfg"
-		discoveryconf = "/var/snap/subutai/current/discovery.gcfg"
+		discoveryconf = "/var/snap/subutai/current/agent.discovery.gcfg"
 		extraconf = "/var/snap/subutai/current/agent.gcfg"
 	}
 	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
