@@ -41,7 +41,7 @@ func checkStore() int {
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
-		if len(line) > 0 {
+		if len(line) > 1 {
 			if line[0] == "tracking:" {
 				channel = line[1]
 				log.Debug("We are on channel: " + channel)
