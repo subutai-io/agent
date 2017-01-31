@@ -1,7 +1,4 @@
 #!groovy
-/* 
-** build job: 'agent.subutai-io.pipeline/dev', propagate: false, wait: false
-*/
 
 notifyBuildDetails = ""
 agentCommitId = ""
@@ -96,7 +93,7 @@ try {
 		/*
 		** Trigger snapcraft build (subutai-io/snap)
 		** - Check version in snapcraft.yaml, and update if need
-		** - If version is not updated, trigger build
+		** - If version is not changed, trigger build
 		*/
 
 		// now snapcraft builder working only for dev branch
@@ -125,6 +122,8 @@ try {
 					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${snapRepoName} ${env.BRANCH_NAME}
 				"""
 				}
+			} else {
+				build job: 'snap.subutai-io.pipeline/dev/', propagate: false, wait: false
 			}
 		}
 	}
