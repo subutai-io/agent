@@ -118,9 +118,14 @@ func init() {
 	discoveryconf := "/var/lib/apps/subutai/current/agent.discovery.gcfg"
 	extraconf := "/var/lib/apps/subutai/current/agent.gcfg"
 	if _, err := os.Stat(conf); os.IsNotExist(err) {
-		conf = "/snap/subutai/current/etc/agent.gcfg"
-		discoveryconf = "/var/snap/subutai/current/agent.discovery.gcfg"
-		extraconf = "/var/snap/subutai/current/agent.gcfg"
+		for _, dir := range []string{"subutai", "subutai-stage", "subutai-dev"} {
+			conf = "/snap/" + dir + "/current/etc/agent.gcfg"
+			discoveryconf = "/var/snap/" + dir + "/current/agent.discovery.gcfg"
+			extraconf = "/var/snap/" + dir + "/current/agent.gcfg"
+			if _, err := os.Stat(conf); !os.IsNotExist(err) {
+				break
+			}
+		}
 	}
 	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
 	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&config, discoveryconf))
