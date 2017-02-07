@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/cheggaaa/pb"
 	"github.com/nightlyone/lockfile"
-	"github.com/pivotal-golang/archiver/extractor"
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
