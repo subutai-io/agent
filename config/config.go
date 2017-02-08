@@ -111,25 +111,24 @@ var (
 func init() {
 	log.Level(log.InfoLevel)
 
+	var discoveryConf configFile
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
-	conf := "/apps/subutai/current/etc/agent.gcfg"
-	discoveryconf := "/var/lib/apps/subutai/current/agent.discovery.gcfg"
-	extraconf := "/var/lib/apps/subutai/current/agent.gcfg"
+	conf := "/var/lib/apps/subutai/current/agent.gcfg"
 	if _, err := os.Stat(conf); os.IsNotExist(err) {
-		for _, dir := range []string{"subutai", "subutai-stage", "subutai-dev"} {
-			conf = "/snap/" + dir + "/current/etc/agent.gcfg"
-			discoveryconf = "/var/snap/" + dir + "/current/agent.discovery.gcfg"
-			extraconf = "/var/snap/" + dir + "/current/agent.gcfg"
-			if _, err := os.Stat(conf); !os.IsNotExist(err) {
-				break
-			}
-		}
+		conf = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/agent.gcfg"
 	}
-	log.Check(log.WarnLevel, "Opening Agent config file "+conf, gcfg.ReadFileInto(&config, conf))
-	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&config, discoveryconf))
-	log.Check(log.DebugLevel, "Opening user defined Agent config file "+extraconf, gcfg.ReadFileInto(&config, extraconf))
+	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg"))
+	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&discoveryConf, conf+".discovery"))
+	log.Check(log.DebugLevel, "Opening Agent configuration file "+conf, gcfg.ReadFileInto(&config, conf))
+
+	if len(config.Management.Host) < 7 {
+		config.Management.Host = discoveryConf.Management.Host
+	}
+	if len(config.Influxdb.Server) < 7 {
+		config.Influxdb.Server = discoveryConf.Influxdb.Server
+	}
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
