@@ -105,7 +105,7 @@ try {
 			git branch: "${env.BRANCH_NAME}", changelog: false, credentialsId: 'hub-optdyn-github-auth', poll: false, url: "https://${snapRepoName}"
 
 			sh """
-				sed 's/version:.*/version: \"${agentVersion}-SNAPSHOT\"/g' -i snapcraft.yaml
+				sed 's/version:.*/version: \"${agentVersion}-(BRANCH)\"/g' -i snapcraft.yaml.templ
 			"""
 
 			def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
