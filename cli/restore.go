@@ -15,7 +15,7 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 
-	"github.com/pivotal-golang/archiver/extractor"
+	"code.cloudfoundry.org/archiver/extractor"
 )
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.

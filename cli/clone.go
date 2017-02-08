@@ -21,14 +21,14 @@ import (
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
-func LxcClone(parent, child, envId, addr, token string) {
+func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
-		parent = idToName(id[1], kurjun, token)
+		parent = idToName(id[1], kurjun, kurjToken)
 	}
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, "", token, false)
+		LxcImport(parent, "", kurjToken, false)
 	}
 	if container.IsContainer(child) {
 		log.Error("Container " + child + " already exist")

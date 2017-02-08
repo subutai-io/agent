@@ -1,12 +1,13 @@
 package net
 
 import (
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/log"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
+
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 // DelIface removes OVS bridges and ports by name, brings system interface down

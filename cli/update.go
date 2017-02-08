@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"io"
@@ -25,6 +27,43 @@ type snap struct {
 	Owner     []string          `json:"owner"`
 	Version   string            `json:"version"`
 	Signature map[string]string `json:"signature"`
+}
+
+func checkStore() int {
+	var channel string
+	var available, installed int
+
+	out, err := exec.Command("snap", "info", "subutai").Output()
+	if err != nil {
+		return 0
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		line := strings.Fields(scanner.Text())
+		if len(line) > 1 {
+			if line[0] == "tracking:" {
+				channel = line[1]
+				log.Debug("We are on channel: " + channel)
+			} else if line[0] == "installed:" {
+				installed, err = strconv.Atoi(strings.Trim(line[2], "()"))
+				if err != nil {
+					return 1
+				}
+				log.Debug("Installed revision: " + strings.Trim(line[2], "()"))
+			} else if line[0] == channel+":" {
+				available, err = strconv.Atoi(strings.Trim(line[2], "()"))
+				if err != nil {
+					return 1
+				}
+				log.Debug("Available revision: " + strings.Trim(line[2], "()"))
+			}
+			if available > installed {
+				return 2
+			}
+		}
+	}
+	return 1
 }
 
 // ifUpdateable returns hash string of new snap package if it available for download on repository
@@ -142,18 +181,32 @@ func Update(name string, check bool) {
 	switch name {
 	case "rh":
 
-		installed, err := strconv.Atoi(getInstalled())
-		log.Check(log.FatalLevel, "Converting installed package timestamp to int", err)
+		switch checkStore() {
+		case 0:
+			installed, err := strconv.Atoi(getInstalled())
+			log.Check(log.FatalLevel, "Converting installed package timestamp to int", err)
 
-		newsnap := ifUpdateable(installed)
-		if len(newsnap) == 0 {
+			newsnap := ifUpdateable(installed)
+			if len(newsnap) == 0 {
+				log.Info("No update is available")
+				os.Exit(1)
+			} else if check {
+				log.Info("Update is available")
+				os.Exit(0)
+			}
+			upgradeRh(newsnap)
+		case 1:
 			log.Info("No update is available")
 			os.Exit(1)
-		} else if check {
-			log.Info("Update is available")
-			os.Exit(0)
+		case 2:
+			if check {
+				log.Info("Update is available")
+				os.Exit(0)
+			} else {
+				log.Check(log.FatalLevel, "Updating RH snap",
+					exec.Command("snap", "refresh", "--devmode", "subutai").Run())
+			}
 		}
-		upgradeRh(newsnap)
 
 	default:
 		if !container.IsContainer(name) {

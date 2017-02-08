@@ -331,6 +331,9 @@ func QuotaNet(name string, size ...string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	nic := GetConfigItem(c.ConfigFileName(), "lxc.network.veth.pair")
+	if size[0] != "" {
+		SetContainerConf(name, [][]string{{"subutai.network.ratelimit", size[0]}})
+	}
 	return net.RateLimit(nic, size[0])
 }
 
@@ -376,7 +379,6 @@ func GetConfigItem(path, item string) string {
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "=")
 			if strings.Trim(line[0], " ") == item {
-				log.Debug(strings.Trim(line[1], " "))
 				return strings.Trim(line[1], " ")
 			}
 		}

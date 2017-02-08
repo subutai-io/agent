@@ -90,10 +90,10 @@ func queryDB(cmd string) (res []client.Result, err error) {
 
 func ramLoad(h string) (memfree, memtotal, cached interface{}) {
 	file, err := os.Open("/proc/meminfo")
-	defer file.Close()
 	if log.Check(log.WarnLevel, "Reading /proc/meminfo", err) {
 		return
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		line := strings.Fields(strings.Replace(scanner.Text(), ":", "", -1))

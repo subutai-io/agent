@@ -18,7 +18,16 @@ import (
 // Promote executes several simple steps, such as dropping a container's configuration to default values,
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
-func LxcPromote(name string) {
+func LxcPromote(name string, source ...string) {
+	if len(source) > 0 && len(source[0]) > 0 {
+		checkSanity(source[0])
+		if container.State(source[0]) == "RUNNING" {
+			container.Stop(source[0])
+			defer container.Start(source[0])
+		}
+		container.Clone(source[0], name)
+		container.SetContainerConf(name, [][]string{{"subutai.parent", container.GetParent(source[0])}})
+	}
 	checkSanity(name)
 
 	// check: start container if it is not running already

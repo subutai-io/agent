@@ -89,6 +89,44 @@ try {
 			"""
 		}
 	}
+	node("snapcraft") {
+		/*
+		** Trigger snapcraft build (subutai-io/snap)
+		** - Check version in snapcraft.yaml, and update if need
+		** - If version is not changed, trigger build
+		*/
+
+		// now snapcraft builder working only for dev branch
+		if (env.BRANCH_NAME == 'dev') {
+			stage("Update version on snap repo")
+
+			deleteDir()
+			String snapRepoName = "github.com/subutai-io/snap.git"
+			git branch: "${env.BRANCH_NAME}", changelog: false, credentialsId: 'hub-optdyn-github-auth', poll: false, url: "https://${snapRepoName}"
+
+			sh """
+				sed 's/version:.*/version: \"${agentVersion}-(BRANCH)\"/g' -i snapcraft.yaml.templ
+			"""
+
+			def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
+
+			if (gitStatus != '') {
+				withCredentials([[$class: 'UsernamePasswordMultiBinding', 
+				credentialsId: 'hub-optdyn-github-auth', 
+				passwordVariable: 'GIT_PASSWORD', 
+				usernameVariable: 'GIT_USER']]) {
+				sh """
+					git config user.email jenkins@subut.ai
+					git config user.name 'Jenkins Admin'
+					git commit snapcraft.yaml -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
+					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${snapRepoName} ${env.BRANCH_NAME}
+				"""
+				}
+			} else {
+				build job: 'snap.subutai-io.pipeline/dev/', propagate: false, wait: false
+			}
+		}
+	}
 
 } catch (e) { 
 	currentBuild.result = "FAILED"

@@ -197,7 +197,7 @@ func DiskQuota(path string, size ...string) string {
 // Quota returns subvolume quota.
 // If size argument is set, it sets new quota value.
 func Quota(path string, size ...string) string {
-	if size != nil {
+	if len(size) > 0 && len(size[0]) > 0 {
 		if err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", config.Agent.LxcPrefix+path).Run(); err != nil {
 			return err.Error()
 		}
