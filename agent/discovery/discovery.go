@@ -94,5 +94,5 @@ func save(ip string) {
 	}
 	config.Management.Host = ip
 	config.Influxdb.Server = ip
-	monitor.Close()
+	monitor.InitInfluxdb()
 }
