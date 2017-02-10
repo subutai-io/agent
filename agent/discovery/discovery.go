@@ -89,10 +89,10 @@ func fingerprint() string {
 }
 
 func save(ip string) {
+	config.Influxdb.Server = ip
 	if config.Management.Host != ip {
 		ioutil.WriteFile(config.Agent.DataPrefix+"agent.gcfg.discovery", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
+		monitor.InitInfluxdb()
 	}
 	config.Management.Host = ip
-	config.Influxdb.Server = ip
-	monitor.InitInfluxdb()
 }
