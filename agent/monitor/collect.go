@@ -57,6 +57,10 @@ func Collect() {
 	}
 }
 
+func Close() {
+	dbclient.Close()
+}
+
 func initInfluxdb() {
 	var err error
 	dbclient, err = client.NewHTTPClient(client.HTTPConfig{

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fromkeith/gossdp"
+	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/net"
@@ -93,4 +94,5 @@ func save(ip string) {
 	}
 	config.Management.Host = ip
 	config.Influxdb.Server = ip
+	monitor.Close()
 }
