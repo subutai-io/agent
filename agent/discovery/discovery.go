@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -18,6 +19,11 @@ import (
 type handler struct {
 }
 
+func (h handler) Tracef(f string, args ...interface{}) {}
+func (h handler) Infof(f string, args ...interface{})  {}
+func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
+func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
+
 func (h handler) Response(message gossdp.ResponseMessage) {
 	if len(config.Management.Fingerprint) == 0 || config.Management.Fingerprint == message.DeviceId {
 		save(message.Location)
@@ -32,12 +38,12 @@ func Monitor() {
 		} else {
 			go client()
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 }
 
 func server() error {
-	s, err := gossdp.NewSsdp(nil)
+	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
 		go s.Start()
 		defer s.Stop()
@@ -55,7 +61,7 @@ func server() error {
 }
 
 func client() error {
-	c, err := gossdp.NewSsdpClient(handler{})
+	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
 	if err == nil {
 		go c.Start()
 		defer c.Stop()
