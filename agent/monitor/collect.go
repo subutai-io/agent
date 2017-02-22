@@ -36,7 +36,7 @@ var (
 // Collect collecting performance statistic from Resource Host and Subutai Containers.
 // It sends this information to IfluxDB server using credentials from configuration file.
 func Collect() {
-	initInfluxdb()
+	InitInfluxdb()
 	for {
 		_, _, err := dbclient.Ping(time.Second)
 		if err == nil {
@@ -51,13 +51,13 @@ func Collect() {
 			}
 		}
 		if err != nil || dbclient.Write(bp) != nil {
-			initInfluxdb()
+			InitInfluxdb()
 		}
 		time.Sleep(time.Second * 30)
 	}
 }
 
-func initInfluxdb() {
+func InitInfluxdb() {
 	var err error
 	dbclient, err = client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
