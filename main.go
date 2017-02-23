@@ -304,7 +304,7 @@ func main() {
 				Flags: []gcli.Flag{
 					gcli.BoolFlag{Name: "global, g", Usage: "create tunnel to global proxy"}},
 				Action: func(c *gcli.Context) error {
-					cli.TunAdd(c.Args().Get(0), c.Args().Get(1), c.Bool("g"))
+					cli.TunAdd(c.Args().Get(0), c.Args().Get(1), true)
 					return nil
 				}}, {
 				Name:  "del",

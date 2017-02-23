@@ -100,7 +100,7 @@ func SetApt(name string) {
 	}
 	gateway := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4.gateway")
 	if len(gateway) == 0 {
-		gateway = "10.10.0.254"
+		gateway = "10.10.10.254"
 	}
 
 	repo := []byte("deb http://" + gateway + "/apt/main trusty main restricted universe multiverse\n" +
@@ -422,7 +422,7 @@ func SetContainerUID(c string) {
 func SetDNS(name string) {
 	dns := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4.gateway")
 	if len(dns) == 0 {
-		dns = "10.10.0.254"
+		dns = "10.10.10.254"
 	}
 
 	resolv := []byte("domain\tintra.lan\nsearch\tintra.lan\nnameserver\t" + dns + "\n")

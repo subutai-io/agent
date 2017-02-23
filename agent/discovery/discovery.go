@@ -2,12 +2,14 @@ package discovery
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/fromkeith/gossdp"
+	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/net"
@@ -16,6 +18,11 @@ import (
 
 type handler struct {
 }
+
+func (h handler) Tracef(f string, args ...interface{}) {}
+func (h handler) Infof(f string, args ...interface{})  {}
+func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
+func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
 
 func (h handler) Response(message gossdp.ResponseMessage) {
 	if len(config.Management.Fingerprint) == 0 || config.Management.Fingerprint == message.DeviceId {
@@ -31,12 +38,12 @@ func Monitor() {
 		} else {
 			go client()
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(30 * time.Second)
 	}
 }
 
 func server() error {
-	s, err := gossdp.NewSsdp(nil)
+	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
 		go s.Start()
 		defer s.Stop()
@@ -54,7 +61,7 @@ func server() error {
 }
 
 func client() error {
-	c, err := gossdp.NewSsdpClient(handler{})
+	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
 	if err == nil {
 		go c.Start()
 		defer c.Stop()
@@ -88,9 +95,10 @@ func fingerprint() string {
 }
 
 func save(ip string) {
+	config.Influxdb.Server = ip
 	if config.Management.Host != ip {
-		ioutil.WriteFile(config.Agent.DataPrefix+"agent.discovery.gcfg", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
+		ioutil.WriteFile(config.Agent.DataPrefix+"agent.gcfg.discovery", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
+		monitor.InitInfluxdb()
 	}
 	config.Management.Host = ip
-	config.Influxdb.Server = ip
 }

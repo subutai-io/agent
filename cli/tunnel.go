@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
-	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -34,11 +34,7 @@ func TunAdd(socket, timeout string, global bool) {
 		socket = socket + ":22"
 	}
 
-	tun := "local"
-	if global {
-		tun = "global"
-	}
-	if item := getTunnel(socket, tun); item != nil {
+	if item := getTunnel(socket); item != nil {
 		if len(timeout) > 0 {
 			tout, err := strconv.Atoi(timeout)
 			log.Check(log.ErrorLevel, "Converting timeout to int", err)
@@ -55,7 +51,7 @@ func TunAdd(socket, timeout string, global bool) {
 		return
 	}
 
-	args, tunsrv := getArgs(global, socket)
+	args, tunsrv := getArgs(socket)
 	cmd := exec.Command("ssh", args...)
 
 	stderr, _ := cmd.StderrPipe()
@@ -71,7 +67,6 @@ func TunAdd(socket, timeout string, global bool) {
 				"pid":    strconv.Itoa(cmd.Process.Pid),
 				"local":  socket,
 				"remote": tunsrv + ":" + port[2],
-				"scope":  tun,
 				"ttl":    "-1",
 			}
 			if len(timeout) > 0 {
@@ -145,28 +140,23 @@ func TunCheck() {
 			if ttl-int(time.Now().Unix()) > 0 {
 				newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
 			}
-			if item["scope"] == "global" {
-				TunAdd(item["local"], newttl, true)
-			} else {
-				TunAdd(item["local"], newttl, false)
-			}
+			TunAdd(item["local"], newttl, true)
 		}
 	}
 }
 
 // getArgs builds command line to execute in system
-func getArgs(global bool, socket string) ([]string, string) {
+func getArgs(socket string) ([]string, string) {
 	var tunsrv string
 	var args []string
-	if global {
-		cdn, err := net.LookupIP(config.CDN.URL)
-		log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
-		tunsrv = cdn[0].String()
-		args = []string{"-i", config.Agent.AppPrefix + "etc/ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
-	} else {
-		tunsrv = ovs.GetIp()
-		args = []string{"-N", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "ubuntu@" + tunsrv}
+	cdn, err := net.LookupIP(config.CDN.URL)
+	log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
+	tunsrv = cdn[0].String()
+	key := config.Agent.AppPrefix + "etc/ssh.pem"
+	if _, err := os.Stat(config.Agent.DataPrefix + "ssh.pem"); err == nil {
+		key = config.Agent.DataPrefix + "ssh.pem"
 	}
+	args = []string{"-i", key, "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	return args, tunsrv
 }
 
@@ -182,14 +172,14 @@ func tunOpen(remote, local string) bool {
 	return true
 }
 
-func getTunnel(local, scope string) map[string]string {
+func getTunnel(socket string) map[string]string {
 	localDB, err := db.New()
 	if !log.Check(log.WarnLevel, "Opening database", err) {
 		list := localDB.GetTunList()
 		log.Check(log.WarnLevel, "Closing database", localDB.Close())
 
 		for _, item := range list {
-			if item["local"] == local && item["scope"] == scope {
+			if item["local"] == socket {
 				return item
 			}
 		}
