@@ -118,7 +118,7 @@ try {
 				sh """
 					git config user.email jenkins@subut.ai
 					git config user.name 'Jenkins Admin'
-					git commit snapcraft.yaml -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
+					git commit snapcraft.yaml.templ -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
 					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${snapRepoName} ${env.BRANCH_NAME}
 				"""
 				}
