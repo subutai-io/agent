@@ -144,3 +144,26 @@ func (i *Instance) GetTunList() (list []map[string]string) {
 	})
 	return list
 }
+
+// DiscoverySave stores information from auto discovery service in DB.
+func (i *Instance) DiscoverySave(ip string) error {
+	return i.db.Update(func(tx *bolt.Tx) error {
+		if c, err := tx.CreateBucketIfNotExists([]byte("config")); err == nil {
+			if err := c.Put([]byte("DiscoveredIP"), []byte(ip)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// DiscoveryLoad returns information from auto discovery service stored in DB.
+func (i *Instance) DiscoveryLoad() (ip string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket([]byte("config")); b != nil {
+			ip = string(b.Get([]byte("DiscoveredIP")))
+		}
+		return nil
+	})
+	return ip
+}

@@ -1,4 +1,4 @@
-//  Config package provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
+// Package config provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
 package config
 
 import (
@@ -111,7 +111,6 @@ var (
 func init() {
 	log.Level(log.InfoLevel)
 
-	var discoveryConf configFile
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
@@ -120,15 +119,7 @@ func init() {
 		conf = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/agent.gcfg"
 	}
 	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg"))
-	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&discoveryConf, conf+".discovery"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+conf, gcfg.ReadFileInto(&config, conf))
-
-	if len(config.Management.Host) < 7 {
-		config.Management.Host = discoveryConf.Management.Host
-	}
-	if len(config.Influxdb.Server) < 7 {
-		config.Influxdb.Server = discoveryConf.Influxdb.Server
-	}
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
