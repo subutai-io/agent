@@ -77,9 +77,9 @@ try {
 			sed 's/version =.*/version = ${agentVersion}/g' -i subutai/etc/agent.gcfg
 		"""
 
-		def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
+		def gitStatusSubos = sh(script: 'git status --porcelain', returnStdout: true)
 
-		if (gitStatus != '') {
+		if (gitStatusSubos != '') {
 			withCredentials([[$class: 'UsernamePasswordMultiBinding', 
 				credentialsId: 'hub-optdyn-github-auth', 
 				passwordVariable: 'GIT_PASSWORD', 
@@ -112,9 +112,9 @@ try {
 				sed 's/version:.*/version: \"${agentVersion}-(BRANCH)\"/g' -i snapcraft.yaml.templ
 			"""
 
-			def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
+			def gitStatusSnap = sh(script: 'git status --porcelain', returnStdout: true)
 
-			if (gitStatus != '') {
+			if (gitStatusSnap != '') {
 				withCredentials([[$class: 'UsernamePasswordMultiBinding', 
 				credentialsId: 'hub-optdyn-github-auth', 
 				passwordVariable: 'GIT_PASSWORD', 
