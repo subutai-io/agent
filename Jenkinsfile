@@ -77,16 +77,20 @@ try {
 			sed 's/version =.*/version = ${agentVersion}/g' -i subutai/etc/agent.gcfg
 		"""
 
-		withCredentials([[$class: 'UsernamePasswordMultiBinding', 
-			credentialsId: 'hub-optdyn-github-auth', 
-			passwordVariable: 'GIT_PASSWORD', 
-			usernameVariable: 'GIT_USER']]) {
-			sh """
-				git config user.email jenkins@subut.ai
-				git config user.name 'Jenkins Admin'
-				git commit subutai/bin/subutai subutai/etc/agent.gcfg -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
-				git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${subosRepoName} ${env.BRANCH_NAME}
-			"""
+		def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
+
+		if (gitStatus != '') {
+			withCredentials([[$class: 'UsernamePasswordMultiBinding', 
+				credentialsId: 'hub-optdyn-github-auth', 
+				passwordVariable: 'GIT_PASSWORD', 
+				usernameVariable: 'GIT_USER']]) {
+				sh """
+					git config user.email jenkins@subut.ai
+					git config user.name 'Jenkins Admin'
+					git commit subutai/bin/subutai subutai/etc/agent.gcfg -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
+					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${subosRepoName} ${env.BRANCH_NAME}
+				"""
+			}
 		}
 	}
 	node("snapcraft") {
