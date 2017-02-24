@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	portmap    = []byte("portmap")
 	uuidmap    = []byte("uuidmap")
 	sshtunnels = []byte("sshtunnels")
 )
@@ -32,7 +31,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{portmap, uuidmap, sshtunnels} {
+		for _, b := range [][]byte{uuidmap, sshtunnels} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -43,15 +42,6 @@ func initdb(db *bolt.DB) error {
 
 func (i *Instance) Close() error {
 	return i.db.Close()
-}
-
-func (i *Instance) WritePortMap(hostport, containerSocket string) error {
-	return i.db.Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(portmap); b != nil {
-			return b.Put([]byte(hostport), []byte(containerSocket))
-		}
-		return nil
-	})
 }
 
 func (i *Instance) AddUuidEntry(name, uuid string) error {

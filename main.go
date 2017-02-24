@@ -211,12 +211,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "portmap", Usage: "map external port to the container socket",
-		Action: func(c *gcli.Context) error {
-			cli.PortMap()
-			return nil
-		}}, {
-
 		Name: "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
