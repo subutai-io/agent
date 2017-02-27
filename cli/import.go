@@ -53,7 +53,7 @@ type metainfo struct {
 // templId retrieves the id of a template on global repository with specified version.
 // If certain version is not set, then latest id will be returned
 func templId(t *templ, kurjun *http.Client, token string) {
-	var meta metainfo
+	var meta []metainfo
 
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
 	if t.name == "management" && len(t.branch) != 0 {
@@ -78,16 +78,24 @@ func templId(t *templ, kurjun *http.Client, token string) {
 	body, err := ioutil.ReadAll(response.Body)
 
 	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		var oldmeta metainfo
+		if log.Check(log.WarnLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta)) {
+			return
+		}
+		meta = append(meta, oldmeta)
+	}
+
+	if len(meta) == 0 {
 		return
 	}
 
-	if t.name != meta.Name {
-		log.Info("Found: " + t.name + " -> " + meta.Name)
-		t.name = meta.Name
+	if t.name != meta[0].Name {
+		log.Info("Found: " + t.name + " -> " + meta[0].Name)
+		t.name = meta[0].Name
 	}
-	t.id = meta.ID
-	t.file = meta.File
-	t.signature = meta.Signs
+	t.id = meta[0].ID
+	t.file = meta[0].File
+	t.signature = meta[0].Signs
 }
 
 // md5sum returns MD5 hash sum of specified file

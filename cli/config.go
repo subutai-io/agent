@@ -46,7 +46,7 @@ func addValue(containerName, key, value string) {
 	if container.GetConfigItem(f, key) == "" { // add it.
 
 		fp, err := os.OpenFile(f, os.O_WRONLY|os.O_APPEND, 0644)
-		log.Check(log.FatalLevel, "Openning config", err)
+		log.Check(log.FatalLevel, "Opening config", err)
 
 		_, err = fp.WriteString(key + " = " + value)
 		log.Check(log.FatalLevel, "Writing string", err)

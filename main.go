@@ -9,6 +9,7 @@ import (
 	"github.com/subutai-io/agent/agent"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 
 	gcli "github.com/codegangsta/cli"
@@ -35,6 +36,17 @@ func main() {
 	if len(config.Template.Branch) != 0 {
 		commit = config.Template.Branch + "/" + commit
 	}
+
+	if base, err := db.New(); err == nil {
+		if len(config.Management.Host) < 7 {
+			config.Management.Host = base.DiscoveryLoad()
+		}
+		if len(config.Influxdb.Server) < 7 {
+			config.Influxdb.Server = base.DiscoveryLoad()
+		}
+		base.Close()
+	}
+
 	app.Version = version + " " + commit
 	app.Usage = "daemon and command line interface binary"
 
@@ -196,12 +208,6 @@ func main() {
 			} else {
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
 			}
-			return nil
-		}}, {
-
-		Name: "portmap", Usage: "map external port to the container socket",
-		Action: func(c *gcli.Context) error {
-			cli.PortMap()
 			return nil
 		}}, {
 

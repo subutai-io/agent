@@ -1,19 +1,25 @@
-//  Config package provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
+// Package config provides configurable variables to other packages, sets logging level, defines global repository accessibility, etc.
 package config
 
 import (
+	"bufio"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/subutai-io/agent/log"
+
+	"strings"
 
 	"gopkg.in/gcfg.v1"
 )
 
 var client *http.Client
+var version = ""
 
 type agentConfig struct {
 	Debug       bool
@@ -24,12 +30,10 @@ type agentConfig struct {
 	GpgPassword string
 }
 type managementConfig struct {
-	CDN           string
 	Host          string
 	Port          string
 	Secret        string
 	GpgUser       string
-	RestVerify    string
 	RestPublicKey string
 	Fingerprint   string
 	Allowinsecure bool
@@ -111,24 +115,22 @@ var (
 func init() {
 	log.Level(log.InfoLevel)
 
-	var discoveryConf configFile
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
-
-	conf := "/var/lib/apps/subutai/current/agent.gcfg"
-	if _, err := os.Stat(conf); os.IsNotExist(err) {
-		conf = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/agent.gcfg"
-	}
 	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg"))
-	log.Check(log.DebugLevel, "Opening Agent discovery configuration file "+conf, gcfg.ReadFileInto(&discoveryConf, conf+".discovery"))
-	log.Check(log.DebugLevel, "Opening Agent configuration file "+conf, gcfg.ReadFileInto(&config, conf))
 
-	if len(config.Management.Host) < 7 {
-		config.Management.Host = discoveryConf.Management.Host
+	confpath := "/var/lib/apps/subutai/current/"
+	if _, err := os.Stat(confpath); os.IsNotExist(err) {
+		confpath = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		config.Agent.AppPrefix = "/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		config.Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
+		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		config.CDN.URL = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-") + "cdn.subut.ai"
+		config.Template.Branch = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-")
+		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
 	}
-	if len(config.Influxdb.Server) < 7 {
-		config.Influxdb.Server = discoveryConf.Influxdb.Server
-	}
+	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
+	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
@@ -174,4 +176,40 @@ func CheckKurjun() (*http.Client, error) {
 	}
 	// }
 	return client, nil
+}
+
+// SaveDefaultConfig saves agent configuration file for future changes by user.
+// It's use build in defaultConfig constant as a source.
+func SaveDefaultConfig(conf string) error {
+	if _, err := os.Stat(conf); err == nil {
+		return nil
+	}
+
+	f, err := os.Create(conf)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+
+	c := reflect.ValueOf(&config).Elem()
+	for i := 0; i < c.NumField(); i++ {
+		_, err := fmt.Fprintln(w, "["+c.Type().Field(i).Name+"]")
+		if err != nil {
+			return err
+		}
+		for j := 0; j < c.Field(i).NumField(); j++ {
+			_, err = fmt.Fprintln(w, c.Field(i).Type().Field(j).Name, "=", c.Field(i).Field(j).Interface())
+			if err != nil {
+				return err
+			}
+
+		}
+		_, err = fmt.Fprintln(w)
+		if err != nil {
+			return err
+		}
+	}
+	w.Flush()
+	return nil
 }
