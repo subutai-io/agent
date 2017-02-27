@@ -122,12 +122,12 @@ func init() {
 	confpath := "/var/lib/apps/subutai/current/"
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
 		confpath = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		Agent.AppPrefix = "/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
-		Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		CDN.URL = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-") + "cdn.subut.ai"
-		Template.Branch = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-")
-		Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
+		config.Agent.AppPrefix = "/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		config.Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
+		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		config.CDN.URL = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-") + "cdn.subut.ai"
+		config.Template.Branch = strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai-")
+		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
 	}
 	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
