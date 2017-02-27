@@ -11,6 +11,7 @@ import (
 var (
 	uuidmap    = []byte("uuidmap")
 	sshtunnels = []byte("sshtunnels")
+	containers = []byte("containers")
 )
 
 type Instance struct {
@@ -31,7 +32,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{uuidmap, sshtunnels} {
+		for _, b := range [][]byte{uuidmap, sshtunnels, containers} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -42,15 +43,6 @@ func initdb(db *bolt.DB) error {
 
 func (i *Instance) Close() error {
 	return i.db.Close()
-}
-
-func (i *Instance) AddUuidEntry(name, uuid string) error {
-	return i.db.Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(uuidmap); b != nil {
-			return b.Put([]byte(uuid), []byte(name))
-		}
-		return nil
-	})
 }
 
 func (i *Instance) DelUuidEntry(name string) error {
@@ -67,7 +59,8 @@ func (i *Instance) DelUuidEntry(name string) error {
 	})
 }
 
-func (i *Instance) GetUuidEntry() (uuid []byte) {
+func (i *Instance) GetUuidEntry(name string) string {
+	var uuid []byte
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(uuidmap); b != nil {
 			if b.Stats().KeyN == 0 {
@@ -83,10 +76,11 @@ func (i *Instance) GetUuidEntry() (uuid []byte) {
 			if len(uuid) == 0 {
 				uuid = []byte(strconv.Itoa(65536 + 65536*b.Stats().KeyN))
 			}
+			b.Put(uuid, []byte(name))
 		}
 		return nil
 	})
-	return uuid
+	return string(uuid)
 }
 
 func (i *Instance) AddTunEntry(options map[string]string) error {
@@ -135,25 +129,12 @@ func (i *Instance) GetTunList() (list []map[string]string) {
 	return list
 }
 
-// DiscoverySave stores information from auto discovery service in DB.
-func (i *Instance) DiscoverySave(ip string) error {
-	return i.db.Update(func(tx *bolt.Tx) error {
-		if c, err := tx.CreateBucketIfNotExists([]byte("config")); err == nil {
-			if err := c.Put([]byte("DiscoveredIP"), []byte(ip)); err != nil {
-				return err
-			}
+func (i *Instance) AddContainer(name, env, parent, addr string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			_, err = b.CreateBucketIfNotExists([]byte(name))
 		}
 		return nil
 	})
-}
-
-// DiscoveryLoad returns information from auto discovery service stored in DB.
-func (i *Instance) DiscoveryLoad() (ip string) {
-	i.db.View(func(tx *bolt.Tx) error {
-		if b := tx.Bucket([]byte("config")); b != nil {
-			ip = string(b.Get([]byte("DiscoveredIP")))
-		}
-		return nil
-	})
-	return ip
+	return
 }
