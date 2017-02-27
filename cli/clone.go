@@ -23,13 +23,12 @@ import (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envId, addr, token, kurjToken string) {
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-
+	meta := make(map[string]string)
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
 		parent = idToName(id[1], kurjun, kurjToken)
 	}
+	meta["parent"] = parent
 
 	if !container.IsTemplate(parent) {
 		LxcImport(parent, "", kurjToken, false)
@@ -46,10 +45,12 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	if len(envId) != 0 {
 		container.SetEnvID(child, envId)
+		meta["environment"] = envId
 	}
 
 	if len(addr) != 0 {
 		addNetConf(child, addr)
+		meta["addr"] = addr
 	}
 
 	container.SetContainerUID(child)
@@ -63,9 +64,11 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	LxcStart(child)
 
-	bolt.AddContainer(child, envId, parent, addr)
-
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	bolt.AddContainer(child, meta)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
 

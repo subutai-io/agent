@@ -152,10 +152,16 @@ func (i *Instance) DiscoveryLoad() (ip string) {
 	return ip
 }
 
-func (i *Instance) AddContainer(name, env, parent, addr string) (err error) {
+func (i *Instance) AddContainer(name string, options ...map[string]string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(containers); b != nil {
-			_, err = b.CreateBucketIfNotExists([]byte(name))
+			if b, err = b.CreateBucketIfNotExists([]byte(name)); err == nil {
+				if len(options) > 0 {
+					for k, v := range options[0] {
+						b.Put([]byte(k), []byte(v))
+					}
+				}
+			}
 		}
 		return nil
 	})
