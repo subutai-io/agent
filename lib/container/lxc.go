@@ -389,29 +389,29 @@ func GetConfigItem(path, item string) string {
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) {
-	db, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	newuid := string(db.GetUuidEntry())
-	log.Check(log.WarnLevel, "Adding new uuid entry", db.AddUuidEntry(c, newuid))
-	log.Check(log.WarnLevel, "Closing database", db.Close())
+	uid := "65536"
+	if bolt, err := db.New(); err == nil {
+		uid = bolt.GetUuidEntry(c)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 
 	SetContainerConf(c, [][]string{
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
-		{"lxc.id_map", "u 0 " + newuid + " 65536"},
-		{"lxc.id_map", "g 0 " + newuid + " 65536"},
+		{"lxc.id_map", "u 0 " + uid + " 65536"},
+		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})
 
 	if s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs"); err == nil {
 		parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift home", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift opt", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift var", err)
 
 		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))

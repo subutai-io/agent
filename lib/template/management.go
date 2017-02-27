@@ -29,7 +29,6 @@ func MngInit() {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/var var none bind,rw 0 0"},
 	})
 	container.SetApt("management")
-	container.SetContainerUID("management")
 	gpg.GenerateKey("management")
 	container.Start("management")
 

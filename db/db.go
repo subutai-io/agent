@@ -9,28 +9,12 @@ import (
 )
 
 var (
-	portmap     = []byte("portmap")
-	uuidmap     = []byte("uuidmap")
-	sshtunnels  = []byte("sshtunnels")
-	environment = []byte("environment")
+	uuidmap    = []byte("uuidmap")
+	sshtunnels = []byte("sshtunnels")
 )
 
 type Instance struct {
 	db *bolt.DB
-}
-
-type Environment struct {
-	id struct {
-		p2p        *bolt.Bucket
-		containers *[]container
-	}
-}
-
-type container struct {
-	quota *bolt.Bucket
-}
-
-type p2p struct {
 }
 
 func New() (*Instance, error) {
@@ -47,7 +31,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{portmap, uuidmap, sshtunnels, environment} {
+		for _, b := range [][]byte{uuidmap, sshtunnels} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -58,15 +42,6 @@ func initdb(db *bolt.DB) error {
 
 func (i *Instance) Close() error {
 	return i.db.Close()
-}
-
-func (i *Instance) WritePortMap(hostport, containerSocket string) error {
-	return i.db.Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(portmap); b != nil {
-			return b.Put([]byte(hostport), []byte(containerSocket))
-		}
-		return nil
-	})
 }
 
 func (i *Instance) AddUuidEntry(name, uuid string) error {
@@ -160,39 +135,25 @@ func (i *Instance) GetTunList() (list []map[string]string) {
 	return list
 }
 
-func (i *Instance) Environment(id string) (env Environment, err error) {
-	i.db.Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(environment); b != nil {
-			env.id, err = b.CreateBucketIfNotExists([]byte(id))
+// DiscoverySave stores information from auto discovery service in DB.
+func (i *Instance) DiscoverySave(ip string) error {
+	return i.db.Update(func(tx *bolt.Tx) error {
+		if c, err := tx.CreateBucketIfNotExists([]byte("config")); err == nil {
+			if err := c.Put([]byte("DiscoveredIP"), []byte(ip)); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
-	return env, err
 }
 
-func (env *Environment) P2P(dev, ip string) (err error) {
-	if env.p2p, err = env.bucket.CreateBucketIfNotExists([]byte("p2p")); err == nil {
-		env.p2p.Put([]byte("dev"), []byte(dev))
-		env.p2p.Put([]byte("ip"), []byte(ip))
-	}
-	return err
-}
-
-func (env *Environment) Container(name string, args ...map[string]string) (err error) {
-	if env.containers.b0ucket, err = env.bucket.CreateBucketIfNotExists([]byte("containers")); err == nil {
-		env.containers.c, err = env.containers.CreateBucketIfNotExists([]byte(name))
-		if err == nil {
-			if len(args) != 0 {
-				for k, v := range args[0] {
-					container.Put([]byte(k), []byte(v))
-				}
-			}
+// DiscoveryLoad returns information from auto discovery service stored in DB.
+func (i *Instance) DiscoveryLoad() (ip string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket([]byte("config")); b != nil {
+			ip = string(b.Get([]byte("DiscoveredIP")))
 		}
-	}
-	return err
+		return nil
+	})
+	return ip
 }
-
-// func (env *Environment) Quota() error {
-// if quota, err := env.containers .CreateBucketIfNotExists(key); err == nil {
-// }
-// }

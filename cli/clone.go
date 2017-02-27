@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
@@ -22,6 +23,9 @@ import (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envId, addr, token, kurjToken string) {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
 		parent = idToName(id[1], kurjun, kurjToken)
@@ -33,7 +37,6 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 	if container.IsContainer(child) {
 		log.Error("Container " + child + " already exist")
 	}
-
 	container.Clone(parent, child)
 	gpg.GenerateKey(child)
 
@@ -49,8 +52,9 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 		addNetConf(child, addr)
 	}
 
-	//Need to change it in parent templates
 	container.SetContainerUID(child)
+
+	//Need to change it in parent templates
 	container.SetApt(child)
 	container.SetDNS(child)
 
@@ -59,8 +63,10 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	LxcStart(child)
 
-	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
+	bolt.AddContainer(child, envId, parent, addr)
 
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
 
 // addNetConf adds network related configuration values to container config file
