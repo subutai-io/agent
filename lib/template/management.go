@@ -4,6 +4,7 @@ import (
 	"os/exec"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
@@ -31,6 +32,11 @@ func MngInit() {
 	container.SetApt("management")
 	gpg.GenerateKey("management")
 	container.Start("management")
+
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd("management", map[string]string{"addr": "10.10.10.1"}))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	log.Info("********************")
 	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")

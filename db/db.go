@@ -61,7 +61,7 @@ func (i *Instance) DelUuidEntry(name string) error {
 
 func (i *Instance) GetUuidEntry(name string) string {
 	var uuid []byte
-	i.db.View(func(tx *bolt.Tx) error {
+	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(uuidmap); b != nil {
 			if b.Stats().KeyN == 0 {
 				uuid = []byte("65536")

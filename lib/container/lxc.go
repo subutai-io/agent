@@ -200,7 +200,7 @@ func Destroy(name string) {
 
 	db, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting uuid entry", db.ContainerDel(name))
+	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
 }
