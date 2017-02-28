@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
@@ -41,8 +42,14 @@ func LxcQuota(name, res, size, threshold string) {
 	case "cpu":
 		quota = strconv.Itoa(container.QuotaCPU(name, size))
 	}
-	fmt.Println(`{"quota":"` + quota + `", "threshold":` + alert + `}`)
+	if len(res) > 0 && len(size) > 0 {
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerQuota(name, res, size))
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 
+	fmt.Println(`{"quota":"` + quota + `", "threshold":` + alert + `}`)
 }
 
 // setQuotaThreshold sets threshold for quota alerts

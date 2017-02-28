@@ -152,18 +152,50 @@ func (i *Instance) DiscoveryLoad() (ip string) {
 	return ip
 }
 
-func (i *Instance) AddContainer(name string, options ...map[string]string) (err error) {
+func (i *Instance) ContainerAdd(name string, options map[string]string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(containers); b != nil {
-			if b, err = b.CreateBucketIfNotExists([]byte(name)); err == nil {
-				if len(options) > 0 {
-					for k, v := range options[0] {
-						b.Put([]byte(k), []byte(v))
-					}
+			b, err = b.CreateBucketIfNotExists([]byte(name))
+			if err != nil {
+				return err
+			}
+			for k, v := range options {
+				if err = b.Put([]byte(k), []byte(v)); err != nil {
+					return err
 				}
 			}
 		}
 		return nil
 	})
 	return
+}
+
+func (i *Instance) ContainerDel(name string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if err = b.DeleteBucket([]byte(name)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				b, err := b.CreateBucketIfNotExists([]byte("quota"))
+				if err != nil {
+					return err
+				}
+				if err = b.Put([]byte(res), []byte(quota)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return err
 }

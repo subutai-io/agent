@@ -66,7 +66,7 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	bolt.AddContainer(child, meta)
+	log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerAdd(child, meta))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
