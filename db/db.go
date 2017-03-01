@@ -12,6 +12,7 @@ var (
 	uuidmap    = []byte("uuidmap")
 	sshtunnels = []byte("sshtunnels")
 	containers = []byte("containers")
+	portmap    = []byte("portmap")
 )
 
 type Instance struct {
@@ -32,7 +33,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{uuidmap, sshtunnels, containers} {
+		for _, b := range [][]byte{uuidmap, sshtunnels, containers, portmap} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -198,4 +199,35 @@ func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
 		return nil
 	})
 	return err
+}
+
+func (i *Instance) PortMapSet(protocol, internal, external string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			b, err = b.CreateBucketIfNotExists([]byte(protocol))
+			if err != nil {
+				return err
+			}
+			if err = b.Put([]byte(external), []byte(internal)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) PortInMap(protocol, external string) (res bool) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				if b.Get([]byte(external)) != nil {
+					res = true
+					return nil
+				}
+			}
+		}
+		return nil
+	})
+	return
 }
