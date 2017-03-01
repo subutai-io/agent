@@ -33,7 +33,7 @@ func checkStore() int {
 	var channel string
 	var available, installed int
 
-	out, err := exec.Command("snap", "info", "subutai").Output()
+	out, err := exec.Command("snap", "info", os.Getenv("SNAP_NAME")).Output()
 	if err != nil {
 		return 0
 	}
@@ -204,7 +204,7 @@ func Update(name string, check bool) {
 				os.Exit(0)
 			} else {
 				log.Check(log.FatalLevel, "Updating RH snap",
-					exec.Command("snap", "refresh", "--devmode", "subutai").Run())
+					exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).Run())
 			}
 		}
 
