@@ -12,7 +12,7 @@ import (
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 
-	gcli "github.com/codegangsta/cli"
+	gcli "github.com/urfave/cli"
 )
 
 var version = "unknown"
@@ -113,7 +113,7 @@ func main() {
 		Name: "daemon", Usage: "start Subutai agent",
 		Action: func(c *gcli.Context) error {
 			config.InitAgentDebug()
-			agent.Start(c)
+			agent.Start()
 			return nil
 		}}, {
 
