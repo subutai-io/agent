@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -211,6 +212,7 @@ func (i *Instance) PortMapSet(protocol, internal, external string) (err error) {
 			if err = b.Put([]byte(external), []byte(internal)); err != nil {
 				return err
 			}
+			log.Debug("Saving:" + protocol + " " + external + ":" + internal)
 		}
 		return nil
 	})

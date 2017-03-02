@@ -195,7 +195,7 @@ func main() {
 					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
 					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
 				Action: func(c *gcli.Context) error {
-					cli.MapTCP(c.String("i"), c.String("e"), c.Bool("r"))
+					cli.MapStream("tcp", c.String("i"), c.String("e"), c.Bool("r"))
 					return nil
 				},
 			},
@@ -220,7 +220,7 @@ func main() {
 					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
 					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
 				Action: func(c *gcli.Context) error {
-					cli.MapUDP(c.String("i"), c.String("e"), c.Bool("r"))
+					cli.MapStream("udp", c.String("i"), c.String("e"), c.Bool("r"))
 					return nil
 				},
 			},
