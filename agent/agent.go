@@ -18,8 +18,6 @@ import (
 	"sync"
 	"time"
 
-	gcli "github.com/codegangsta/cli"
-
 	"github.com/subutai-io/agent/agent/alert"
 	"github.com/subutai-io/agent/agent/connect"
 	"github.com/subutai-io/agent/agent/container"
@@ -72,7 +70,7 @@ func initAgent() {
 }
 
 //Start starting Subutai Agent daemon, all required goroutines and keep working during all life cycle.
-func Start(c *gcli.Context) {
+func Start() {
 	initAgent()
 
 	http.HandleFunc("/trigger", trigger)
