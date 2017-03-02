@@ -210,7 +210,7 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 
 // idToName retrieves template name from global repository by passed id string
 func idToName(id string, kurjun *http.Client, token string) string {
-	var meta metainfo
+	var meta []metainfo
 
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
 	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
@@ -225,7 +225,10 @@ func idToName(id string, kurjun *http.Client, token string) string {
 	}
 	log.Check(log.ErrorLevel, "Parsing response body", json.Unmarshal(body, &meta))
 
-	return meta.Name
+	if len(meta) > 0 {
+		return meta[0].Name
+	}
+	return ""
 }
 
 // lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation
