@@ -6,7 +6,6 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -202,27 +201,37 @@ func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
 	return err
 }
 
-func (i *Instance) PortMapSet(protocol, internal, external string) (err error) {
+func (i *Instance) PortMapSet(protocol, internal, external string, domain []string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			b, err = b.CreateBucketIfNotExists([]byte(protocol))
 			if err != nil {
 				return err
 			}
+			if protocol == "http" && len(domain) > 0 {
+				b, err = b.CreateBucketIfNotExists([]byte(domain[0]))
+				if err != nil {
+					return err
+				}
+			}
 			if err = b.Put([]byte(external), []byte(internal)); err != nil {
 				return err
 			}
-			log.Debug("Saving:" + protocol + " " + external + ":" + internal)
 		}
 		return nil
 	})
 	return
 }
 
-func (i *Instance) PortInMap(protocol, external string) (res bool) {
+func (i *Instance) PortInMap(protocol, external string, domain []string) (res bool) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b = b.Bucket([]byte(protocol)); b != nil {
+				if protocol == "http" && len(domain) > 0 {
+					if b = b.Bucket([]byte(domain[0])); b == nil {
+						return nil
+					}
+				}
 				if b.Get([]byte(external)) != nil {
 					res = true
 					return nil

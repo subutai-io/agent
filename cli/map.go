@@ -39,11 +39,33 @@ func MapStream(protocol, internal, external string, remove bool) {
 	log.Info(ovs.GetIp() + ":" + external)
 }
 
-func MapHTTP(internal, external, domain string, remove bool) {}
+func MapHTTP(internal, external, domain string, remove bool) {
+	if len(domain) == 0 {
+		log.Error("Parameter \"domain\" should be passed with HTTP protocol")
+	}
+	if !validSocket(internal) {
+		log.Error("Parameter \"internal\" should be in ip:port format")
+	}
+
+	if portIsNew("http", &external, domain) {
+		newConfig("http", external, domain)
+	}
+
+	addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+external+".conf",
+		"#Add new host here", "server "+internal+";", false)
+
+	// save information to database
+	saveMapToDB("http", internal, external, domain)
+
+	// reload nginx
+	restart()
+
+	log.Info(ovs.GetIp() + ":" + external)
+}
 
 func isFree(protocol, port string) (res bool) {
 	switch protocol {
-	case "tcp":
+	case "tcp", "http":
 		if ln, err := net.Listen("tcp", ovs.GetIp()+":"+port); err == nil {
 			ln.Close()
 			res = true
@@ -75,7 +97,7 @@ func validSocket(socket string) bool {
 	return false
 }
 
-func portIsNew(protocol string, external *string) (new bool) {
+func portIsNew(protocol string, external *string, domain ...string) (new bool) {
 	if len(*external) != 0 {
 		if port, err := strconv.Atoi(*external); err != nil || port < 1000 || port > 65536 {
 			log.Error("Parameter \"external\" should be integer in range of 1000-65536")
@@ -85,7 +107,7 @@ func portIsNew(protocol string, external *string) (new bool) {
 		} else {
 			bolt, err := db.New()
 			log.Check(log.ErrorLevel, "Openning portmap database", err)
-			if !bolt.PortInMap(protocol, *external) {
+			if !bolt.PortInMap(protocol, *external, domain) {
 				log.Error("Port is busy")
 			}
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
@@ -99,30 +121,40 @@ func portIsNew(protocol string, external *string) (new bool) {
 	return
 }
 
-func newConfig(protocol, port string) {
+func newConfig(protocol, port string, domain ...string) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
 		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/stream", 0755))
-	fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
 
 	switch protocol {
 	case "tcp":
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
 		addLine(config.Agent.DataPrefix+"nginx-includes/stream/tcp-"+port+".conf",
 			"listen PORT;", "listen "+port+";", true)
 	case "udp":
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
 		addLine(config.Agent.DataPrefix+"nginx-includes/stream/udp-"+port+".conf",
 			"listen PORT;", "listen "+port+" udp;", true)
+	case "http":
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/http-stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
+		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
+			"listen PORT;", "listen "+port+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
+			"server_name DOMAIN;", "server_name "+domain[0]+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
+			"proxy_pass http://PROTO-PORT/;", "proxy_pass http://http-"+port+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
+			"upstream PROTO-PORT {", "upstream http-"+port+" {", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
+			"server localhost:81;", " ", true)
+		return
 	}
 	addLine(config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf",
 		"proxy_pass PROTO-PORT;", "proxy_pass "+protocol+"-"+port+";", true)
-	addLine(config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf",
-		"upstream PROTO-PORT {", "upstream "+protocol+"-"+port+" {", true)
-	addLine(config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf",
-		"server localhost:81;", " ", true)
 }
 
-func saveMapToDB(protocol, internal, external string) {
+func saveMapToDB(protocol, internal, external string, domain ...string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database", err)
-	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, internal, external))
+	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, internal, external, domain))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }

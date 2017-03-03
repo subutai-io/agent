@@ -205,7 +205,7 @@ func main() {
 				Flags: []gcli.Flag{
 					gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
 					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
-					gcli.BoolFlag{Name: "domain, d", Usage: "delete domain from vlan"},
+					gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
 					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
 				Action: func(c *gcli.Context) error {
 					cli.MapHTTP(c.String("i"), c.String("e"), c.String("d"), c.Bool("r"))
