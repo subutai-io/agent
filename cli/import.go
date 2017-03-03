@@ -223,7 +223,11 @@ func idToName(id string, kurjun *http.Client, token string) string {
 	if string(body) == "Not found" {
 		log.Error("Template with id \"" + id + "\" not found")
 	}
-	log.Check(log.ErrorLevel, "Parsing response body", json.Unmarshal(body, &meta))
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		var oldmeta metainfo
+		log.Check(log.ErrorLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta))
+		meta = append(meta, oldmeta)
+	}
 
 	if len(meta) > 0 {
 		return meta[0].Name
