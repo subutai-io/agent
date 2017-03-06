@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -216,6 +217,33 @@ func (i *Instance) PortMapSet(protocol, internal, external string, domain []stri
 			}
 			if err = b.Put([]byte(external), []byte(internal)); err != nil {
 				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) PortMapDelete(protocol, internal, external string, domain []string) (left int) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b := b.Bucket([]byte(protocol)); b != nil {
+				if protocol == "http" && len(domain) > 0 {
+					if len(internal) == 0 {
+						b.DeleteBucket([]byte(domain[0]))
+						return nil
+					}
+					b = b.Bucket([]byte(domain[0]))
+				}
+				if len(external) > 0 && len(internal) > 0 {
+					if b.Bucket([]byte(external)); b != nil {
+						b.DeleteBucket([]byte(internal))
+						left = b.Stats().KeyN
+						log.Debug("Left " + strconv.Itoa(left) + " entries")
+					}
+				} else if len(external) > 0 {
+					b.DeleteBucket([]byte(external))
+				}
 			}
 		}
 		return nil

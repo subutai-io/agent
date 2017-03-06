@@ -16,6 +16,10 @@ import (
 )
 
 func MapPort(protocol, internal, external string, remove bool, domain ...string) {
+	if remove {
+		mapRemove(protocol, internal, external, domain)
+		return
+	}
 	//validate args
 	if protocol == "http" && len(domain[0]) == 0 {
 		log.Error("\"-d domain\" is mandatory for http protocol")
@@ -41,6 +45,23 @@ func MapPort(protocol, internal, external string, remove bool, domain ...string)
 	restart()
 
 	log.Info(ovs.GetIp() + ":" + external)
+}
+
+func mapRemove(protocol, internal, external string, domain []string) {
+	// remove from database
+	bolt, err := db.New()
+	log.Check(log.ErrorLevel, "Openning portmap database", err)
+	l := bolt.PortMapDelete(protocol, internal, external, domain)
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	// remove from file
+	if l > 0 {
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
+			"server "+internal+";", " ", true)
+	} else {
+		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + ".conf")
+	}
+	restart()
+	// reload
 }
 
 func isFree(protocol, port string) (res bool) {
