@@ -186,44 +186,14 @@ func main() {
 		}}, {
 
 		Name: "map", Usage: "Subutai port mapping",
-		Subcommands: []gcli.Command{
-			{
-				Name:  "tcp",
-				Usage: "add tcp port map",
-				Flags: []gcli.Flag{
-					gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
-					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
-					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
-				Action: func(c *gcli.Context) error {
-					cli.MapStream("tcp", c.String("i"), c.String("e"), c.Bool("r"))
-					return nil
-				},
-			},
-			{
-				Name:  "http",
-				Usage: "add http port map",
-				Flags: []gcli.Flag{
-					gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
-					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
-					gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
-					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
-				Action: func(c *gcli.Context) error {
-					cli.MapHTTP(c.String("i"), c.String("e"), c.String("d"), c.Bool("r"))
-					return nil
-				},
-			},
-			{
-				Name:  "udp",
-				Usage: "add udp port map",
-				Flags: []gcli.Flag{
-					gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
-					gcli.StringFlag{Name: "external, e", Usage: "RH port"},
-					gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
-				Action: func(c *gcli.Context) error {
-					cli.MapStream("udp", c.String("i"), c.String("e"), c.Bool("r"))
-					return nil
-				},
-			},
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
+			gcli.StringFlag{Name: "external, e", Usage: "RH port"},
+			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"},
+			gcli.StringFlag{Name: "domain, d", Usage: "domain name"}},
+		Action: func(c *gcli.Context) error {
+			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.Bool("r"), c.String("d"))
+			return nil
 		}}, {
 
 		Name: "metrics", Usage: "list Subutai container",

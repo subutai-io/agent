@@ -15,47 +15,27 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-func MapStream(protocol, internal, external string, remove bool) {
-	//validate internal socket
+func MapPort(protocol, internal, external string, remove bool, domain ...string) {
+	//validate args
+	if protocol == "http" && len(domain[0]) == 0 {
+		log.Error("\"-d domain\" is mandatory for http protocol")
+	}
+
 	if !validSocket(internal) {
 		log.Error("Parameter \"internal\" should be in ip:port format")
 	}
 
 	// check external port and create nginx config
-	if portIsNew(protocol, &external) {
-		newConfig(protocol, external)
+	if portIsNew(protocol, &external, domain) {
+		newConfig(protocol, external, domain)
 	}
 
 	// add containers to backend
-	addLine(config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+external+".conf",
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
 		"#Add new host here", "server "+internal+";", false)
 
 	// save information to database
-	saveMapToDB(protocol, internal, external)
-
-	// reload nginx
-	restart()
-
-	log.Info(ovs.GetIp() + ":" + external)
-}
-
-func MapHTTP(internal, external, domain string, remove bool) {
-	if len(domain) == 0 {
-		log.Error("Parameter \"domain\" should be passed with HTTP protocol")
-	}
-	if !validSocket(internal) {
-		log.Error("Parameter \"internal\" should be in ip:port format")
-	}
-
-	if portIsNew("http", &external, domain) {
-		newConfig("http", external, domain)
-	}
-
-	addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+external+".conf",
-		"#Add new host here", "server "+internal+";", false)
-
-	// save information to database
-	saveMapToDB("http", internal, external, domain)
+	saveMapToDB(protocol, internal, external, domain)
 
 	// reload nginx
 	restart()
@@ -97,7 +77,7 @@ func validSocket(socket string) bool {
 	return false
 }
 
-func portIsNew(protocol string, external *string, domain ...string) (new bool) {
+func portIsNew(protocol string, external *string, domain []string) (new bool) {
 	if len(*external) != 0 {
 		if port, err := strconv.Atoi(*external); err != nil || port < 1000 || port > 65536 {
 			log.Error("Parameter \"external\" should be integer in range of 1000-65536")
@@ -121,38 +101,42 @@ func portIsNew(protocol string, external *string, domain ...string) (new bool) {
 	return
 }
 
-func newConfig(protocol, port string, domain ...string) {
+func newConfig(protocol, port string, domain []string) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
-		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/stream", 0755))
+		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/"+protocol, 0755))
 
 	switch protocol {
+	case "http":
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example",
+			config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf")
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			"listen 	80;", "listen "+port+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			"server_name DOMAIN;", "server_name "+domain[0]+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			"proxy_pass http://DOMAIN-upstream/;", "proxy_pass http://http-"+port+";", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			"upstream DOMAIN-upstream {", "upstream http-"+port+" {", true)
 	case "tcp":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
-		addLine(config.Agent.DataPrefix+"nginx-includes/stream/tcp-"+port+".conf",
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example",
+			config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf")
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
 			"listen PORT;", "listen "+port+";", true)
 	case "udp":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
-		addLine(config.Agent.DataPrefix+"nginx-includes/stream/udp-"+port+".conf",
+		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example",
+			config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf")
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
 			"listen PORT;", "listen "+port+" udp;", true)
-	case "http":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/http-stream.example", config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf")
-		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
-			"listen PORT;", "listen "+port+";", true)
-		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
-			"server_name DOMAIN;", "server_name "+domain[0]+";", true)
-		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
-			"proxy_pass http://PROTO-PORT/;", "proxy_pass http://http-"+port+";", true)
-		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
-			"upstream PROTO-PORT {", "upstream http-"+port+" {", true)
-		addLine(config.Agent.DataPrefix+"nginx-includes/http/http-"+port+".conf",
-			"server localhost:81;", " ", true)
-		return
 	}
-	addLine(config.Agent.DataPrefix+"nginx-includes/stream/"+protocol+"-"+port+".conf",
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+		"server localhost:81;", " ", true)
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+		"upstream PROTO-PORT {", "upstream "+protocol+"-"+port+" {", true)
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
 		"proxy_pass PROTO-PORT;", "proxy_pass "+protocol+"-"+port+";", true)
 }
 
-func saveMapToDB(protocol, internal, external string, domain ...string) {
+func saveMapToDB(protocol, internal, external string, domain []string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database", err)
 	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, internal, external, domain))
