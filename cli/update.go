@@ -31,7 +31,7 @@ type snap struct {
 
 func checkStore() int {
 	if exec.Command("snap", "list", os.Getenv("SNAP_NAME")).Run() != nil {
-		return 1
+		return 0
 	}
 
 	local, _, _ := client.New(nil).Snap(os.Getenv("SNAP_NAME"))
