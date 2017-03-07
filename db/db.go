@@ -11,6 +11,8 @@ import (
 var (
 	uuidmap    = []byte("uuidmap")
 	sshtunnels = []byte("sshtunnels")
+	containers = []byte("containers")
+	portmap    = []byte("portmap")
 )
 
 type Instance struct {
@@ -31,7 +33,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{uuidmap, sshtunnels} {
+		for _, b := range [][]byte{uuidmap, sshtunnels, containers, portmap} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -42,15 +44,6 @@ func initdb(db *bolt.DB) error {
 
 func (i *Instance) Close() error {
 	return i.db.Close()
-}
-
-func (i *Instance) AddUuidEntry(name, uuid string) error {
-	return i.db.Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(uuidmap); b != nil {
-			return b.Put([]byte(uuid), []byte(name))
-		}
-		return nil
-	})
 }
 
 func (i *Instance) DelUuidEntry(name string) error {
@@ -67,8 +60,9 @@ func (i *Instance) DelUuidEntry(name string) error {
 	})
 }
 
-func (i *Instance) GetUuidEntry() (uuid []byte) {
-	i.db.View(func(tx *bolt.Tx) error {
+func (i *Instance) GetUuidEntry(name string) string {
+	var uuid []byte
+	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(uuidmap); b != nil {
 			if b.Stats().KeyN == 0 {
 				uuid = []byte("65536")
@@ -83,10 +77,11 @@ func (i *Instance) GetUuidEntry() (uuid []byte) {
 			if len(uuid) == 0 {
 				uuid = []byte(strconv.Itoa(65536 + 65536*b.Stats().KeyN))
 			}
+			b.Put(uuid, []byte(name))
 		}
 		return nil
 	})
-	return uuid
+	return string(uuid)
 }
 
 func (i *Instance) AddTunEntry(options map[string]string) error {
@@ -156,4 +151,129 @@ func (i *Instance) DiscoveryLoad() (ip string) {
 		return nil
 	})
 	return ip
+}
+
+func (i *Instance) ContainerAdd(name string, options map[string]string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			b, err = b.CreateBucketIfNotExists([]byte(name))
+			if err != nil {
+				return err
+			}
+			for k, v := range options {
+				if err = b.Put([]byte(k), []byte(v)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) ContainerDel(name string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if err = b.DeleteBucket([]byte(name)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				b, err := b.CreateBucketIfNotExists([]byte("quota"))
+				if err != nil {
+					return err
+				}
+				if err = b.Put([]byte(res), []byte(quota)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (i *Instance) PortMapSet(protocol, internal, external string, domain []string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			b, err = b.CreateBucketIfNotExists([]byte(protocol))
+			if err != nil {
+				return err
+			}
+			if protocol == "http" && len(domain) > 0 {
+				b, err = b.CreateBucketIfNotExists([]byte(domain[0]))
+				if err != nil {
+					return err
+				}
+			}
+			b, err = b.CreateBucketIfNotExists([]byte(external))
+			if err != nil {
+				return err
+			}
+			if err = b.Put([]byte(internal), []byte("w")); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) PortMapDelete(protocol, internal, external string, domain []string) (left int) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b := b.Bucket([]byte(protocol)); b != nil {
+				if protocol == "http" && len(domain) > 0 {
+					if len(internal) == 0 {
+						b.DeleteBucket([]byte(domain[0]))
+						return nil
+					}
+					b = b.Bucket([]byte(domain[0]))
+				}
+				if len(external) > 0 && len(internal) > 0 {
+					if b = b.Bucket([]byte(external)); b != nil {
+						left = b.Stats().KeyN
+						if b.Get([]byte(internal)) != nil {
+							b.Delete([]byte(internal))
+							left--
+						}
+					}
+				} else if len(external) > 0 {
+					b.DeleteBucket([]byte(external))
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) PortInMap(protocol, external, internal string, domain []string) (res bool) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				if protocol == "http" && len(domain) > 0 {
+					if b = b.Bucket([]byte(domain[0])); b == nil {
+						return nil
+					}
+				}
+				if b = b.Bucket([]byte(external)); b != nil {
+					if len(internal) > 0 && b.Get([]byte(internal)) == nil {
+						return nil
+					}
+					res = true
+				}
+			}
+		}
+		return nil
+	})
+	return
 }

@@ -185,6 +185,17 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "map", Usage: "Subutai port mapping",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
+			gcli.StringFlag{Name: "external, e", Usage: "RH port"},
+			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"},
+			gcli.StringFlag{Name: "domain, d", Usage: "domain name"}},
+		Action: func(c *gcli.Context) error {
+			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.Bool("r"), c.String("d"))
+			return nil
+		}}, {
+
 		Name: "metrics", Usage: "list Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "start, s", Usage: "start time"},
