@@ -30,7 +30,7 @@ func MapPort(protocol, internal, external string, remove bool, domain ...string)
 	}
 
 	// check external port and create nginx config
-	if portIsNew(protocol, &external, domain) {
+	if portIsNew(protocol, internal, &external, domain) {
 		newConfig(protocol, external, domain)
 	}
 
@@ -48,12 +48,14 @@ func MapPort(protocol, internal, external string, remove bool, domain ...string)
 }
 
 func mapRemove(protocol, internal, external string, domain []string) {
-	// remove from database
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database", err)
+	if !bolt.PortInMap(protocol, external, internal, domain) {
+		log.Error("Map doesn't exists")
+	}
 	l := bolt.PortMapDelete(protocol, internal, external, domain)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-	// remove from file
+
 	if l > 0 {
 		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
 			"server "+internal+";", " ", true)
@@ -61,7 +63,6 @@ func mapRemove(protocol, internal, external string, domain []string) {
 		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + ".conf")
 	}
 	restart()
-	// reload
 }
 
 func isFree(protocol, port string) (res bool) {
@@ -98,7 +99,7 @@ func validSocket(socket string) bool {
 	return false
 }
 
-func portIsNew(protocol string, external *string, domain []string) (new bool) {
+func portIsNew(protocol, internal string, external *string, domain []string) (new bool) {
 	if len(*external) != 0 {
 		if port, err := strconv.Atoi(*external); err != nil || port < 1000 || port > 65536 {
 			log.Error("Parameter \"external\" should be integer in range of 1000-65536")
@@ -108,7 +109,9 @@ func portIsNew(protocol string, external *string, domain []string) (new bool) {
 		} else {
 			bolt, err := db.New()
 			log.Check(log.ErrorLevel, "Openning portmap database", err)
-			if !bolt.PortInMap(protocol, *external, domain) {
+			if bolt.PortInMap(protocol, *external, internal, domain) {
+				log.Error("Map is already exists")
+			} else if !bolt.PortInMap(protocol, *external, "", domain) {
 				log.Error("Port is busy")
 			}
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())

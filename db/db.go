@@ -6,7 +6,6 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/log"
 )
 
 var (
@@ -215,7 +214,11 @@ func (i *Instance) PortMapSet(protocol, internal, external string, domain []stri
 					return err
 				}
 			}
-			if err = b.Put([]byte(external), []byte(internal)); err != nil {
+			b, err = b.CreateBucketIfNotExists([]byte(external))
+			if err != nil {
+				return err
+			}
+			if err = b.Put([]byte(internal), []byte("w")); err != nil {
 				return err
 			}
 		}
@@ -236,10 +239,12 @@ func (i *Instance) PortMapDelete(protocol, internal, external string, domain []s
 					b = b.Bucket([]byte(domain[0]))
 				}
 				if len(external) > 0 && len(internal) > 0 {
-					if b.Bucket([]byte(external)); b != nil {
-						b.DeleteBucket([]byte(internal))
+					if b = b.Bucket([]byte(external)); b != nil {
 						left = b.Stats().KeyN
-						log.Debug("Left " + strconv.Itoa(left) + " entries")
+						if b.Get([]byte(internal)) != nil {
+							b.Delete([]byte(internal))
+							left--
+						}
 					}
 				} else if len(external) > 0 {
 					b.DeleteBucket([]byte(external))
@@ -251,7 +256,7 @@ func (i *Instance) PortMapDelete(protocol, internal, external string, domain []s
 	return
 }
 
-func (i *Instance) PortInMap(protocol, external string, domain []string) (res bool) {
+func (i *Instance) PortInMap(protocol, external, internal string, domain []string) (res bool) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b = b.Bucket([]byte(protocol)); b != nil {
@@ -260,9 +265,11 @@ func (i *Instance) PortInMap(protocol, external string, domain []string) (res bo
 						return nil
 					}
 				}
-				if b.Get([]byte(external)) != nil {
+				if b = b.Bucket([]byte(external)); b != nil {
+					if len(internal) > 0 && b.Get([]byte(internal)) == nil {
+						return nil
+					}
 					res = true
-					return nil
 				}
 			}
 		}
