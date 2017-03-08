@@ -48,9 +48,10 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 		meta["environment"] = envId
 	}
 
-	if len(addr) != 0 {
+	if ip := strings.Fields(addr); len(ip) > 1 {
 		addNetConf(child, addr)
-		meta["addr"] = addr
+		meta["ip"] = strings.Split(ip[0], "/")[0]
+		meta["vlan"] = ip[1]
 	}
 
 	container.SetContainerUID(child)
@@ -63,6 +64,8 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 	container.DisableSSHPwd(child)
 
 	LxcStart(child)
+
+	meta["interface"] = container.GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.veth.pair")
 
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)

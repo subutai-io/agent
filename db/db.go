@@ -201,6 +201,42 @@ func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
 	return err
 }
 
+func (i *Instance) GetContainerByName(name string) (c map[string]string) {
+	// c := make(map[string]string)
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				b.ForEach(func(kk, vv []byte) error {
+					c[string(kk)] = string(vv)
+					return nil
+				})
+			}
+		}
+		return nil
+	})
+	return c
+}
+
+func (i *Instance) GetContainerByVlan(vlan string) (list []string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			b.ForEach(func(k, v []byte) error {
+				if c := b.Bucket(k); c != nil {
+					c.ForEach(func(kk, vv []byte) error {
+						if string(kk) == "vlan" && string(vv) == vlan {
+							list = append(list, string(k))
+						}
+						return nil
+					})
+				}
+				return nil
+			})
+		}
+		return nil
+	})
+	return
+}
+
 func (i *Instance) PortMapSet(protocol, internal, external string, domain []string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
