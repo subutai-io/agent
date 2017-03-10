@@ -46,6 +46,6 @@ func LxcHostname(c, name string) {
 
 // Hostname sets the hostname of host
 func Hostname(name string) {
-	_, err := exec.Command("hostnamectl", "set-hostname", name).CombinedOutput()
-	log.Check(log.FatalLevel, "Setting host hostname", err)
+	out, err := exec.Command("hostnamectl", "set-hostname", name).CombinedOutput()
+	log.Check(log.FatalLevel, "Setting host hostname: "+string(out), err)
 }
