@@ -17,7 +17,7 @@ import (
 
 func MapPort(protocol, internal, external string, remove bool, domain ...string) {
 	if remove {
-		mapRemove(protocol, internal, external, domain)
+		mapRemove(protocol, internal, external)
 		return
 	}
 	//validate args
@@ -47,18 +47,23 @@ func MapPort(protocol, internal, external string, remove bool, domain ...string)
 	log.Info(ovs.GetIp() + ":" + external)
 }
 
-func mapRemove(protocol, internal, external string, domain []string) {
+func mapRemove(protocol, internal, external string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database", err)
-	if !bolt.PortInMap(protocol, external, internal, domain) {
+	if !bolt.PortInMap(protocol, external, internal) {
 		log.Error("Map doesn't exists")
 	}
-	l := bolt.PortMapDelete(protocol, internal, external, domain)
+	l := bolt.PortMapDelete(protocol, internal, external)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	if l > 0 {
+		if strings.Contains(internal, ":") {
+			internal = internal + ";"
+		} else {
+			internal = internal + ":"
+		}
 		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
-			"server "+internal+";", " ", true)
+			"server "+internal, " ", true)
 	} else {
 		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + ".conf")
 	}
@@ -91,7 +96,7 @@ func random(min, max int) int {
 func validSocket(socket string) bool {
 	if addr := strings.Split(socket, ":"); len(addr) == 2 {
 		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
-			if _, err := strconv.Atoi(addr[1]); err == nil {
+			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
 				return true
 			}
 		}
@@ -109,9 +114,9 @@ func portIsNew(protocol, internal string, external *string, domain []string) (ne
 		} else {
 			bolt, err := db.New()
 			log.Check(log.ErrorLevel, "Openning portmap database", err)
-			if bolt.PortInMap(protocol, *external, internal, domain) {
+			if bolt.PortInMap(protocol, *external, internal) {
 				log.Error("Map is already exists")
-			} else if !bolt.PortInMap(protocol, *external, "", domain) {
+			} else if !bolt.PortInMap(protocol, *external, "") {
 				log.Error("Port is busy")
 			}
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
@@ -160,9 +165,13 @@ func newConfig(protocol, port string, domain []string) {
 		"proxy_pass PROTO-PORT;", "proxy_pass "+protocol+"-"+port+";", true)
 }
 
-func saveMapToDB(protocol, internal, external string, domain []string) {
+func saveMapToDB(protocol, internal, external string, ops []string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database", err)
-	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, internal, external, domain))
+	c := bolt.ContainerByKey("ip", strings.Split(internal, ":")[0])
+	if len(c) == 1 {
+		ops = append(ops, c[0])
+	}
+	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, internal, external, ops))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }

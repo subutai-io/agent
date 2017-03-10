@@ -1,9 +1,12 @@
 package db
 
 import (
+	"bytes"
 	"strconv"
 
 	"github.com/boltdb/bolt"
+
+	"strings"
 
 	"github.com/subutai-io/agent/config"
 )
@@ -201,8 +204,8 @@ func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
 	return err
 }
 
-func (i *Instance) GetContainerByName(name string) (c map[string]string) {
-	// c := make(map[string]string)
+func (i *Instance) ContainerByName(name string) map[string]string {
+	c := make(map[string]string)
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(containers); b != nil {
 			if b = b.Bucket([]byte(name)); b != nil {
@@ -217,13 +220,13 @@ func (i *Instance) GetContainerByName(name string) (c map[string]string) {
 	return c
 }
 
-func (i *Instance) GetContainerByVlan(vlan string) (list []string) {
+func (i *Instance) ContainerByKey(key, value string) (list []string) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(containers); b != nil {
 			b.ForEach(func(k, v []byte) error {
 				if c := b.Bucket(k); c != nil {
 					c.ForEach(func(kk, vv []byte) error {
-						if string(kk) == "vlan" && string(vv) == vlan {
+						if string(kk) == key && string(vv) == value {
 							list = append(list, string(k))
 						}
 						return nil
@@ -237,48 +240,70 @@ func (i *Instance) GetContainerByVlan(vlan string) (list []string) {
 	return
 }
 
-func (i *Instance) PortMapSet(protocol, internal, external string, domain []string) (err error) {
+func (i *Instance) PortMapSet(protocol, internal, external string, ops []string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			b, err = b.CreateBucketIfNotExists([]byte(protocol))
-			if err != nil {
-				return err
-			}
-			if protocol == "http" && len(domain) > 0 {
-				b, err = b.CreateBucketIfNotExists([]byte(domain[0]))
-				if err != nil {
-					return err
+			if err == nil {
+				b, err = b.CreateBucketIfNotExists([]byte(external))
+				if err == nil {
+					b, err = b.CreateBucketIfNotExists([]byte(internal))
+					if protocol == "http" && len(ops) > 0 {
+						b.Put([]byte("domain"), []byte(ops[0]))
+					}
+					if len(ops) > 1 {
+						b.Put([]byte("container"), []byte(ops[1]))
+					}
 				}
 			}
-			b, err = b.CreateBucketIfNotExists([]byte(external))
-			if err != nil {
-				return err
-			}
-			if err = b.Put([]byte(internal), []byte("w")); err != nil {
-				return err
-			}
+			return err
 		}
 		return nil
 	})
 	return
 }
 
-func (i *Instance) PortMapDelete(protocol, internal, external string, domain []string) (left int) {
+func (i *Instance) ContainerPorts(protocol, container string) (list []string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				b.ForEach(func(k, v []byte) error {
+					if c := b.Bucket(k); c != nil {
+						c.ForEach(func(kk, vv []byte) error {
+							if d := c.Bucket(kk); d != nil {
+								d.ForEach(func(kkk, vvv []byte) error {
+									if string(kkk) == "container" && string(vvv) == container {
+										list = append(list, string(k))
+									}
+									return nil
+								})
+							}
+							return nil
+						})
+					}
+					return nil
+				})
+			}
+		}
+		return nil
+	})
+	return
+}
+func (i *Instance) PortMapDelete(protocol, internal, external string) (left int) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b := b.Bucket([]byte(protocol)); b != nil {
-				if protocol == "http" && len(domain) > 0 {
-					if len(internal) == 0 {
-						b.DeleteBucket([]byte(domain[0]))
-						return nil
-					}
-					b = b.Bucket([]byte(domain[0]))
-				}
 				if len(external) > 0 && len(internal) > 0 {
 					if b = b.Bucket([]byte(external)); b != nil {
 						left = b.Stats().KeyN
-						if b.Get([]byte(internal)) != nil {
-							b.Delete([]byte(internal))
+						if !strings.Contains(internal, ":") {
+							c := b.Cursor()
+							for k, _ := c.Seek([]byte(internal + ":")); k != nil && bytes.HasPrefix(k, []byte(internal+":")); k, _ = c.Next() {
+								b.DeleteBucket(k)
+								left--
+							}
+						} else if b.Bucket([]byte(internal)) != nil {
+							b.DeleteBucket([]byte(internal))
 							left--
 						}
 					}
@@ -292,20 +317,25 @@ func (i *Instance) PortMapDelete(protocol, internal, external string, domain []s
 	return
 }
 
-func (i *Instance) PortInMap(protocol, external, internal string, domain []string) (res bool) {
+func (i *Instance) PortInMap(protocol, external, internal string) (res bool) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b = b.Bucket([]byte(protocol)); b != nil {
-				if protocol == "http" && len(domain) > 0 {
-					if b = b.Bucket([]byte(domain[0])); b == nil {
-						return nil
-					}
-				}
 				if b = b.Bucket([]byte(external)); b != nil {
-					if len(internal) > 0 && b.Get([]byte(internal)) == nil {
+					if len(internal) == 0 {
+						res = true
+						return nil
+					} else if !strings.Contains(internal, ":") {
+						b.ForEach(func(k, v []byte) error {
+							if strings.Contains(string(k), internal+":") {
+								res = true
+							}
+							return nil
+						})
+					} else if b.Bucket([]byte(internal)) != nil {
+						res = true
 						return nil
 					}
-					res = true
 				}
 			}
 		}

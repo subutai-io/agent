@@ -39,7 +39,7 @@ func LxcDestroy(id string, vlan bool) {
 	} else if vlan {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
-		list := bolt.GetContainerByVlan(id)
+		list := bolt.ContainerByKey("vlan", id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 		for _, c := range list {
 			msg = "Vlan " + id + " is destroyed"
@@ -49,7 +49,7 @@ func LxcDestroy(id string, vlan bool) {
 	} else {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
-		c := bolt.GetContainerByName(id)
+		c := bolt.ContainerByName(id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 		if len(c) != 0 {
