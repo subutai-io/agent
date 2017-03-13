@@ -59,6 +59,7 @@ func LxcDestroy(id string, vlan bool) {
 		if vlan, ok := c["vlan"]; ok {
 			if ip, ok := c["ip"]; ok {
 				ProxyDel(vlan, ip, false)
+				cleanupPortMap(c["ip"])
 			}
 		}
 		net.DelIface(c["interface"])
@@ -107,4 +108,22 @@ func cleanupNetStat(vlan string) {
 	})
 	queryInfluxDB(c, `drop series from host_net where iface = 'p2p`+vlan+`'`)
 	queryInfluxDB(c, `drop series from host_net where iface = 'gw-`+vlan+`'`)
+}
+
+func cleanupPortMap(ip string) {
+	list := make(map[string][]string)
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	for _, proto := range []string{"tcp", "udp", "http"} {
+		list[proto] = bolt.ExtPorts(proto, ip)
+		// mapRemove(proto, ip, port)
+
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	for proto, ports := range list {
+		for _, port := range ports {
+			mapRemove(proto, ip, port)
+		}
+	}
 }

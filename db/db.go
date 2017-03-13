@@ -263,23 +263,15 @@ func (i *Instance) PortMapSet(protocol, internal, external string, ops []string)
 	return
 }
 
-func (i *Instance) ContainerPorts(protocol, container string) (list []string) {
+func (i *Instance) ExtPorts(protocol, internal string) (list []string) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b = b.Bucket([]byte(protocol)); b != nil {
 				b.ForEach(func(k, v []byte) error {
 					if c := b.Bucket(k); c != nil {
-						c.ForEach(func(kk, vv []byte) error {
-							if d := c.Bucket(kk); d != nil {
-								d.ForEach(func(kkk, vvv []byte) error {
-									if string(kkk) == "container" && string(vvv) == container {
-										list = append(list, string(k))
-									}
-									return nil
-								})
-							}
-							return nil
-						})
+						if kk, _ := c.Cursor().Seek([]byte(internal + ":")); kk != nil {
+							list = append(list, string(k))
+						}
 					}
 					return nil
 				})
@@ -295,7 +287,7 @@ func (i *Instance) PortMapDelete(protocol, internal, external string) (left int)
 			if b := b.Bucket([]byte(protocol)); b != nil {
 				if len(external) > 0 && len(internal) > 0 {
 					if b = b.Bucket([]byte(external)); b != nil {
-						left = b.Stats().KeyN
+						left = b.Stats().BucketN - 1
 						if !strings.Contains(internal, ":") {
 							c := b.Cursor()
 							for k, _ := c.Seek([]byte(internal + ":")); k != nil && bytes.HasPrefix(k, []byte(internal+":")); k, _ = c.Next() {
