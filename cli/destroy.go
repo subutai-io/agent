@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"os"
 	"strings"
 
 	"github.com/influxdata/influxdb/client/v2"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
@@ -37,24 +37,32 @@ func LxcDestroy(id string, vlan bool) {
 			msg = id + " not found. Please check if a container name is correct."
 		}
 	} else if vlan {
-		for _, c := range container.Containers() {
-			if container.GetConfigItem(config.Agent.LxcPrefix+c+"/config", "#vlan_id") == id {
-				msg = "Vlan " + id + " is destroyed"
-				LxcDestroy(c, false)
-			}
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		list := bolt.ContainerByKey("vlan", id)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		for _, c := range list {
+			msg = "Vlan " + id + " is destroyed"
+			LxcDestroy(c, false)
 		}
 		cleanupNet(id)
 	} else {
-		if _, err := os.Stat(config.Agent.LxcPrefix + id); !os.IsNotExist(err) {
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		c := bolt.ContainerByName(id)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		if len(c) != 0 {
 			msg = id + " is destroyed"
 		}
-		if vlan := container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "#vlan_id"); len(vlan) != 0 {
-			node := strings.Split(container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "lxc.network.ipv4"), "/")
-			if len(node) > 1 {
-				ProxyDel(vlan, node[0], false)
+
+		if vlan, ok := c["vlan"]; ok {
+			if ip, ok := c["ip"]; ok {
+				ProxyDel(vlan, ip, false)
+				cleanupPortMap(c["ip"])
 			}
 		}
-		net.DelIface(container.GetConfigItem(config.Agent.LxcPrefix+id+"/config", "lxc.network.veth.pair"))
+		net.DelIface(c["interface"])
 		container.Destroy(id)
 	}
 
@@ -100,4 +108,22 @@ func cleanupNetStat(vlan string) {
 	})
 	queryInfluxDB(c, `drop series from host_net where iface = 'p2p`+vlan+`'`)
 	queryInfluxDB(c, `drop series from host_net where iface = 'gw-`+vlan+`'`)
+}
+
+func cleanupPortMap(ip string) {
+	list := make(map[string][]string)
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	for _, proto := range []string{"tcp", "udp", "http"} {
+		list[proto] = bolt.ExtPorts(proto, ip)
+		// mapRemove(proto, ip, port)
+
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	for proto, ports := range list {
+		for _, port := range ports {
+			mapRemove(proto, ip, port)
+		}
+	}
 }
