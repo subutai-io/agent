@@ -53,7 +53,7 @@ type metainfo struct {
 // templId retrieves the id of a template on global repository with specified version.
 // If certain version is not set, then latest id will be returned
 func templId(t *templ, kurjun *http.Client, token string) {
-	var meta metainfo
+	var meta []metainfo
 
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
 	if t.name == "management" && len(t.branch) != 0 {
@@ -78,16 +78,24 @@ func templId(t *templ, kurjun *http.Client, token string) {
 	body, err := ioutil.ReadAll(response.Body)
 
 	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		var oldmeta metainfo
+		if log.Check(log.WarnLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta)) {
+			return
+		}
+		meta = append(meta, oldmeta)
+	}
+
+	if len(meta) == 0 {
 		return
 	}
 
-	if t.name != meta.Name {
-		log.Info("Found: " + t.name + " -> " + meta.Name)
-		t.name = meta.Name
+	if t.name != meta[0].Name {
+		log.Info("Found: " + t.name + " -> " + meta[0].Name)
+		t.name = meta[0].Name
 	}
-	t.id = meta.ID
-	t.file = meta.File
-	t.signature = meta.Signs
+	t.id = meta[0].ID
+	t.file = meta[0].File
+	t.signature = meta[0].Signs
 }
 
 // md5sum returns MD5 hash sum of specified file
@@ -202,7 +210,7 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 
 // idToName retrieves template name from global repository by passed id string
 func idToName(id string, kurjun *http.Client, token string) string {
-	var meta metainfo
+	var meta []metainfo
 
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
 	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
@@ -215,9 +223,16 @@ func idToName(id string, kurjun *http.Client, token string) string {
 	if string(body) == "Not found" {
 		log.Error("Template with id \"" + id + "\" not found")
 	}
-	log.Check(log.ErrorLevel, "Parsing response body", json.Unmarshal(body, &meta))
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		var oldmeta metainfo
+		log.Check(log.ErrorLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta))
+		meta = append(meta, oldmeta)
+	}
 
-	return meta.Name
+	if len(meta) > 0 {
+		return meta[0].Name
+	}
+	return ""
 }
 
 // lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation

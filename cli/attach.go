@@ -1,4 +1,4 @@
-// Subutai CLI is a set of commands which are meant to provide a control interface
+// Package cli is a set of commands which are meant to provide a control interface
 // for different system components such as LXC, BTRFS, OVS, etc.
 // The CLI is an abstraction layer between the system and the SS Management application, but may also be used manually.
 package cli

@@ -9,9 +9,10 @@ import (
 	"github.com/subutai-io/agent/agent"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 
-	gcli "github.com/codegangsta/cli"
+	gcli "github.com/urfave/cli"
 )
 
 var version = "unknown"
@@ -35,6 +36,17 @@ func main() {
 	if len(config.Template.Branch) != 0 {
 		commit = config.Template.Branch + "/" + commit
 	}
+
+	if base, err := db.New(); err == nil {
+		if len(config.Management.Host) < 7 {
+			config.Management.Host = base.DiscoveryLoad()
+		}
+		if len(config.Influxdb.Server) < 7 {
+			config.Influxdb.Server = base.DiscoveryLoad()
+		}
+		base.Close()
+	}
+
 	app.Version = version + " " + commit
 	app.Usage = "daemon and command line interface binary"
 
@@ -101,7 +113,7 @@ func main() {
 		Name: "daemon", Usage: "start Subutai agent",
 		Action: func(c *gcli.Context) error {
 			config.InitAgentDebug()
-			agent.Start(c)
+			agent.Start()
 			return nil
 		}}, {
 
@@ -173,6 +185,17 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "map", Usage: "Subutai port mapping",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
+			gcli.StringFlag{Name: "external, e", Usage: "RH port"},
+			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"},
+			gcli.StringFlag{Name: "domain, d", Usage: "domain name"}},
+		Action: func(c *gcli.Context) error {
+			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.Bool("r"), c.String("d"))
+			return nil
+		}}, {
+
 		Name: "metrics", Usage: "list Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "start, s", Usage: "start time"},
@@ -196,12 +219,6 @@ func main() {
 			} else {
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
 			}
-			return nil
-		}}, {
-
-		Name: "portmap", Usage: "map external port to the container socket",
-		Action: func(c *gcli.Context) error {
-			cli.PortMap()
 			return nil
 		}}, {
 
