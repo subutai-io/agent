@@ -240,7 +240,7 @@ func (i *Instance) ContainerByKey(key, value string) (list []string) {
 	return
 }
 
-func (i *Instance) PortMapSet(protocol, internal, external string, ops []string) (err error) {
+func (i *Instance) PortMapSet(protocol, internal, external string, ops map[string]string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			b, err = b.CreateBucketIfNotExists([]byte(protocol))
@@ -248,11 +248,8 @@ func (i *Instance) PortMapSet(protocol, internal, external string, ops []string)
 				b, err = b.CreateBucketIfNotExists([]byte(external))
 				if err == nil {
 					b, err = b.CreateBucketIfNotExists([]byte(internal))
-					if protocol == "http" && len(ops) > 0 {
-						b.Put([]byte("domain"), []byte(ops[0]))
-					}
-					if len(ops) > 1 {
-						b.Put([]byte("container"), []byte(ops[1]))
+					for k, v := range ops {
+						b.Put([]byte(k), []byte(v))
 					}
 				}
 			}
