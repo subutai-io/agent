@@ -165,10 +165,10 @@ func newConfig(protocol, port, domain, cert string) {
 		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+".key", key, 0644))
 
 		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
-			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
+			"ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
 			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+port+".crt;", true)
 		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
-			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
+			"ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
 			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+port+".key;", true)
 	case "http":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example",
