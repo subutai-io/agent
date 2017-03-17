@@ -76,6 +76,10 @@ func mapRemove(protocol, internal, external string) {
 			"server "+internal, " ", true)
 	} else {
 		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + ".conf")
+		if protocol == "https" {
+			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + ".key")
+			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + ".crt")
+		}
 	}
 	restart()
 }
