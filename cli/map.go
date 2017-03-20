@@ -17,44 +17,39 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-func MapPort(protocol, internal, external, domain, cert string, remove bool) {
+func MapPort(protocol, internal, external, policy, domain, cert string, remove bool) {
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")
 	}
 
 	if remove {
 		mapRemove(protocol, internal, external)
-		return
-	}
-	//validate args
-	if (protocol == "http" || protocol == "https") && len(domain) == 0 {
+	} else if (protocol == "http" || protocol == "https") && len(domain) == 0 {
 		log.Error("\"-d domain\" is mandatory for http protocol")
-	}
-
-	if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
+	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
 		log.Error("\"-c certificate\" is missing or invalid pem file")
+	} else if validSocket(internal) {
+		// log.Error("Parameter \"internal\" should be in ip:port format")
+
+		// check external port and create nginx config
+		if portIsNew(protocol, internal, domain, &external) {
+			newConfig(protocol, external, domain, cert)
+		}
+
+		// add containers to backend
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
+			"#Add new host here", "server "+internal+";", false)
+
+		// save information to database
+		saveMapToDB(protocol, internal, external, domain)
+		balanceMethod(protocol, external, policy)
+
+		log.Info(ovs.GetIp() + ":" + external)
+	} else if len(policy) != 0 {
+		balanceMethod(protocol, external, policy)
 	}
-
-	if !validSocket(internal) {
-		log.Error("Parameter \"internal\" should be in ip:port format")
-	}
-
-	// check external port and create nginx config
-	if portIsNew(protocol, internal, domain, &external) {
-		newConfig(protocol, external, domain, cert)
-	}
-
-	// add containers to backend
-	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+".conf",
-		"#Add new host here", "server "+internal+";", false)
-
-	// save information to database
-	saveMapToDB(protocol, internal, external, domain)
-
 	// reload nginx
 	restart()
-
-	log.Info(ovs.GetIp() + ":" + external)
 }
 
 func mapRemove(protocol, internal, external string) {
@@ -81,7 +76,6 @@ func mapRemove(protocol, internal, external string) {
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + ".crt")
 		}
 	}
-	restart()
 }
 
 func isFree(protocol, port string) (res bool) {
@@ -202,6 +196,47 @@ func newConfig(protocol, port, domain, cert string) {
 		"upstream PROTO-PORT {", "upstream "+protocol+"-"+port+" {", true)
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
 		"proxy_pass PROTO-PORT;", "proxy_pass "+protocol+"-"+port+";", true)
+}
+
+func balanceMethod(protocol, port, policy string) {
+	replaceString := "upstream " + protocol + "-" + port + " {"
+	bolt, err := db.New()
+	log.Check(log.ErrorLevel, "Openning portmap database", err)
+	if !bolt.PortInMap(protocol, port, "") {
+		log.Error("Port is not mapped")
+	}
+	if p := bolt.GetMapMethod(protocol, port); len(p) != 0 && p != policy {
+		replaceString = p + " "
+	} else if p == policy {
+		return
+	}
+	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, policy))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	switch policy {
+	case "round_robin", "least_conn":
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			replaceString, policy+";", false)
+	case "least_time":
+		if protocol == "tcp" {
+			policy = policy + " connect"
+		} else {
+			policy = policy + " header"
+		}
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			replaceString, policy+";", false)
+	case "hash":
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			replaceString, policy+" $remote_addr;", false)
+	case "ip_hash":
+		if protocol != "http" {
+			log.Warn("ip_hash policy allowed only for http protocol")
+			return
+		}
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+".conf",
+			replaceString, policy+";", false)
+	default:
+		log.Warn("Unsupported balancing method \"" + policy + "\"")
+	}
 }
 
 func saveMapToDB(protocol, internal, external, domain string) {
