@@ -260,6 +260,34 @@ func (i *Instance) PortMapSet(protocol, internal, external string, ops map[strin
 	return
 }
 
+func (i *Instance) SetMapMethod(protocol, external, policy string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				if b = b.Bucket([]byte(external)); b != nil {
+					return b.Put([]byte("policy"), []byte(policy))
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) GetMapMethod(protocol, external string) (policy string) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				if b = b.Bucket([]byte(external)); b != nil {
+					policy = string(b.Get([]byte("policy")))
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
 func (i *Instance) ExtPorts(protocol, internal string) (list []string) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
