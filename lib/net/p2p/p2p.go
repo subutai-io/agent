@@ -9,12 +9,16 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 )
 
 // Create adds new P2P interface to the Resource Host. This interface connected to the swarm.
 func Create(interfaceName, localPeepIPAddr, hash, key, ttl, portRange string) {
 	cmd := []string{"start", "-key", key, "-dev", interfaceName, "-ttl", ttl, "-hash", hash}
+	if len(config.Template.Branch) > 0 {
+		cmd = append(cmd, []string{"-dht", config.Template.Branch + "cdn.subut.ai:6881"}...)
+	}
 	if localPeepIPAddr != "dhcp" {
 		cmd = append(cmd, "-ip", localPeepIPAddr)
 	}

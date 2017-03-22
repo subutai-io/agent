@@ -23,6 +23,7 @@ func init() {
 		log.Error("Please run as root")
 	}
 	os.Setenv("PATH", "/apps/subutai/current/bin:"+os.Getenv("PATH"))
+	log.ActivateSyslog("127.0.0.1:1514", "cli")
 	if len(os.Args) > 1 {
 		if os.Args[1] == "-d" {
 			log.Level(log.DebugLevel)
@@ -182,6 +183,16 @@ func main() {
 			gcli.BoolFlag{Name: "parent, p", Usage: "with parent"}},
 		Action: func(c *gcli.Context) error {
 			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("a"), c.Bool("p"))
+			return nil
+		}}, {
+
+		Name: "log", Usage: "print application logs",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "start, s", Usage: "start time"},
+			gcli.StringFlag{Name: "end, e", Usage: "end time"},
+			gcli.StringFlag{Name: "level, l", Usage: "log level"}},
+		Action: func(c *gcli.Context) error {
+			cli.Log(c.Args().Get(0), c.String("l"), c.String("s"), c.String("e"))
 			return nil
 		}}, {
 

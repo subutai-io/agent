@@ -9,13 +9,12 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
-	"github.com/subutai-io/agent/log"
-
-	"strings"
-
 	"gopkg.in/gcfg.v1"
+
+	"github.com/subutai-io/agent/log"
 )
 
 var client *http.Client
@@ -147,6 +146,7 @@ func InitAgentDebug() {
 	if config.Agent.Debug {
 		log.Level(log.DebugLevel)
 	}
+	log.ActivateSyslog("127.0.0.1:1514", "subutai")
 }
 
 // CheckKurjun checks if the Kurjun node available.

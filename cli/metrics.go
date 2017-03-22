@@ -50,7 +50,6 @@ func queryInfluxDB(clnt client.Client, cmd string) (res []client.Result, err err
 //	last week is in 5 minute intervals,
 // After 7 days all statistics is are overwritten by new incoming data.
 func HostMetrics(host, start, end string) {
-	// Make client
 	c, _ := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
 		Username:           config.Influxdb.User,
