@@ -57,12 +57,9 @@ func main() {
 
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "clear, c", Usage: "clear environment"},
-			gcli.BoolFlag{Name: "x86, x", Usage: "use x86 personality"},
-			gcli.BoolFlag{Name: "regular, r", Usage: "connect as regular user"}},
+		SkipFlagParsing: true,
 		Action: func(c *gcli.Context) error {
-			cli.LxcAttach(c.Args().Get(0), c.Bool("c"), c.Bool("x"), c.Bool("r"))
+			cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
 			return nil
 		}}, {
 
