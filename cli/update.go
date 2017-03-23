@@ -199,7 +199,7 @@ func Update(name string, check bool) {
 			log.Info("Update is available")
 			os.Exit(0)
 		}
-		_, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})
+		_, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"})
 		log.Check(log.FatalLevel, "Updating container", err)
 	}
 }
