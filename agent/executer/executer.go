@@ -202,7 +202,7 @@ func buildCmd(r *RequestOptions) *exec.Cmd {
 		return nil
 	}
 	for _, arg := range r.Args {
-		_, err = buff.WriteString(arg + " ")
+		_, err = buff.WriteString("\"" + arg + "\" ")
 		if err != nil {
 			return nil
 		}
