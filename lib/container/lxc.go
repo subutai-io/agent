@@ -149,7 +149,7 @@ func Stop(name string) {
 }
 
 // AttachExec executes a command inside Subutai container.
-func AttachExec(name string, command []string) (output []string, err error) {
+func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !IsContainer(name) {
 		return output, errors.New("Container does not exists")
 	}
@@ -167,13 +167,19 @@ func AttachExec(name string, command []string) (output []string, err error) {
 	if err != nil {
 		return output, errors.New("Failed to create OS pipe")
 	}
-	_, err = container.RunCommand(command, lxc.AttachOptions{
+
+	options := lxc.AttachOptions{
 		Namespaces: -1,
 		UID:        0,
 		GID:        0,
 		StdoutFd:   bufW.Fd(),
 		StderrFd:   bufWErr.Fd(),
-	})
+	}
+	if len(env) > 0 {
+		options.Env = env[0]
+	}
+
+	_, err = container.RunCommand(command, options)
 	log.Check(log.DebugLevel, "Executing command inside container", err)
 
 	log.Check(log.DebugLevel, "Closing write buffer for stdout", bufW.Close())
