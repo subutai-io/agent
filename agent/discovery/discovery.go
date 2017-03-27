@@ -74,7 +74,7 @@ func client() error {
 		go c.Start()
 		defer c.Stop()
 
-		err = c.ListenFor("urn:subutai:management:peer:4")
+		err = c.ListenFor("urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4")
 		time.Sleep(2 * time.Second)
 	}
 	return err
