@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -51,7 +52,7 @@ func server() error {
 		go s.Start()
 		defer s.Stop()
 		s.AdvertiseServer(gossdp.AdvertisableServer{
-			ServiceType: "urn:subutai:management:peer:4",
+			ServiceType: "urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4",
 			DeviceUuid:  fingerprint(),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
