@@ -55,7 +55,6 @@ func id() (list map[string]string) {
 	if err != nil {
 		return
 	}
-
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
@@ -71,7 +70,6 @@ func stat() string {
 	if err != nil {
 		return ""
 	}
-
 	return string(out)
 }
 
@@ -225,7 +223,7 @@ func alertLoad() (load map[string]Load) {
 
 		disk := []hdd{}
 		for _, v := range []string{"", "/rootfs", "/opt", "/var", "/home"} {
-			diskValues := diskQuota(diskIDs["lib/lxc/"+cont.Name()+v], diskMap)
+			diskValues := diskQuota(diskIDs[cont.Name()+v], diskMap)
 			if len(diskValues) > 1 {
 				disk = append(disk, hdd{Current: diskValues[0], Quota: diskValues[1], Partition: v})
 			}
