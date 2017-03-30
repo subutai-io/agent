@@ -36,6 +36,7 @@ type Container struct {
 type Quota struct {
 	CPU  int `json:"cpu,omitempty"`
 	RAM  int `json:"ram,omitempty"`
+	Disk int `json:"disk,omitempty"`
 	Root int `json:"root,omitempty"`
 	Home int `json:"home,omitempty"`
 	Opt  int `json:"opt,omitempty"`

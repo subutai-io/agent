@@ -30,11 +30,8 @@ func LxcQuota(name, res, size, threshold string) {
 		quota = container.QuotaNet(name, size)
 	case "rootfs", "home", "var", "opt":
 		quota = fs.Quota(name+"/"+res, size)
-		if quota == "none" {
-			quota = "0"
-		}
 	case "disk":
-		quota = fs.DiskQuota(name, size)
+		quota = fs.Quota(name, size)
 	case "cpuset":
 		quota = container.QuotaCPUset(name, size)
 	case "ram":
@@ -47,6 +44,10 @@ func LxcQuota(name, res, size, threshold string) {
 		log.Check(log.WarnLevel, "Opening database", err)
 		log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerQuota(name, res, size))
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
+
+	if quota == "none" {
+		quota = "0"
 	}
 
 	fmt.Println(`{"quota":"` + quota + `", "threshold":` + alert + `}`)

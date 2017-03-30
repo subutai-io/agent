@@ -172,28 +172,6 @@ func Stat(path, index string, raw bool) string {
 	return ""
 }
 
-// DiskQuota returns total disk quota for Subutai container.
-// If size argument is set, it sets new quota value.
-func DiskQuota(path string, size ...string) string {
-	parent := id(path)
-	if err := exec.Command("btrfs", "qgroup", "create", "1/"+parent, config.Agent.LxcPrefix+path).Run(); err != nil {
-		return err.Error()
-	}
-
-	for _, subvol := range []string{"/rootfs", "/opt", "/var", "/home"} {
-		index := id(path + subvol)
-		if err := exec.Command("btrfs", "qgroup", "assign", "0/"+index, "1/"+parent, config.Agent.LxcPrefix+path).Run(); err != nil {
-			return err.Error()
-		}
-	}
-	if size != nil {
-		if err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).Run(); err != nil {
-			return err.Error()
-		}
-	}
-	return Stat(path, "quota", false)
-}
-
 // Quota returns subvolume quota.
 // If size argument is set, it sets new quota value.
 func Quota(path string, size ...string) string {
