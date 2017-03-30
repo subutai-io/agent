@@ -56,10 +56,10 @@ func LxcDestroy(id string, vlan bool) {
 			msg = id + " is destroyed"
 		}
 
-		if vlan, ok := c["vlan"]; ok {
-			if ip, ok := c["ip"]; ok {
+		if ip, ok := c["ip"]; ok {
+			cleanupPortMap(c["ip"])
+			if vlan, ok := c["vlan"]; ok {
 				ProxyDel(vlan, ip, false)
-				cleanupPortMap(c["ip"])
 			}
 		}
 		net.DelIface(c["interface"])
@@ -82,7 +82,6 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	if id == "management" || id == "everything" {
-		template.MngStop()
 		template.MngDel()
 	}
 	if len(msg) == 0 {
@@ -113,17 +112,17 @@ func cleanupNetStat(vlan string) {
 func cleanupPortMap(ip string) {
 	list := make(map[string][]string)
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Opening database to list portmap", err)
 	for _, proto := range []string{"tcp", "udp", "http"} {
 		list[proto] = bolt.ExtPorts(proto, ip)
-		// mapRemove(proto, ip, port)
-
 	}
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	for proto, ports := range list {
 		for _, port := range ports {
+			log.Debug("Removing map: " + proto + ", " + ip + ", " + port)
 			mapRemove(proto, ip, port)
 		}
 	}
+	restart()
 }

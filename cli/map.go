@@ -33,6 +33,9 @@ func MapPort(protocol, internal, external, policy, domain, cert string, remove b
 		log.Error("\"-c certificate\" is missing or invalid pem file")
 	} else if len(internal) != 0 && !validSocket(internal) {
 		log.Error("Invalid internal socket \"" + internal + "\"")
+	} else if (external == "8443" || external == "8444" || external == "8086") &&
+		internal != "10.10.10.1:"+external {
+		log.Error("Reserved system ports")
 	} else if len(internal) != 0 {
 		// check external port and create nginx config
 		if portIsNew(protocol, internal, domain, &external) {
