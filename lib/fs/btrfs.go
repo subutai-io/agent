@@ -150,7 +150,7 @@ func SetVolReadOnly(subvol string, flag bool) {
 }
 
 // Stat returns quota and usage for BTRFS subvolume.
-func Stat(path, index string, raw bool) string {
+func Stat(path, index string, raw bool) (value string) {
 	var row = map[string]int{"quota": 3, "usage": 2}
 
 	args := []string{"qgroup", "show", "-r", config.Agent.LxcPrefix}
@@ -164,12 +164,30 @@ func Stat(path, index string, raw bool) string {
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
 		if len(line) > 3 {
-			if line[0] == "0/"+ind {
-				return line[row[index]]
+			if strings.HasSuffix(line[0], "/"+ind) {
+				value = line[row[index]]
 			}
 		}
 	}
-	return ""
+	return value
+}
+
+// DiskQuota returns total disk quota for Subutai container.
+// If size argument is set, it sets new quota value.
+func DiskQuota(path string, size ...string) string {
+	parent := id(path)
+	exec.Command("btrfs", "qgroup", "create", "1/"+parent, config.Agent.LxcPrefix+path).Run()
+	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/opt"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
+	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/var"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
+	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/home"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
+	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
+
+	if size != nil {
+		if out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput(); err != nil {
+			return err.Error() + string(out)
+		}
+	}
+	return Stat(path, "quota", false)
 }
 
 // Quota returns subvolume quota.

@@ -31,7 +31,7 @@ func LxcQuota(name, res, size, threshold string) {
 	case "rootfs", "home", "var", "opt":
 		quota = fs.Quota(name+"/"+res, size)
 	case "disk":
-		quota = fs.Quota(name, size)
+		quota = fs.DiskQuota(name, size)
 	case "cpuset":
 		quota = container.QuotaCPUset(name, size)
 	case "ram":
