@@ -1,7 +1,9 @@
-// Log package purposed for error handling, verbosity level, output formatting, etc.
+// Package log purposed for error handling, verbosity level, output formatting, etc.
 package log
 
 import (
+	"fmt"
+	"log/syslog"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -22,6 +24,11 @@ var (
 	PanicLevel = logrus.PanicLevel
 )
 
+var (
+	syslogServer string
+	appName      string
+)
+
 func init() {
 	format := new(logrus.TextFormatter)
 	format.FullTimestamp = true
@@ -37,21 +44,17 @@ func Check(level logrus.Level, msg string, err error) bool {
 	if err != nil {
 		switch level {
 		case logrus.PanicLevel:
-			logrus.SetOutput(os.Stderr)
-			logrus.Panic(msg, ", ", err)
+			Panic(msg, ", ", err)
 		case logrus.FatalLevel:
-			logrus.SetOutput(os.Stderr)
-			logrus.Fatal(msg, ", ", err)
+			Fatal(msg, ", ", err)
 		case logrus.ErrorLevel:
-			logrus.SetOutput(os.Stderr)
-			logrus.Error(msg, ", ", err)
-			os.Exit(1)
+			Error(msg, ", ", err)
 		case logrus.WarnLevel:
-			logrus.Warn(msg, ", ", err)
+			Warn(msg, ", ", err)
 		case logrus.InfoLevel:
-			logrus.Info(msg, ", ", err)
+			Info(msg, ", ", err)
 		case logrus.DebugLevel:
-			logrus.Debug(msg, ", ", err)
+			Debug(msg, ", ", err)
 		}
 		return true
 	}
@@ -65,35 +68,54 @@ func Level(level logrus.Level) {
 }
 
 // Panic stops process after showing panic message. Highest error level
-func Panic(msg ...string) {
+func Panic(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
-	logrus.Panic(msg)
+	logrus.Panic(msg...)
+	sendSyslog(syslog.LOG_EMERG, msg...)
 }
 
 // Fatal stops process after showing fatal message.
-func Fatal(msg ...string) {
+func Fatal(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
-	logrus.Fatal(msg)
+	logrus.Fatal(msg...)
+	sendSyslog(syslog.LOG_CRIT, msg...)
 }
 
 // Error stops process after showing error message.
-func Error(msg ...string) {
+func Error(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
-	logrus.Error(msg)
+	logrus.Error(msg...)
+	sendSyslog(syslog.LOG_ERR, msg...)
 	os.Exit(1)
 }
 
 // Warn keeps process working after showing warning message.
-func Warn(msg ...string) {
-	logrus.Warn(msg)
+func Warn(msg ...interface{}) {
+	logrus.Warn(msg...)
+	sendSyslog(syslog.LOG_WARNING, msg...)
 }
 
 // Info keeps process working after showing information message.
-func Info(msg ...string) {
-	logrus.Info(msg)
+func Info(msg ...interface{}) {
+	logrus.Info(msg...)
+	sendSyslog(syslog.LOG_INFO, msg...)
 }
 
 // Debug logs debug information
-func Debug(msg ...string) {
-	logrus.Debug(msg)
+func Debug(msg ...interface{}) {
+	logrus.Debug(msg...)
+	sendSyslog(syslog.LOG_DEBUG, msg...)
+}
+
+func sendSyslog(level syslog.Priority, msg ...interface{}) {
+	if l3, err := syslog.Dial("udp", syslogServer, level, appName); err == nil {
+		l3.Write([]byte(fmt.Sprint(msg...)))
+		l3.Close()
+	}
+}
+
+// ActivateSyslog configures logging to send data to the syslog server
+func ActivateSyslog(socket, app string) {
+	syslogServer = socket
+	appName = app
 }

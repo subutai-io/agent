@@ -295,6 +295,10 @@ func Info(command, host, interval string) {
 	if command == "ipaddr" {
 		fmt.Println(net.GetIp())
 		return
+	} else if command == "ports" {
+		for k := range usedPorts() {
+			fmt.Println(k)
+		}
 	}
 
 	initdb()
@@ -313,4 +317,21 @@ func Info(command, host, interval string) {
 		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))
 	}
+}
+
+func usedPorts() map[string]bool {
+	ports := make(map[string]bool)
+
+	out, _ := exec.Command("netstat", "-ltun").Output()
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	for scanner.Scan() {
+		line := strings.Fields(scanner.Text())
+		if len(line) > 4 && (strings.HasPrefix(line[0], "tcp") || strings.HasPrefix(line[0], "udp")) {
+			if socket := strings.Split(line[3], ":"); len(socket) > 1 && socket[0] != "127.0.0.1" {
+				ports[strings.TrimSuffix(line[0], "6")+":"+socket[len(socket)-1]] = true
+			}
+		}
+	}
+	return ports
 }

@@ -55,7 +55,6 @@ func id() (list map[string]string) {
 	if err != nil {
 		return
 	}
-
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
@@ -71,7 +70,6 @@ func stat() string {
 	if err != nil {
 		return ""
 	}
-
 	return string(out)
 }
 
@@ -224,8 +222,8 @@ func alertLoad() (load map[string]Load) {
 		ramValues := ramQuota(cont.Name())
 
 		disk := []hdd{}
-		for _, v := range []string{"rootfs", "opt", "var", "home"} {
-			diskValues := diskQuota(diskIDs["lib/lxc/"+cont.Name()+"/"+v], diskMap)
+		for _, v := range []string{"", "/rootfs", "/opt", "/var", "/home"} {
+			diskValues := diskQuota(diskIDs[cont.Name()+v], diskMap)
 			if len(diskValues) > 1 {
 				disk = append(disk, hdd{Current: diskValues[0], Quota: diskValues[1], Partition: v})
 			}
@@ -280,13 +278,15 @@ func Quota(list []container.Container) (output []container.Container) {
 			v.Quota.RAM = c.RAM.Quota
 			for _, value := range stats[v.Name].Disk {
 				switch value.Partition {
-				case "rootfs":
+				case "":
+					v.Quota.Disk = value.Quota
+				case "/rootfs":
 					v.Quota.Root = value.Quota
-				case "home":
+				case "/home":
 					v.Quota.Home = value.Quota
-				case "var":
+				case "/var":
 					v.Quota.Var = value.Quota
-				case "opt":
+				case "/opt":
 					v.Quota.Opt = value.Quota
 				}
 			}

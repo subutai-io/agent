@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/fromkeith/gossdp"
 	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
@@ -30,6 +32,8 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	}
 }
 
+// Monitor provides service for auto discovery based on SSDP protocol.
+// It starts SSDP server if management container active, otherwise it starts client for waiting another SSDP server.
 func Monitor() {
 	for {
 		if container.State("management") == "RUNNING" {
@@ -48,7 +52,7 @@ func server() error {
 		go s.Start()
 		defer s.Stop()
 		s.AdvertiseServer(gossdp.AdvertisableServer{
-			ServiceType: "urn:subutai:management:peer:4",
+			ServiceType: "urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4",
 			DeviceUuid:  fingerprint(),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
@@ -61,12 +65,16 @@ func server() error {
 }
 
 func client() error {
+	if len(config.Influxdb.Server) > 6 && len(config.Management.Host) > 6 {
+		return nil
+	}
+
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
 	if err == nil {
 		go c.Start()
 		defer c.Stop()
 
-		err = c.ListenFor("urn:subutai:management:peer:4")
+		err = c.ListenFor("urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4")
 		time.Sleep(2 * time.Second)
 	}
 	return err
@@ -95,9 +103,15 @@ func fingerprint() string {
 }
 
 func save(ip string) {
+	base, err := db.New()
+	if err != nil {
+		return
+	}
+	base.DiscoverySave(ip)
+	base.Close()
+
 	config.Influxdb.Server = ip
 	if config.Management.Host != ip {
-		ioutil.WriteFile(config.Agent.DataPrefix+"agent.gcfg.discovery", []byte("[management]\nhost = "+ip+"\n\n[influxdb]\nserver = "+ip+"\n\n"), 0600)
 		monitor.InitInfluxdb()
 	}
 	config.Management.Host = ip

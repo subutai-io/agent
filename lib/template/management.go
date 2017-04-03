@@ -4,6 +4,7 @@ import (
 	"os/exec"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
@@ -29,25 +30,27 @@ func MngInit() {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/var var none bind,rw 0 0"},
 	})
 	container.SetApt("management")
-	container.SetContainerUID("management")
 	gpg.GenerateKey("management")
 	container.Start("management")
+
+	//TODO move mapping functions to lib to get rid of exec
+	log.Check(log.WarnLevel, "Exposing port 8443",
+		exec.Command("subutai", "map", "tcp", "-i", "10.10.10.1:8443", "-e", "8443").Run())
+	log.Check(log.WarnLevel, "Exposing port 8444",
+		exec.Command("subutai", "map", "tcp", "-i", "10.10.10.1:8444", "-e", "8444").Run())
+	log.Check(log.WarnLevel, "Exposing port 8086",
+		exec.Command("subutai", "map", "tcp", "-i", "10.10.10.1:8086", "-e", "8086").Run())
+
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd("management", map[string]string{"ip": "10.10.10.1"}))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	log.Info("********************")
 	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")
 	log.Info("login: admin")
 	log.Info("password: secret")
 	log.Info("********************")
-}
-
-// MngStop drops port forwarding rules needed by Management container
-func MngStop() {
-	for _, iface := range []string{"wan", "eth1", "eth2"} {
-		for _, port := range []string{"8443", "8444"} {
-			exec.Command("iptables", "-t", "nat", "-D", "PREROUTING", "-i", iface, "-p",
-				"tcp", "--dport", port, "-j", "DNAT", "--to-destination", "10.10.10.1:"+port).Run()
-		}
-	}
 }
 
 // MngDel removes Management network interfaces, resets dhcp client

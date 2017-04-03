@@ -77,16 +77,20 @@ try {
 			sed 's/version =.*/version = ${agentVersion}/g' -i subutai/etc/agent.gcfg
 		"""
 
-		withCredentials([[$class: 'UsernamePasswordMultiBinding', 
-			credentialsId: 'hub-optdyn-github-auth', 
-			passwordVariable: 'GIT_PASSWORD', 
-			usernameVariable: 'GIT_USER']]) {
-			sh """
-				git config user.email jenkins@subut.ai
-				git config user.name 'Jenkins Admin'
-				git commit subutai/bin/subutai subutai/etc/agent.gcfg -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
-				git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${subosRepoName} ${env.BRANCH_NAME}
-			"""
+		def gitStatusSubos = sh(script: 'git status --porcelain', returnStdout: true)
+
+		if (gitStatusSubos != '') {
+			withCredentials([[$class: 'UsernamePasswordMultiBinding', 
+				credentialsId: 'hub-optdyn-github-auth', 
+				passwordVariable: 'GIT_PASSWORD', 
+				usernameVariable: 'GIT_USER']]) {
+				sh """
+					git config user.email jenkins@subut.ai
+					git config user.name 'Jenkins Admin'
+					git commit subutai/bin/subutai subutai/etc/agent.gcfg -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
+					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${subosRepoName} ${env.BRANCH_NAME}
+				"""
+			}
 		}
 	}
 	node("snapcraft") {
@@ -108,9 +112,9 @@ try {
 				sed 's/version:.*/version: \"${agentVersion}-(BRANCH)\"/g' -i snapcraft.yaml.templ
 			"""
 
-			def gitStatus = sh(script: 'git status --porcelain', returnStdout: true)
+			def gitStatusSnap = sh(script: 'git status --porcelain', returnStdout: true)
 
-			if (gitStatus != '') {
+			if (gitStatusSnap != '') {
 				withCredentials([[$class: 'UsernamePasswordMultiBinding', 
 				credentialsId: 'hub-optdyn-github-auth', 
 				passwordVariable: 'GIT_PASSWORD', 
@@ -118,7 +122,7 @@ try {
 				sh """
 					git config user.email jenkins@subut.ai
 					git config user.name 'Jenkins Admin'
-					git commit snapcraft.yaml -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
+					git commit snapcraft.yaml.templ -m 'Push subutai version from subutai-io/agent@${agentCommitId}'
 					git push https://${env.GIT_USER}:'${env.GIT_PASSWORD}'@${snapRepoName} ${env.BRANCH_NAME}
 				"""
 				}

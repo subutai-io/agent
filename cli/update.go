@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"io"
@@ -14,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/cheggaaa/pb"
+	"github.com/snapcore/snapd/client"
+	"github.com/snapcore/snapd/store"
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
@@ -22,7 +22,7 @@ import (
 )
 
 type snap struct {
-	Id        string            `json:"id"`
+	ID        string            `json:"id"`
 	Name      string            `json:"name"`
 	Owner     []string          `json:"owner"`
 	Version   string            `json:"version"`
@@ -30,38 +30,14 @@ type snap struct {
 }
 
 func checkStore() int {
-	var channel string
-	var available, installed int
-
-	out, err := exec.Command("snap", "info", "subutai").Output()
-	if err != nil {
+	if exec.Command("snap", "list", os.Getenv("SNAP_NAME")).Run() != nil {
 		return 0
 	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 1 {
-			if line[0] == "tracking:" {
-				channel = line[1]
-				log.Debug("We are on channel: " + channel)
-			} else if line[0] == "installed:" {
-				installed, err = strconv.Atoi(strings.Trim(line[2], "()"))
-				if err != nil {
-					return 1
-				}
-				log.Debug("Installed revision: " + strings.Trim(line[2], "()"))
-			} else if line[0] == channel+":" {
-				available, err = strconv.Atoi(strings.Trim(line[2], "()"))
-				if err != nil {
-					return 1
-				}
-				log.Debug("Available revision: " + strings.Trim(line[2], "()"))
-			}
-			if available > installed {
-				return 2
-			}
-		}
+	local, _, _ := client.New(nil).Snap(os.Getenv("SNAP_NAME"))
+	remote, _ := store.New(nil, nil).SnapInfo(store.SnapSpec{Name: os.Getenv("SNAP_NAME"), Channel: "beta"}, nil)
+	if local != nil && remote != nil && remote.Revision.N > local.Revision.N {
+		return 2
 	}
 	return 1
 }
@@ -89,11 +65,11 @@ func ifUpdateable(installed int) string {
 		if len(config.Template.Branch) != 0 && strings.HasSuffix(v.Name, config.Template.Arch+"-"+config.Template.Branch+".snap") && installed < available && verifyAuthor(v) {
 			log.Debug("Found newer snap: " + v.Name + ", " + v.Version)
 			installed = available
-			hash = v.Id
+			hash = v.ID
 		} else if len(config.Template.Branch) == 0 && strings.HasSuffix(v.Name, config.Template.Arch+".snap") && installed < available && verifyAuthor(v) {
 			log.Debug("Found newer snap: " + v.Name + ", " + v.Version)
 			installed = available
-			hash = v.Id
+			hash = v.ID
 		}
 	}
 
@@ -108,7 +84,7 @@ func verifyAuthor(p snap) bool {
 		return false
 	}
 	signedhash := gpg.VerifySignature(gpg.KurjunUserPK("jenkins"), p.Signature["jenkins"])
-	if p.Id != signedhash {
+	if p.ID != signedhash {
 		log.Debug("Signature does not match with update hash")
 		return false
 	}
@@ -204,7 +180,7 @@ func Update(name string, check bool) {
 				os.Exit(0)
 			} else {
 				log.Check(log.FatalLevel, "Updating RH snap",
-					exec.Command("snap", "refresh", "--devmode", "subutai").Run())
+					exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).Run())
 			}
 		}
 
@@ -223,7 +199,8 @@ func Update(name string, check bool) {
 			log.Info("Update is available")
 			os.Exit(0)
 		}
-		_, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})
+		_, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
+			[]string{"DEBIAN_FRONTEND=noninteractive"})
 		log.Check(log.FatalLevel, "Updating container", err)
 	}
 }

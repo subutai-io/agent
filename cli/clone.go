@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
@@ -22,10 +23,12 @@ import (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envId, addr, token, kurjToken string) {
+	meta := make(map[string]string)
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
 		parent = idToName(id[1], kurjun, kurjToken)
 	}
+	meta["parent"] = parent
 
 	if !container.IsTemplate(parent) {
 		LxcImport(parent, "", kurjToken, false)
@@ -33,7 +36,6 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 	if container.IsContainer(child) {
 		log.Error("Container " + child + " already exist")
 	}
-
 	container.Clone(parent, child)
 	gpg.GenerateKey(child)
 
@@ -43,14 +45,18 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	if len(envId) != 0 {
 		container.SetEnvID(child, envId)
+		meta["environment"] = envId
 	}
 
-	if len(addr) != 0 {
+	if ip := strings.Fields(addr); len(ip) > 1 {
 		addNetConf(child, addr)
+		meta["ip"] = strings.Split(ip[0], "/")[0]
+		meta["vlan"] = ip[1]
 	}
+
+	container.SetContainerUID(child)
 
 	//Need to change it in parent templates
-	container.SetContainerUID(child)
 	container.SetApt(child)
 	container.SetDNS(child)
 
@@ -59,8 +65,14 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 
 	LxcStart(child)
 
-	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
+	meta["interface"] = container.GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.veth.pair")
 
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(child, meta))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
 
 // addNetConf adds network related configuration values to container config file

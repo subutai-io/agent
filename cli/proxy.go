@@ -125,9 +125,9 @@ func addDomain(vlan, domain, cert string) {
 			log.Info("Cannot create key file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".key")
 			os.Exit(1)
 		}
-		addLine(confinc+vlan+".conf", "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
+		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")

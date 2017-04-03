@@ -34,7 +34,7 @@ var (
 )
 
 // Collect collecting performance statistic from Resource Host and Subutai Containers.
-// It sends this information to IfluxDB server using credentials from configuration file.
+// It sends this information to InfluxDB server using credentials from configuration file.
 func Collect() {
 	InitInfluxdb()
 	for {
@@ -77,24 +77,24 @@ func parsefile(hostname, lxc, cgtype, filename string) {
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		line := strings.Split(scanner.Text(), " ")
-		value, err := strconv.ParseInt(line[1], 10, 62)
-		log.Check(log.DebugLevel, "Parsing file from proc", err)
-		if cgtype == "memory" && lxcmemory[line[0]] {
-			point, err := client.NewPoint("lxc_"+cgtype,
-				map[string]string{"hostname": lxc, "type": line[0]},
-				map[string]interface{}{"value": value},
-				time.Now())
-			if err == nil {
+		if value, err := strconv.Atoi(line[1]); err == nil {
+			if cgtype == "memory" && lxcmemory[line[0]] {
+				point, err := client.NewPoint("lxc_"+cgtype,
+					map[string]string{"hostname": lxc, "type": line[0]},
+					map[string]interface{}{"value": value},
+					time.Now())
+				if err == nil {
+					bp.AddPoint(point)
+				}
+			} else if cgtype == "cpuacct" {
+				point, err := client.NewPoint("lxc_cpu",
+					map[string]string{"hostname": lxc, "type": line[0]},
+					map[string]interface{}{"value": value / runtime.NumCPU()},
+					time.Now())
 				bp.AddPoint(point)
-			}
-		} else if cgtype == "cpuacct" {
-			point, err := client.NewPoint("lxc_cpu",
-				map[string]string{"hostname": lxc, "type": line[0]},
-				map[string]interface{}{"value": value / int64(runtime.NumCPU())},
-				time.Now())
-			bp.AddPoint(point)
-			if err == nil {
-				bp.AddPoint(point)
+				if err == nil {
+					bp.AddPoint(point)
+				}
 			}
 		}
 	}
@@ -131,13 +131,13 @@ func netStat() {
 		return
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))
-	traffic := make([]int64, 2)
+	traffic := make([]int, 2)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), ":") {
 			line := strings.Fields(scanner.Text())
-			traffic[0], err = strconv.ParseInt(line[1], 10, 64)
+			traffic[0], err = strconv.Atoi(line[1])
 			log.Check(log.DebugLevel, "Parsing network stat file from proc", err)
-			traffic[1], err = strconv.ParseInt(line[9], 10, 64)
+			traffic[1], err = strconv.Atoi(line[9])
 			log.Check(log.DebugLevel, "Parsing network stat file from proc", err)
 
 			nicname := strings.Split(line[0], ":")[0]
@@ -173,24 +173,29 @@ func btrfsStat() {
 		line := strings.Fields(scanner.Text())
 		list["0/"+line[1]] = line[8]
 	}
-	out, err = exec.Command("btrfs", "qgroup", "show", "-r", "--raw", config.Agent.LxcPrefix).Output()
+	out, err = exec.Command("btrfs", "qgroup", "show", "-repc", "--raw", config.Agent.LxcPrefix).Output()
 	if log.Check(log.DebugLevel, "Getting BTRFS stats", err) {
 		return
 	}
 	scanner = bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
-		path := strings.Split(list[line[0]], "/")
-		if len(path) > 3 {
-			value, err := strconv.Atoi(line[2])
-			log.Check(log.DebugLevel, "Parsing network stat file from proc", err)
-			point, err := client.NewPoint("lxc_disk",
-				map[string]string{"hostname": path[2], "mount": path[3], "type": "used"},
-				map[string]interface{}{"value": value},
-				time.Now())
-			bp.AddPoint(point)
-			if err == nil {
-				bp.AddPoint(point)
+		if path := strings.Split(list[line[0]], "/"); len(path) == 1 {
+			if value, err := strconv.Atoi(line[2]); err == nil {
+				point, err := client.NewPoint("lxc_disk",
+					map[string]string{"hostname": path[0], "mount": "total", "type": "used"},
+					map[string]interface{}{"value": value},
+					time.Now())
+				if err == nil {
+					bp.AddPoint(point)
+				}
+			}
+		} else if line[5] == "---" {
+			for k, v := range list {
+				if v == strings.Split(list[line[0]], "/")[0] && len(k) > 1 {
+					exec.Command("btrfs", "qgroup", "create", "1"+k[1:], config.Agent.LxcPrefix).Run()
+					exec.Command("btrfs", "qgroup", "assign", line[0], "1"+k[1:], config.Agent.LxcPrefix).Run()
+				}
 			}
 		}
 	}
@@ -225,23 +230,19 @@ func diskFree() {
 func memStat() {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(bufio.NewReader(file))
-	for scanner.Scan() {
-		line := strings.Fields(strings.Replace(scanner.Text(), ":", "", -1))
-		value, err := strconv.ParseInt(line[1], 10, 62)
-		log.Check(log.DebugLevel, "Parsing network memory stats from proc", err)
-		if memory[line[0]] {
-			point, err := client.NewPoint("host_memory",
-				map[string]string{"hostname": hostname, "type": line[0]},
-				map[string]interface{}{"value": value * 1024},
-				time.Now())
-			if err == nil {
-				bp.AddPoint(point)
+	if file, err := os.Open("/proc/meminfo"); err == nil {
+		defer file.Close()
+		scanner := bufio.NewScanner(bufio.NewReader(file))
+		for scanner.Scan() {
+			line := strings.Fields(strings.Replace(scanner.Text(), ":", "", -1))
+			if value, err := strconv.Atoi(line[1]); err == nil && memory[line[0]] {
+				point, err := client.NewPoint("host_memory",
+					map[string]string{"hostname": hostname, "type": line[0]},
+					map[string]interface{}{"value": value * 1024},
+					time.Now())
+				if err == nil {
+					bp.AddPoint(point)
+				}
 			}
 		}
 	}

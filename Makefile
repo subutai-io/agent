@@ -8,7 +8,7 @@ ifneq (${GIT_BRANCH}, )
 	VERSION:=${VERSION}-SNAPSHOT
 endif
 COMMIT=$(shell git rev-parse HEAD)
-LDFLAGS=-ldflags "-r /apps/subutai/current/lib -w -s -X main.version=${VERSION} -X main.commit=${COMMIT}"
+LDFLAGS=-ldflags "-r /snap/subutai-dev/current/lib -w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X github.com/subutai-io/agent/config.version=$(VERSION)"
 
 all:
 	@if [ ! -d "$(GOPATH)/src/github.com/subutai-io/agent" ]; then mkdir -p $(GOPATH)/src/github.com/subutai-io/; ln -s $(shell pwd) $(GOPATH)/src/github.com/subutai-io/agent; fi

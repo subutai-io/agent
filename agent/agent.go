@@ -18,13 +18,12 @@ import (
 	"sync"
 	"time"
 
-	gcli "github.com/codegangsta/cli"
-
 	"github.com/subutai-io/agent/agent/alert"
 	"github.com/subutai-io/agent/agent/connect"
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/agent/discovery"
 	"github.com/subutai-io/agent/agent/executer"
+	"github.com/subutai-io/agent/agent/logger"
 	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
@@ -72,7 +71,7 @@ func initAgent() {
 }
 
 //Start starting Subutai Agent daemon, all required goroutines and keep working during all life cycle.
-func Start(c *gcli.Context) {
+func Start() {
 	initAgent()
 
 	http.HandleFunc("/trigger", trigger)
@@ -84,6 +83,7 @@ func Start(c *gcli.Context) {
 	go monitor.Collect()
 	go connectionMonitor()
 	go alert.Processing()
+	go logger.SyslogServer()
 
 	go func() {
 		s := make(chan os.Signal, 1)

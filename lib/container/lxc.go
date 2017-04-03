@@ -149,7 +149,7 @@ func Stop(name string) {
 }
 
 // AttachExec executes a command inside Subutai container.
-func AttachExec(name string, command []string) (output []string, err error) {
+func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !IsContainer(name) {
 		return output, errors.New("Container does not exists")
 	}
@@ -167,13 +167,19 @@ func AttachExec(name string, command []string) (output []string, err error) {
 	if err != nil {
 		return output, errors.New("Failed to create OS pipe")
 	}
-	_, err = container.RunCommand(command, lxc.AttachOptions{
+
+	options := lxc.AttachOptions{
 		Namespaces: -1,
 		UID:        0,
 		GID:        0,
 		StdoutFd:   bufW.Fd(),
 		StderrFd:   bufWErr.Fd(),
-	})
+	}
+	if len(env) > 0 {
+		options.Env = env[0]
+	}
+
+	_, err = container.RunCommand(command, options)
 	log.Check(log.DebugLevel, "Executing command inside container", err)
 
 	log.Check(log.DebugLevel, "Closing write buffer for stdout", bufW.Close())
@@ -200,6 +206,7 @@ func Destroy(name string) {
 
 	db, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
 }
@@ -389,29 +396,29 @@ func GetConfigItem(path, item string) string {
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) {
-	db, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	newuid := string(db.GetUuidEntry())
-	log.Check(log.WarnLevel, "Adding new uuid entry", db.AddUuidEntry(c, newuid))
-	log.Check(log.WarnLevel, "Closing database", db.Close())
+	uid := "65536"
+	if bolt, err := db.New(); err == nil {
+		uid = bolt.GetUuidEntry(c)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 
 	SetContainerConf(c, [][]string{
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
-		{"lxc.id_map", "u 0 " + newuid + " 65536"},
-		{"lxc.id_map", "g 0 " + newuid + " 65536"},
+		{"lxc.id_map", "u 0 " + uid + " 65536"},
+		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})
 
 	if s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs"); err == nil {
 		parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift home", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift opt", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, newuid, "65536").Run()
+		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, uid, "65536").Run()
 		log.Check(log.DebugLevel, "uidmapshift var", err)
 
 		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))

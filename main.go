@@ -9,9 +9,10 @@ import (
 	"github.com/subutai-io/agent/agent"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 
-	gcli "github.com/codegangsta/cli"
+	gcli "github.com/urfave/cli"
 )
 
 var version = "unknown"
@@ -22,6 +23,7 @@ func init() {
 		log.Error("Please run as root")
 	}
 	os.Setenv("PATH", "/apps/subutai/current/bin:"+os.Getenv("PATH"))
+	log.ActivateSyslog("127.0.0.1:1514", "cli")
 	if len(os.Args) > 1 {
 		if os.Args[1] == "-d" {
 			log.Level(log.DebugLevel)
@@ -35,6 +37,17 @@ func main() {
 	if len(config.Template.Branch) != 0 {
 		commit = config.Template.Branch + "/" + commit
 	}
+
+	if base, err := db.New(); err == nil {
+		if len(config.Management.Host) < 7 {
+			config.Management.Host = base.DiscoveryLoad()
+		}
+		if len(config.Influxdb.Server) < 7 {
+			config.Influxdb.Server = base.DiscoveryLoad()
+		}
+		base.Close()
+	}
+
 	app.Version = version + " " + commit
 	app.Usage = "daemon and command line interface binary"
 
@@ -44,12 +57,9 @@ func main() {
 
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "clear, c", Usage: "clear environment"},
-			gcli.BoolFlag{Name: "x86, x", Usage: "use x86 personality"},
-			gcli.BoolFlag{Name: "regular, r", Usage: "connect as regular user"}},
+		SkipFlagParsing: true,
 		Action: func(c *gcli.Context) error {
-			cli.LxcAttach(c.Args().Get(0), c.Bool("c"), c.Bool("x"), c.Bool("r"))
+			cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
 			return nil
 		}}, {
 
@@ -101,7 +111,7 @@ func main() {
 		Name: "daemon", Usage: "start Subutai agent",
 		Action: func(c *gcli.Context) error {
 			config.InitAgentDebug()
-			agent.Start(c)
+			agent.Start()
 			return nil
 		}}, {
 
@@ -173,6 +183,29 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "log", Usage: "print application logs",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "start, s", Usage: "start time"},
+			gcli.StringFlag{Name: "end, e", Usage: "end time"},
+			gcli.StringFlag{Name: "level, l", Usage: "log level"}},
+		Action: func(c *gcli.Context) error {
+			cli.Log(c.Args().Get(0), c.String("l"), c.String("s"), c.String("e"))
+			return nil
+		}}, {
+
+		Name: "map", Usage: "Subutai port mapping",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
+			gcli.StringFlag{Name: "external, e", Usage: "RH port"},
+			gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
+			gcli.StringFlag{Name: "cert, c", Usage: "https certificate"},
+			gcli.StringFlag{Name: "policy, p", Usage: "balancing policy"},
+			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
+		Action: func(c *gcli.Context) error {
+			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("r"))
+			return nil
+		}}, {
+
 		Name: "metrics", Usage: "list Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "start, s", Usage: "start time"},
@@ -196,12 +229,6 @@ func main() {
 			} else {
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
 			}
-			return nil
-		}}, {
-
-		Name: "portmap", Usage: "map external port to the container socket",
-		Action: func(c *gcli.Context) error {
-			cli.PortMap()
 			return nil
 		}}, {
 
