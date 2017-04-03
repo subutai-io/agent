@@ -180,17 +180,15 @@ func btrfsStat() {
 	scanner = bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
-		path := strings.Split(list[line[0]], "/")
-		if len(path) > 3 {
-			value, err := strconv.Atoi(line[2])
-			log.Check(log.DebugLevel, "Parsing network stat file from proc", err)
-			point, err := client.NewPoint("lxc_disk",
-				map[string]string{"hostname": path[2], "mount": path[3], "type": "used"},
-				map[string]interface{}{"value": value},
-				time.Now())
-			bp.AddPoint(point)
-			if err == nil {
-				bp.AddPoint(point)
+		if path := strings.Split(list[line[0]], "/"); len(path) > 1 {
+			if value, err := strconv.Atoi(line[2]); err == nil {
+				point, err := client.NewPoint("lxc_disk",
+					map[string]string{"hostname": path[0], "mount": path[1], "type": "used"},
+					map[string]interface{}{"value": value},
+					time.Now())
+				if err == nil {
+					bp.AddPoint(point)
+				}
 			}
 		}
 	}
