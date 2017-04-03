@@ -173,21 +173,28 @@ func btrfsStat() {
 		line := strings.Fields(scanner.Text())
 		list["0/"+line[1]] = line[8]
 	}
-	out, err = exec.Command("btrfs", "qgroup", "show", "-r", "--raw", config.Agent.LxcPrefix).Output()
+	out, err = exec.Command("btrfs", "qgroup", "show", "-repc", "--raw", config.Agent.LxcPrefix).Output()
 	if log.Check(log.DebugLevel, "Getting BTRFS stats", err) {
 		return
 	}
 	scanner = bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
-		if path := strings.Split(list[line[0]], "/"); len(path) > 1 {
+		if path := strings.Split(list[line[0]], "/"); len(path) == 1 {
 			if value, err := strconv.Atoi(line[2]); err == nil {
 				point, err := client.NewPoint("lxc_disk",
-					map[string]string{"hostname": path[0], "mount": path[1], "type": "used"},
+					map[string]string{"hostname": path[0], "mount": "total", "type": "used"},
 					map[string]interface{}{"value": value},
 					time.Now())
 				if err == nil {
 					bp.AddPoint(point)
+				}
+			}
+		} else if line[5] == "---" {
+			for k, v := range list {
+				if v == strings.Split(list[line[0]], "/")[0] && len(k) > 1 {
+					exec.Command("btrfs", "qgroup", "create", "1"+k[1:], config.Agent.LxcPrefix).Run()
+					exec.Command("btrfs", "qgroup", "assign", line[0], "1"+k[1:], config.Agent.LxcPrefix).Run()
 				}
 			}
 		}

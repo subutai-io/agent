@@ -183,7 +183,7 @@ func DiskQuota(path string, size ...string) string {
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 
 	if size != nil {
-		if out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput(); err != nil {
+		if out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput(); err != nil {
 			return err.Error() + string(out)
 		}
 	}
