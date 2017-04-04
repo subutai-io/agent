@@ -395,7 +395,7 @@ func GetConfigItem(path, item string) string {
 
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
-func SetContainerUID(c string) {
+func SetContainerUID(c string) string {
 	uid := "65536"
 	if bolt, err := db.New(); err == nil {
 		uid = bolt.GetUuidEntry(c)
@@ -423,6 +423,7 @@ func SetContainerUID(c string) {
 
 		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
 	}
+	return uid
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
@@ -439,6 +440,14 @@ func SetDNS(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/tail", resolv, 0644))
 	log.Check(log.DebugLevel, "Writing resolv.conf",
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
+}
+
+func CriuHax(name string) {
+	SetContainerConf(name, [][]string{
+		{"lxc.console", "none"},
+		{"lxc.tty", "0"},
+		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
+	})
 }
 
 // SetEnvID is deprecated function and should be removed.

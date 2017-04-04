@@ -33,7 +33,7 @@ func MngInit() {
 	gpg.GenerateKey("management")
 	container.Start("management")
 
-	//TODO move mapping functions to lib to get rid of exec
+	//TODO move mapping functions from cli package and get rid of exec
 	log.Check(log.WarnLevel, "Exposing port 8443",
 		exec.Command("subutai", "map", "tcp", "-i", "10.10.10.1:8443", "-e", "8443").Run())
 	log.Check(log.WarnLevel, "Exposing port 8444",

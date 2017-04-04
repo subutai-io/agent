@@ -1,0 +1,42 @@
+package cli
+
+import (
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/log"
+	lxc "gopkg.in/lxc/go-lxc.v2"
+)
+
+func Checkpoint(name string, restore, backup bool) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.ErrorLevel, "Creating container object", err)
+
+	switch restore {
+	case true:
+		options := lxc.RestoreOptions{
+			Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+			Verbose:   true,
+		}
+		log.Check(log.ErrorLevel, "Restoring checkpoint", c.Restore(options))
+
+	case false:
+		options := lxc.CheckpointOptions{
+			Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+			Verbose:   true,
+			Stop:      true,
+		}
+		// log.Check(log.DebugLevel, "Removing autostart trigger", os.Remove(config.Agent.LxcPrefix+"/"+name+"/.start"))
+		log.Check(log.ErrorLevel, "Creating checkpoint", c.Checkpoint(options))
+		// bolt, err := db.New()
+		// log.Check(log.WarnLevel, "Opening database", err)
+		// meta := bolt.ContainerByName(name)
+		// log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		// uid, _ := strconv.Atoi(meta["uid"])
+		// log.Check(log.WarnLevel, "Chowning checkpoint",
+		// os.Chown(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
+		// if backup {
+		// BackupContainer(name, true, true)
+		// }
+	}
+}
+
+// subutai-dev.criu dump -s --tree 2140 -D /var/snap/subutai-dev/common/lxc/m1/checkpoint --enable-external-masters --ext-mount-map auto --file-locks --ext-mount-map /opt:/var/snap/subutai-dev/common/lxc/m1/opt --ext-mount-map /home:/var/snap/subutai-dev/common/lxc/m1/home --ext-mount-map /var:/var/snap/subutai-dev/common/lxc/m1/var --empty-ns net
