@@ -81,11 +81,8 @@ func id(path string) string {
 	log.Check(log.DebugLevel, "Getting BTRFS subvolume list", err)
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 8 {
-			if (line[8] == path) || (strings.HasSuffix(line[8], path) && strings.Contains(path, "/")) {
-				return line[1]
-			}
+		if line := strings.Fields(scanner.Text()); len(line) > 8 && line[8] == path {
+			return line[1]
 		}
 	}
 	return ""
