@@ -181,7 +181,7 @@ func btrfsStat() {
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
 		if path := strings.Split(list[line[0]], "/"); len(path) == 1 {
-			if value, err := strconv.Atoi(line[2]); err == nil {
+			if value, err := strconv.Atoi(line[1]); err == nil {
 				point, err := client.NewPoint("lxc_disk",
 					map[string]string{"hostname": path[0], "mount": "total", "type": "used"},
 					map[string]interface{}{"value": value},
