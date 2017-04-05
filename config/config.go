@@ -125,8 +125,8 @@ func init() {
 		config.Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
 		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
 		config.Template.Branch = strings.TrimPrefix(strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai"), "-")
-		config.CDN.URL = config.Template.Branch + "cdn.subut.ai"
 		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
+		config.CDN.URL = config.Template.Branch + "cdn.subut.ai"
 	}
 	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))

@@ -194,7 +194,7 @@ func DiskQuota(path string, size ...string) string {
 // If size argument is set, it sets new quota value.
 func Quota(path string, size ...string) string {
 	if len(size) > 0 && len(size[0]) > 0 {
-		if err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", config.Agent.LxcPrefix+path).Run(); err != nil {
+		if err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", config.Agent.LxcPrefix+path).Run(); err != nil {
 			return err.Error()
 		}
 	}
@@ -205,7 +205,5 @@ func Quota(path string, size ...string) string {
 func GetBtrfsRoot() string {
 	data, err := exec.Command("findmnt", "-nT", config.Agent.LxcPrefix).Output()
 	log.Check(log.FatalLevel, "Searching btrfs mount point", err)
-
-	line := strings.Fields(string(data))
-	return line[0] + "/"
+	return strings.Fields(string(data))[0] + "/"
 }
