@@ -83,7 +83,7 @@ func id(path string) string {
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())
 		if len(line) > 8 {
-			if strings.HasSuffix(line[8], path) {
+			if (line[8] == path) || (strings.HasSuffix(line[8], path) && strings.Contains(path, "/")) {
 				return line[1]
 			}
 		}
