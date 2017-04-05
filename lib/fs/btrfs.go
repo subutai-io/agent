@@ -151,11 +151,11 @@ func SetVolReadOnly(subvol string, flag bool) {
 
 // Stat returns quota and usage for BTRFS subvolume.
 func Stat(path, index string, raw bool) (value string) {
-	var row = map[string]int{"quota": 3, "usage": 2}
+	var row = map[string]int{"quota": 4, "usage": 2}
 
-	args := []string{"qgroup", "show", "-r", config.Agent.LxcPrefix}
+	args := []string{"qgroup", "show", "-re", config.Agent.LxcPrefix}
 	if raw {
-		args = []string{"qgroup", "show", "-r", "--raw", config.Agent.LxcPrefix}
+		args = []string{"qgroup", "show", "-re", "--raw", config.Agent.LxcPrefix}
 	}
 	out, err := exec.Command("btrfs", args...).Output()
 	log.Check(log.FatalLevel, "Getting btrfs stats", err)
@@ -182,7 +182,7 @@ func DiskQuota(path string, size ...string) string {
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/home"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 
-	if size != nil {
+	if len(size) > 0 && len(size[0]) > 0 {
 		if out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput(); err != nil {
 			return err.Error() + string(out)
 		}
