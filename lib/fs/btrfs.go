@@ -81,11 +81,8 @@ func id(path string) string {
 	log.Check(log.DebugLevel, "Getting BTRFS subvolume list", err)
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 8 {
-			if strings.HasSuffix(line[8], path) {
-				return line[1]
-			}
+		if line := strings.Fields(scanner.Text()); len(line) > 8 && line[8] == path {
+			return line[1]
 		}
 	}
 	return ""
@@ -146,9 +143,9 @@ func SetVolReadOnly(subvol string, flag bool) {
 func Stat(path, index string, raw bool) (value string) {
 	var row = map[string]int{"quota": 3, "usage": 2}
 
-	args := []string{"qgroup", "show", "-r", config.Agent.LxcPrefix}
+	args := []string{"qgroup", "show", "-re", config.Agent.LxcPrefix}
 	if raw {
-		args = []string{"qgroup", "show", "-r", "--raw", config.Agent.LxcPrefix}
+		args = []string{"qgroup", "show", "-re", "--raw", config.Agent.LxcPrefix}
 	}
 	out, err := exec.Command("btrfs", args...).Output()
 	log.Check(log.FatalLevel, "Getting btrfs stats", err)
@@ -175,10 +172,10 @@ func DiskQuota(path string, size ...string) string {
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/home"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 
-	if size != nil {
-		if out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput(); err != nil {
-			return err.Error() + string(out)
-		}
+	if len(size) > 0 && len(size[0]) > 0 {
+		out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput()
+		log.Check(log.ErrorLevel, "Limiting BTRFS group 1/"+parent+" "+string(out), err)
+		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
 	}
 	return Stat(path, "quota", false)
 }
@@ -187,9 +184,9 @@ func DiskQuota(path string, size ...string) string {
 // If size argument is set, it sets new quota value.
 func Quota(path string, size ...string) string {
 	if len(size) > 0 && len(size[0]) > 0 {
-		if err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", config.Agent.LxcPrefix+path).Run(); err != nil {
-			return err.Error()
-		}
+		out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", config.Agent.LxcPrefix+path).CombinedOutput()
+		log.Check(log.ErrorLevel, "Limiting BTRFS subvolume "+config.Agent.LxcPrefix+path+" "+string(out), err)
+		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
 	}
 	return Stat(path, "quota", false)
 }
@@ -198,7 +195,5 @@ func Quota(path string, size ...string) string {
 func GetBtrfsRoot() string {
 	data, err := exec.Command("findmnt", "-nT", config.Agent.LxcPrefix).Output()
 	log.Check(log.FatalLevel, "Searching btrfs mount point", err)
-
-	line := strings.Fields(string(data))
-	return line[0] + "/"
+	return strings.Fields(string(data))[0] + "/"
 }
