@@ -22,7 +22,7 @@ import (
 // A full backup creates a delta-file of each BTRFS subvolume. An incremental backup (default) creates a delta-file with the difference of changes between the current and last snapshots.
 // All deltas are compressed to archives in `/mnt/backups/` directory (container_datetime.tar.gz or container_datetime_Full.tar.gz for full backup).
 // A changelog file can be found next to backups archive (container_datetime_changelog.txt or container_datetime_Full_changelog.txt) which contains a list of changes made between two backups.
-func BackupContainer(container string, full, stop bool) {
+func BackupContainer(container string, full, stop bool) string {
 	backupDir := config.Agent.LxcPrefix + "/backups/"
 	var changelog []string
 
@@ -124,6 +124,8 @@ func BackupContainer(container string, full, stop bool) {
 
 	log.Check(log.WarnLevel, "Remove tmpdir", os.RemoveAll(backupDir+"/tmpdir"))
 	log.Check(log.WarnLevel, "Deleting .backup file to "+container+" container", os.Remove(config.Agent.LxcPrefix+container+"/.backup"))
+
+	return currentDT
 }
 
 // getContainerMountPoints returns array of paths to all containers mountpoints

@@ -92,7 +92,7 @@ func RestoreContainer(container, date, newContainer string) {
 		volumeName := path.Base(volume)
 		volumeName = strings.Replace(volumeName, "@parent", "", -1)
 
-		log.Check(log.DebugLevel, "Move "+volume+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+		log.Check(log.WarnLevel, "Move "+volume+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
 			exec.Command("mv", volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName).Run())
 		fs.SubvolumeDestroy(volume)
 	}
