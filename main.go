@@ -80,6 +80,16 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "checkpoint", Usage: "chekpoint/restore in user space",
+		Flags: []gcli.Flag{
+			gcli.BoolFlag{Name: "backup, b", Usage: "Run backup after checkpoint"},
+			gcli.StringFlag{Name: "date, d", Usage: "Restore backup with this timestamp"},
+			gcli.BoolFlag{Name: "restore, r", Usage: "Restore checkpoint"}},
+		Action: func(c *gcli.Context) error {
+			cli.Checkpoint(c.Args().Get(0), c.String("d"), c.Bool("r"), c.Bool("b"))
+			return nil
+		}}, {
+
 		Name: "clone", Usage: "clone Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},

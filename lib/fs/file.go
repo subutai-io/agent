@@ -3,6 +3,7 @@ package fs
 import (
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/jhoonb/archivex"
 
@@ -29,4 +30,13 @@ func Tar(folder, file string) {
 	archive.Create(file)
 	log.Check(log.FatalLevel, "Packing file "+folder, archive.AddAll(folder, false))
 	archive.Close()
+}
+
+func ChownR(path string, uid, gid int) error {
+	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+		if err == nil {
+			err = os.Chown(name, uid, gid)
+		}
+		return err
+	})
 }

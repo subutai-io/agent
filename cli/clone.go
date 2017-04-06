@@ -54,11 +54,12 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 		meta["vlan"] = ip[1]
 	}
 
-	container.SetContainerUID(child)
+	meta["uid"] = container.SetContainerUID(child)
 
 	//Need to change it in parent templates
 	container.SetApt(child)
 	container.SetDNS(child)
+	container.CriuHax(child)
 
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(child)

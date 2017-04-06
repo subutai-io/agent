@@ -71,14 +71,9 @@ func RestoreContainer(container, date, newContainer string) {
 		for _, deltaFile := range deltas {
 			deltaName := strings.Replace(path.Base(deltaFile), ".delta", "", -1)
 			parent := (newContainerTmpDir + deltaName + "@parent")
-			dst := newContainerTmpDir
-			// if strings.Contains(file, "Full") {
-			// 	parent = dst
-			// }
-			fs.Receive(parent, dst, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
-				!strings.Contains(file, "Full"))
 
-			fs.SubvolumeDestroy(newContainerTmpDir + deltaName + "@parent")
+			fs.Receive(parent, newContainerTmpDir, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
+				!strings.Contains(file, "Full"))
 			log.Check(log.DebugLevel, "Rename unpacked subvolume to @parent "+newContainerTmpDir+deltaName+" -> "+newContainerTmpDir+deltaName+"@parent",
 				exec.Command("mv",
 					newContainerTmpDir+deltaName,
@@ -90,14 +85,16 @@ func RestoreContainer(container, date, newContainer string) {
 	fs.SubvolumeCreate(config.Agent.LxcPrefix + newContainer)
 
 	// move volumes
-	volumes, _ := filepath.Glob(newContainerTmpDir + "/*")
+	volumes, _ := filepath.Glob(newContainerTmpDir + "/*@parent")
 
 	for _, volume := range volumes {
 		fs.SetVolReadOnly(volume, false)
 		volumeName := path.Base(volume)
 		volumeName = strings.Replace(volumeName, "@parent", "", -1)
-		log.Check(log.DebugLevel, "Move "+volumeName+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+
+		log.Check(log.WarnLevel, "Move "+volume+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
 			exec.Command("mv", volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName).Run())
+		fs.SubvolumeDestroy(volume)
 	}
 
 	// restore meta files

@@ -91,19 +91,12 @@ func id(path string) string {
 // Receive creates BTRFS subvolume using saved delta-file, it can depend on some parent.
 // Parent subvolume should be installed before receiving child subvolume.
 func Receive(src, dst, delta string, parent bool) {
-	args := []string{"receive", "-p", src, dst}
-	if !parent {
-		args = []string{"receive", dst}
+	args := []string{"receive", dst, "-f", config.Agent.LxcPrefix + "tmpdir/" + delta}
+	if parent {
+		args = append(args, "-p", src)
 	}
 	log.Debug(strings.Join(args, " "))
-	receive := exec.Command("btrfs", args...)
-	input, err := os.Open(config.Agent.LxcPrefix + "tmpdir/" + delta)
-	if !log.Check(log.FatalLevel, "Opening delta "+delta, err) {
-		defer input.Close()
-		receive.Stdin = input
-		out, err := receive.CombinedOutput()
-		log.Check(log.FatalLevel, "Receiving delta "+delta+": "+string(out), err)
-	}
+	log.Check(log.WarnLevel, "Receiving delta", exec.Command("btrfs", args...).Run())
 }
 
 // Send creates delta-file using BTRFS subvolume, it can depend on some parent.
