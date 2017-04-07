@@ -137,6 +137,5 @@ func position(slice []string, value string) int {
 
 // Unpack extract passed archive to directory
 func unpack(archive, dir string) {
-	tgz := extractor.NewTgz()
-	tgz.Extract(archive, dir)
+	log.Check(log.DebugLevel, "Extracting archive", extractor.NewTgz().Extract(archive, dir))
 }

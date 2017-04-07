@@ -50,9 +50,9 @@ type metainfo struct {
 	Signs map[string]string `json:"signature"`
 }
 
-// templId retrieves the id of a template on global repository with specified version.
+// templateID retrieves the id of a template on global repository with specified version.
 // If certain version is not set, then latest id will be returned
-func templId(t *templ, kurjun *http.Client, token string) {
+func templateID(t *templ, kurjun *http.Client, token string) {
 	var meta []metainfo
 
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
@@ -343,7 +343,7 @@ func LxcImport(name, version, token string, torrent bool) {
 		kurjun, _ = config.CheckKurjun()
 	}
 	if kurjun != nil {
-		templId(&t, kurjun, token)
+		templateID(&t, kurjun, token)
 	} else {
 		log.Info("Trying to import from local storage")
 	}

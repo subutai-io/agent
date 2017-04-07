@@ -30,7 +30,7 @@ func tunnelCreate(tunnel, addr, vlan, vni string) {
 
 	log.Check(log.FatalLevel, "Creating tunnel port",
 		exec.Command("ovs-vsctl", "--may-exist", "add-port", "gw-"+vlan, tunnel, "--", "set", "interface", tunnel, "type=vxlan",
-			"options:stp_enable=true", "options:key="+vni, "options:remote_ip="+string(addr)).Run())
+			"options:stp_enable=true", "options:key="+vni, "options:remote_ip="+addr).Run())
 
 	log.Check(log.FatalLevel, "MakeVNIMap set port: ", exec.Command("ovs-vsctl", "--if-exists", "set", "port", tunnel, "tag="+vlan).Run())
 }

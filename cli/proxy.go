@@ -194,9 +194,8 @@ func getDomain(vlan string) string {
 func isVlanExist(vlan string) bool {
 	if _, err := os.Stat(confinc + vlan + ".conf"); err == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // isNodeExist is true if specified node belongs to vlan, otherwise it is false
