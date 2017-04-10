@@ -376,7 +376,9 @@ func (i *Instance) PortmapList(protocol string) (list []string) {
 					})
 					return nil
 				})
-				list = append(list, line)
+				if len(line) > 0 {
+					list = append(list, line)
+				}
 			}
 		}
 		return nil

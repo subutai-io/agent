@@ -69,7 +69,7 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 
 func mapList(protocol string) (list []string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning portmap database to remove mapping", err)
+	log.Check(log.ErrorLevel, "Openning portmap database to get list", err)
 	switch protocol {
 	case "tcp", "udp", "http", "https":
 		list = bolt.PortmapList(protocol)
