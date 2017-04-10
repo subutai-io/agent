@@ -370,8 +370,8 @@ func (i *Instance) PortmapList(protocol string) (list []string) {
 					if c := b.Bucket(k); c != nil {
 						c.ForEach(func(kk, vv []byte) error {
 							if protocol == "http" || protocol == "https" {
-								if c = c.Bucket(kk); c != nil {
-									domain = string(c.Get([]byte("domain")))
+								if d := c.Bucket(kk); d != nil {
+									domain = string(d.Get([]byte("domain")))
 								}
 							}
 							line = protocol + "\t" + string(k) + "\t" + string(kk) + "\t" + domain
