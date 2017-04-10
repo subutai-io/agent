@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/fs"
@@ -17,7 +19,14 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-func MapPort(protocol, internal, external, policy, domain, cert string, remove bool) {
+func MapPort(protocol, internal, external, policy, domain, cert string, list, remove bool) {
+	if list {
+		for _, v := range mapList(protocol) {
+			fmt.Println(v)
+		}
+		return
+	}
+
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")
 	}
@@ -56,6 +65,21 @@ func MapPort(protocol, internal, external, policy, domain, cert string, remove b
 	}
 	// reload nginx
 	restart()
+}
+
+func mapList(protocol string) (list []string) {
+	bolt, err := db.New()
+	log.Check(log.ErrorLevel, "Openning portmap database to remove mapping", err)
+	switch protocol {
+	case "tcp", "udp", "http", "https":
+		list = bolt.PortmapList(protocol)
+	default:
+		for _, v := range []string{"tcp", "udp", "http", "https"} {
+			list = append(list, bolt.PortmapList(v)...)
+		}
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	return
 }
 
 func mapRemove(protocol, internal, external string) {

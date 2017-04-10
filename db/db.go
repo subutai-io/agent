@@ -360,3 +360,26 @@ func (i *Instance) PortInMap(protocol, external, internal string) (res bool) {
 	})
 	return
 }
+
+func (i *Instance) PortmapList(protocol string) (list []string) {
+	var line, domain string
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(portmap); b != nil {
+			if b = b.Bucket([]byte(protocol)); b != nil {
+				b.ForEach(func(k, v []byte) error {
+					b.Bucket(k).ForEach(func(kk, vv []byte) error {
+						if protocol == "http" || protocol == "https" {
+							domain = string(b.Bucket(k).Bucket(kk).Get([]byte("domain")))
+						}
+						line = protocol + "\t" + string(k) + "\t" + string(kk) + "\t" + domain
+						return nil
+					})
+					return nil
+				})
+				list = append(list, line)
+			}
+		}
+		return nil
+	})
+	return
+}

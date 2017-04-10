@@ -210,9 +210,10 @@ func main() {
 			gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
 			gcli.StringFlag{Name: "cert, c", Usage: "https certificate"},
 			gcli.StringFlag{Name: "policy, p", Usage: "balancing policy"},
+			gcli.BoolFlag{Name: "list, l", Usage: "list mapped ports"},
 			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"}},
 		Action: func(c *gcli.Context) error {
-			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("r"))
+			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"))
 			return nil
 		}}, {
 
