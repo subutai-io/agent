@@ -374,15 +374,14 @@ func (i *Instance) PortmapList(protocol string) (list []string) {
 									domain = string(d.Get([]byte("domain")))
 								}
 							}
-							line = protocol + "\t" + string(k) + "\t" + string(kk) + "\t" + domain
+							if line = protocol + "\t" + string(k) + "\t" + string(kk) + "\t" + domain; len(line) > 0 {
+								list = append(list, line)
+							}
 							return nil
 						})
 					}
 					return nil
 				})
-				if len(line) > 0 {
-					list = append(list, line)
-				}
 			}
 		}
 		return nil
