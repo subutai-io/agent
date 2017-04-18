@@ -243,7 +243,7 @@ func balanceMethod(protocol, port, policy string) {
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	switch policy {
-	case "round-robin":
+	case "round-robin", "round_robin":
 		policy = "#round-robin"
 	//  "least_conn":
 	case "least_time":
