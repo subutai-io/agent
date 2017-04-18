@@ -30,9 +30,6 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")
 	}
-	if len(external) == 0 {
-		log.Error("\"-e port\" must be specified")
-	}
 
 	if remove {
 		mapRemove(protocol, internal, external)
