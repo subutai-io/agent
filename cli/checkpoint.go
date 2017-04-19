@@ -11,16 +11,12 @@ import (
 	lxc "gopkg.in/lxc/go-lxc.v2"
 )
 
-func Checkpoint(name, date string, restore, backup bool) {
+func Checkpoint(name string, restore, stop bool) {
 	switch restore {
 	case true:
 		options := lxc.RestoreOptions{
 			Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
 			Verbose:   true,
-		}
-		if backup {
-			log.Info("Restoring container data")
-			RestoreContainer(name, date, name)
 		}
 		c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 		log.Check(log.ErrorLevel, "Creating container object", err)
@@ -32,7 +28,7 @@ func Checkpoint(name, date string, restore, backup bool) {
 		options := lxc.CheckpointOptions{
 			Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
 			Verbose:   true,
-			Stop:      true,
+			Stop:      stop,
 		}
 		c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 		log.Check(log.ErrorLevel, "Creating container object", err)
@@ -46,10 +42,6 @@ func Checkpoint(name, date string, restore, backup bool) {
 		uid, _ := strconv.Atoi(meta["uid"])
 		log.Check(log.WarnLevel, "Chowning checkpoint",
 			fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
-		if backup {
-			log.Info("Creating data backup")
-			log.Info("Dump timestamp: " + BackupContainer(name, true, true))
-		}
 	}
 }
 

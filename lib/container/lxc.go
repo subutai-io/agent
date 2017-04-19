@@ -160,6 +160,18 @@ func Stop(name string) {
 	}
 }
 
+func Freeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Freezing LXC container", c.Freeze())
+}
+
+func Unfreeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Unfreezing LXC container", c.Unfreeze())
+}
+
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !IsContainer(name) {
