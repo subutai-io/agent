@@ -53,7 +53,7 @@ func BackupContainer(container string, full, stop bool) string {
 		fs.SubvolumeCreate(backupDir + container)
 	}
 
-	lastSnapshotDir := getLastSnapshotDir(currentDT, backupDir+container)
+	lastSnapshotDir := getLastSnapshotDir(backupDir + container)
 	log.Debug("last snapshot dir: " + lastSnapshotDir)
 
 	if !full && lastSnapshotDir == "" {
@@ -125,7 +125,7 @@ func BackupContainer(container string, full, stop bool) string {
 	log.Check(log.WarnLevel, "Remove tmpdir", os.RemoveAll(backupDir+"/tmpdir"))
 	log.Check(log.WarnLevel, "Deleting .backup file to "+container+" container", os.Remove(config.Agent.LxcPrefix+container+"/.backup"))
 
-	return currentDT
+	return tarballName
 }
 
 // getContainerMountPoints returns array of paths to all containers mountpoints
@@ -198,7 +198,7 @@ func getModifiedList(td, ytd, rdir string) []string {
 }
 
 // getLastSnapshotDir returns a path to latest snapshot directory
-func getLastSnapshotDir(currentDT, path string) string {
+func getLastSnapshotDir(path string) string {
 	lastSnapshot := ""
 
 	dirs, _ := filepath.Glob(path + "/*")

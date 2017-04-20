@@ -320,7 +320,7 @@ func main() {
 			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
 			gcli.StringFlag{Name: "container, c", Usage: "name of new container"}},
 		Action: func(c *gcli.Context) error {
-			cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"))
+			cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
 			return nil
 		}}, {
 

@@ -22,14 +22,14 @@ func Migrate(name, stage, destination string) {
 		}
 		//full backup
 		log.Info("Creating data backup")
-		archive := config.Agent.LxcPrefix + "/backups/" + name + "_" + BackupContainer(name, true, false) + ".tar.gz"
+		archive := BackupContainer(name, true, false)
 		//transfer to destination
 		log.Info("Transfering data backup to destination")
 		transfer(archive, destination, config.Agent.LxcPrefix+"/backups/"+name+"_migration-stage1_Full.tar.gz")
 	case "2", "import-data":
 		//restore from full backup
 		log.Info("Restoring data backup")
-		RestoreContainer(name, "migration-stage1", name)
+		RestoreContainer(name, "migration-stage1", name, false)
 	case "3", "create-dump":
 		if len(destination) == 0 {
 			log.Error("Specify destination host")
@@ -42,14 +42,14 @@ func Migrate(name, stage, destination string) {
 		Checkpoint(name, false, false)
 		//diffirential backup
 		log.Info("Creating diffirential data backup")
-		archive := config.Agent.LxcPrefix + "/backups/" + name + "_" + BackupContainer(name, false, false) + ".tar.gz"
+		archive := BackupContainer(name, false, false)
 		//transfer to destination
 		log.Info("Transfering data")
 		transfer(archive, destination, config.Agent.LxcPrefix+"/backups/"+name+"_migration-stage2.tar.gz")
 	case "4", "restore-dump":
 		//restore diffirential backup
 		log.Info("Restoring data")
-		RestoreContainer(name, "migration-stage2", name)
+		RestoreContainer(name, "migration-stage2", name, true)
 		//restore memory dump
 		log.Info("Restoring memory dump")
 		Checkpoint(name, true, false)
