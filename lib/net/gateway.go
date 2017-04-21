@@ -3,8 +3,11 @@ package net
 import (
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
@@ -55,4 +58,15 @@ func rollbackConf(contName string) {
 		log.Check(log.FatalLevel, "Removing incorrect"+file, os.Remove(filePath+file))
 		log.Check(log.FatalLevel, "Restoring backup", os.Rename(filePath+file+".BACKUP", filePath+file))
 	}
+}
+
+func ValidSocket(socket string) bool {
+	if addr := strings.Split(socket, ":"); len(addr) == 2 {
+		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
+			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -37,7 +37,7 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		log.Error("\"-d domain\" is mandatory for http protocol")
 	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
 		log.Error("\"-c certificate\" is missing or invalid pem file")
-	} else if len(internal) != 0 && !validSocket(internal) {
+	} else if len(internal) != 0 && !ovs.ValidSocket(internal) {
 		log.Error("Invalid internal socket \"" + internal + "\"")
 	} else if (external == "8443" || external == "8444" || external == "8086") &&
 		internal != "10.10.10.1:"+external {
@@ -126,17 +126,6 @@ func isFree(protocol, port string) (res bool) {
 func random(min, max int) int {
 	rand.Seed(time.Now().Unix())
 	return rand.Intn(max-min) + min
-}
-
-func validSocket(socket string) bool {
-	if addr := strings.Split(socket, ":"); len(addr) == 2 {
-		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
-			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func portIsNew(protocol, internal, domain string, external *string) (new bool) {

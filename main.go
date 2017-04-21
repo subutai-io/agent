@@ -82,11 +82,10 @@ func main() {
 
 		Name: "checkpoint", Usage: "chekpoint/restore in user space",
 		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "backup, b", Usage: "Run backup after checkpoint"},
-			gcli.StringFlag{Name: "date, d", Usage: "Restore backup with this timestamp"},
+			gcli.BoolFlag{Name: "stop, s", Usage: "Stop container during checkpoint"},
 			gcli.BoolFlag{Name: "restore, r", Usage: "Restore checkpoint"}},
 		Action: func(c *gcli.Context) error {
-			cli.Checkpoint(c.Args().Get(0), c.String("d"), c.Bool("r"), c.Bool("b"))
+			cli.Checkpoint(c.Args().Get(0), c.Bool("r"), c.Bool("s"))
 			return nil
 		}}, {
 
@@ -226,6 +225,15 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "migrate", Usage: "migrate Subutai container",
+		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "stage, s", Usage: "migration stage"},
+			gcli.StringFlag{Name: "destination, d", Usage: "peer destination address"}},
+		Action: func(c *gcli.Context) error {
+			cli.Migrate(c.Args().Get(0), c.String("s"), c.String("d"))
+			return nil
+		}}, {
+
 		Name: "p2p", Usage: "P2P network operations",
 		Flags: []gcli.Flag{
 			gcli.BoolFlag{Name: "create, c", Usage: "create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
@@ -312,7 +320,7 @@ func main() {
 			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
 			gcli.StringFlag{Name: "container, c", Usage: "name of new container"}},
 		Action: func(c *gcli.Context) error {
-			cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"))
+			cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
 			return nil
 		}}, {
 

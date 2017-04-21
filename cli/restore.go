@@ -19,13 +19,12 @@ import (
 )
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
-func RestoreContainer(container, date, newContainer string) {
-	backupDir := config.Agent.LxcPrefix + "/backups/"
-
-	if lxcContainer.IsContainer(newContainer) {
+func RestoreContainer(container, date, newContainer string, force bool) {
+	if lxcContainer.IsContainer(newContainer) && !force {
 		log.Fatal("Container " + newContainer + " is already exist!")
 	}
 
+	backupDir := config.Agent.LxcPrefix + "/backups/"
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
 	tmpUnpackDir := config.Agent.LxcPrefix + "tmpdir/unpacking_" + currentDT + "/"
 
@@ -74,6 +73,7 @@ func RestoreContainer(container, date, newContainer string) {
 
 			fs.Receive(parent, newContainerTmpDir, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
 				!strings.Contains(file, "Full"))
+			fs.SubvolumeDestroy(newContainerTmpDir + deltaName + "@parent")
 			log.Check(log.DebugLevel, "Rename unpacked subvolume to @parent "+newContainerTmpDir+deltaName+" -> "+newContainerTmpDir+deltaName+"@parent",
 				exec.Command("mv",
 					newContainerTmpDir+deltaName,
@@ -89,11 +89,15 @@ func RestoreContainer(container, date, newContainer string) {
 
 	for _, volume := range volumes {
 		fs.SetVolReadOnly(volume, false)
-		volumeName := path.Base(volume)
-		volumeName = strings.Replace(volumeName, "@parent", "", -1)
+		volumeName := strings.Replace(path.Base(volume), "@parent", "", -1)
 
-		log.Check(log.WarnLevel, "Move "+volume+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
-			exec.Command("mv", volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName).Run())
+		if _, err := os.Stat(config.Agent.LxcPrefix + newContainer + "/" + volumeName); err == nil {
+			log.Check(log.FatalLevel, "Copying "+volume+" content to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+				exec.Command("rsync", "-av", volume+"/", config.Agent.LxcPrefix+newContainer+"/"+volumeName+"/").Run())
+		} else {
+			log.Check(log.WarnLevel, "Renaming "+volume+" to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+				os.Rename(volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName))
+		}
 		fs.SubvolumeDestroy(volume)
 	}
 
