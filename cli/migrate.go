@@ -35,12 +35,14 @@ func Migrate(name, stage, destination string) {
 		checkDestination(&destination)
 		//memory dump
 		log.Info("Creating memory dump")
-		res := Checkpoint(name, false, false)
-		for counter := 0; !res && counter < 3; res = Checkpoint(name, false, false) {
+		err := container.Dump(name, false)
+		for counter := 0; err != nil && counter < 3; err = container.Dump(name, false) {
 			log.Warn("Retrying memory dump")
 			time.Sleep(time.Second * 1)
 			counter++
 		}
+		//remove autostart
+		log.Check(log.WarnLevel, "Removing start trigger", os.Remove(config.Agent.LxcPrefix+name+"/.start"))
 		//container freeze
 		log.Warn("Freezing container")
 		container.Freeze(name)
@@ -50,8 +52,6 @@ func Migrate(name, stage, destination string) {
 		//cleaning container directory
 		log.Check(log.WarnLevel, "Removing memory images",
 			os.RemoveAll(config.Agent.LxcPrefix+name+"/checkpoint"))
-		log.Check(log.WarnLevel, "Removing start trigger",
-			os.Remove(config.Agent.LxcPrefix+name+"/.start"))
 		//transfer to destination
 		log.Info("Sending data")
 		transfer(archive, destination, config.Agent.LxcPrefix+"/backups/"+name+"_migration-stage2.tar.gz")
@@ -61,7 +61,7 @@ func Migrate(name, stage, destination string) {
 		RestoreContainer(name, "migration-stage2", name, true)
 		//restore memory dump
 		log.Info("Restoring memory dump")
-		Checkpoint(name, true, false)
+		container.DumpRestore(name)
 		//Unfreeze
 		log.Info("Unfreezing container")
 		container.Unfreeze(name)
