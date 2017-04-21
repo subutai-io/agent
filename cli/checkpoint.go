@@ -11,7 +11,7 @@ import (
 	lxc "gopkg.in/lxc/go-lxc.v2"
 )
 
-func Checkpoint(name string, restore, stop bool) {
+func Checkpoint(name string, restore, stop bool) bool {
 	switch restore {
 	case true:
 		options := lxc.RestoreOptions{
@@ -43,6 +43,7 @@ func Checkpoint(name string, restore, stop bool) {
 		log.Check(log.WarnLevel, "Chowning checkpoint",
 			fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
 	}
+	return true
 }
 
 // subutai-dev.criu dump -s --tree 2140 -D /var/snap/subutai-dev/common/lxc/m1/checkpoint --enable-external-masters --ext-mount-map auto --file-locks --ext-mount-map /opt:/var/snap/subutai-dev/common/lxc/m1/opt --ext-mount-map /home:/var/snap/subutai-dev/common/lxc/m1/home --ext-mount-map /var:/var/snap/subutai-dev/common/lxc/m1/var --empty-ns net

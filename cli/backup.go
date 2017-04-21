@@ -111,7 +111,7 @@ func BackupContainer(container string, full, stop bool) string {
 	}
 
 	log.Check(log.FatalLevel, "Copy meta files",
-		exec.Command("rsync", "-av", `--exclude`, `/rootfs`, `--exclude`, `/home`, `--exclude`, `/opt`, `--exclude`, `/var`, config.Agent.LxcPrefix+container+"/", tmpBackupDir+"meta").Run())
+		exec.Command("rsync", "-av", `--exclude`, `/rootfs`, `--exclude`, `/home`, `--exclude`, `/opt`, `--exclude`, `/var`, `--exclude`, `.*`, config.Agent.LxcPrefix+container+"/", tmpBackupDir+"meta").Run())
 
 	log.Check(log.FatalLevel, "Create Changelog file on tmpdir",
 		ioutil.WriteFile(changelogName, []byte(strings.Join(changelog, "\n")), 0644))
