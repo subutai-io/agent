@@ -22,7 +22,7 @@ import (
 // A full backup creates a delta-file of each BTRFS subvolume. An incremental backup (default) creates a delta-file with the difference of changes between the current and last snapshots.
 // All deltas are compressed to archives in `/mnt/backups/` directory (container_datetime.tar.gz or container_datetime_Full.tar.gz for full backup).
 // A changelog file can be found next to backups archive (container_datetime_changelog.txt or container_datetime_Full_changelog.txt) which contains a list of changes made between two backups.
-func BackupContainer(container string, full, stop bool) {
+func BackupContainer(container string, full, stop bool) string {
 	backupDir := config.Agent.LxcPrefix + "/backups/"
 	var changelog []string
 
@@ -53,7 +53,7 @@ func BackupContainer(container string, full, stop bool) {
 		fs.SubvolumeCreate(backupDir + container)
 	}
 
-	lastSnapshotDir := getLastSnapshotDir(currentDT, backupDir+container)
+	lastSnapshotDir := getLastSnapshotDir(backupDir + container)
 	log.Debug("last snapshot dir: " + lastSnapshotDir)
 
 	if !full && lastSnapshotDir == "" {
@@ -111,7 +111,7 @@ func BackupContainer(container string, full, stop bool) {
 	}
 
 	log.Check(log.FatalLevel, "Copy meta files",
-		exec.Command("rsync", "-av", `--exclude`, `/rootfs`, `--exclude`, `/home`, `--exclude`, `/opt`, `--exclude`, `/var`, config.Agent.LxcPrefix+container+"/", tmpBackupDir+"meta").Run())
+		exec.Command("rsync", "-av", `--exclude`, `/rootfs`, `--exclude`, `/home`, `--exclude`, `/opt`, `--exclude`, `/var`, `--exclude`, `.*`, config.Agent.LxcPrefix+container+"/", tmpBackupDir+"meta").Run())
 
 	log.Check(log.FatalLevel, "Create Changelog file on tmpdir",
 		ioutil.WriteFile(changelogName, []byte(strings.Join(changelog, "\n")), 0644))
@@ -124,6 +124,8 @@ func BackupContainer(container string, full, stop bool) {
 
 	log.Check(log.WarnLevel, "Remove tmpdir", os.RemoveAll(backupDir+"/tmpdir"))
 	log.Check(log.WarnLevel, "Deleting .backup file to "+container+" container", os.Remove(config.Agent.LxcPrefix+container+"/.backup"))
+
+	return tarballName
 }
 
 // getContainerMountPoints returns array of paths to all containers mountpoints
@@ -196,7 +198,7 @@ func getModifiedList(td, ytd, rdir string) []string {
 }
 
 // getLastSnapshotDir returns a path to latest snapshot directory
-func getLastSnapshotDir(currentDT, path string) string {
+func getLastSnapshotDir(path string) string {
 	lastSnapshot := ""
 
 	dirs, _ := filepath.Glob(path + "/*")

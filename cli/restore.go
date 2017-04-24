@@ -19,13 +19,12 @@ import (
 )
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
-func RestoreContainer(container, date, newContainer string) {
-	backupDir := config.Agent.LxcPrefix + "/backups/"
-
-	if lxcContainer.IsContainer(newContainer) {
+func RestoreContainer(container, date, newContainer string, force bool) {
+	if lxcContainer.IsContainer(newContainer) && !force {
 		log.Fatal("Container " + newContainer + " is already exist!")
 	}
 
+	backupDir := config.Agent.LxcPrefix + "/backups/"
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
 	tmpUnpackDir := config.Agent.LxcPrefix + "tmpdir/unpacking_" + currentDT + "/"
 
@@ -71,13 +70,9 @@ func RestoreContainer(container, date, newContainer string) {
 		for _, deltaFile := range deltas {
 			deltaName := strings.Replace(path.Base(deltaFile), ".delta", "", -1)
 			parent := (newContainerTmpDir + deltaName + "@parent")
-			dst := newContainerTmpDir
-			// if strings.Contains(file, "Full") {
-			// 	parent = dst
-			// }
-			fs.Receive(parent, dst, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
-				!strings.Contains(file, "Full"))
 
+			fs.Receive(parent, newContainerTmpDir, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
+				!strings.Contains(file, "Full"))
 			fs.SubvolumeDestroy(newContainerTmpDir + deltaName + "@parent")
 			log.Check(log.DebugLevel, "Rename unpacked subvolume to @parent "+newContainerTmpDir+deltaName+" -> "+newContainerTmpDir+deltaName+"@parent",
 				exec.Command("mv",
@@ -90,14 +85,20 @@ func RestoreContainer(container, date, newContainer string) {
 	fs.SubvolumeCreate(config.Agent.LxcPrefix + newContainer)
 
 	// move volumes
-	volumes, _ := filepath.Glob(newContainerTmpDir + "/*")
+	volumes, _ := filepath.Glob(newContainerTmpDir + "/*@parent")
 
 	for _, volume := range volumes {
 		fs.SetVolReadOnly(volume, false)
-		volumeName := path.Base(volume)
-		volumeName = strings.Replace(volumeName, "@parent", "", -1)
-		log.Check(log.DebugLevel, "Move "+volumeName+" volume to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
-			exec.Command("mv", volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName).Run())
+		volumeName := strings.Replace(path.Base(volume), "@parent", "", -1)
+
+		if _, err := os.Stat(config.Agent.LxcPrefix + newContainer + "/" + volumeName); err == nil {
+			log.Check(log.FatalLevel, "Copying "+volume+" content to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+				exec.Command("rsync", "-av", volume+"/", config.Agent.LxcPrefix+newContainer+"/"+volumeName+"/").Run())
+		} else {
+			log.Check(log.WarnLevel, "Renaming "+volume+" to "+config.Agent.LxcPrefix+newContainer+"/"+volumeName,
+				os.Rename(volume, config.Agent.LxcPrefix+newContainer+"/"+volumeName))
+		}
+		fs.SubvolumeDestroy(volume)
 	}
 
 	// restore meta files
@@ -140,6 +141,5 @@ func position(slice []string, value string) int {
 
 // Unpack extract passed archive to directory
 func unpack(archive, dir string) {
-	tgz := extractor.NewTgz()
-	tgz.Extract(archive, dir)
+	log.Check(log.DebugLevel, "Extracting archive", extractor.NewTgz().Extract(archive, dir))
 }

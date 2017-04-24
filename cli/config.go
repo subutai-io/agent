@@ -16,13 +16,10 @@ func LxcConfig(contName, operation, key, value string) {
 	switch operation {
 	case "add":
 		addValue(contName, key, value)
-		break
 	case "del":
 		delValue(contName, key, value)
-		break
 	case "":
 		displayConfig(contName)
-		break
 	}
 }
 

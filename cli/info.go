@@ -275,9 +275,8 @@ func grep(str, filename string) string {
 	f := bufio.NewReader(fh)
 
 	defer fh.Close()
-	buf := make([]byte, 64)
 	for {
-		buf, _, err = f.ReadLine()
+		buf, _, err := f.ReadLine()
 		if err != nil {
 			log.Warn("Cannot read line from file")
 			return ""
@@ -302,9 +301,6 @@ func Info(command, host, interval string) {
 	}
 
 	initdb()
-	if len(interval) == 0 {
-		interval = "10m"
-	}
 
 	switch command {
 	case "quota":

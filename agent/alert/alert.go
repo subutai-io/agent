@@ -168,7 +168,7 @@ func diskQuota(mountid, diskMap string) []int {
 	for _, line := range strings.Split(diskMap, "\n") {
 		row := strings.Fields(line)
 		if len(row) > 3 {
-			if row[0] == "0/"+mountid {
+			if strings.HasSuffix(row[0], "/"+mountid) {
 				u, l = row[2], row[3]
 			}
 		}

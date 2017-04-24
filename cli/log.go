@@ -15,6 +15,7 @@ import (
 
 var syslogLevels = []string{"emerg", "alert", "crit", "err", "warn", "notice", "info", "debug"}
 
+// Log prints log information from database server.
 func Log(app, level, start, end string) {
 	c, _ := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",

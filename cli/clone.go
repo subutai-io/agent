@@ -22,7 +22,7 @@ import (
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
-func LxcClone(parent, child, envId, addr, token, kurjToken string) {
+func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta := make(map[string]string)
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, _ := config.CheckKurjun()
@@ -43,9 +43,9 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 		gpg.ExchageAndEncrypt(child, token)
 	}
 
-	if len(envId) != 0 {
-		container.SetEnvID(child, envId)
-		meta["environment"] = envId
+	if len(envID) != 0 {
+		container.SetEnvID(child, envID)
+		meta["environment"] = envID
 	}
 
 	if ip := strings.Fields(addr); len(ip) > 1 {
@@ -54,11 +54,12 @@ func LxcClone(parent, child, envId, addr, token, kurjToken string) {
 		meta["vlan"] = ip[1]
 	}
 
-	container.SetContainerUID(child)
+	meta["uid"] = container.SetContainerUID(child)
 
 	//Need to change it in parent templates
 	container.SetApt(child)
 	container.SetDNS(child)
+	container.CriuHax(child)
 
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(child)

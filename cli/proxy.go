@@ -127,7 +127,7 @@ func addDomain(vlan, domain, cert string) {
 		}
 		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")
@@ -194,9 +194,8 @@ func getDomain(vlan string) string {
 func isVlanExist(vlan string) bool {
 	if _, err := os.Stat(confinc + vlan + ".conf"); err == nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // isNodeExist is true if specified node belongs to vlan, otherwise it is false

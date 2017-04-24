@@ -116,6 +116,18 @@ func SetApt(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list.d/subutai-repo.list", kurjun, 0644))
 }
 
+func CollectInfo(name string) {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	if len(bolt.ContainerByName(name)) == 0 {
+		meta := make(map[string]string)
+		meta["ip"] = GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4")
+		meta["parent"] = GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+}
+
 // Start starts the Subutai container.
 func Start(name string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -146,6 +158,53 @@ func Stop(name string) {
 		log.Check(log.WarnLevel, "Creating .stop file to "+name, err)
 		log.Check(log.WarnLevel, "Closing .stop file "+name, f.Close())
 	}
+}
+
+func Freeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Freezing LXC container", c.Freeze())
+}
+
+func Unfreeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Unfreezing LXC container", c.Unfreeze())
+}
+
+func Dump(name string, stop bool) error {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err != nil {
+		return err
+	}
+	options := lxc.CheckpointOptions{
+		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+		Verbose:   true,
+		Stop:      stop,
+	}
+	if err = c.Checkpoint(options); err != nil {
+		return err
+	}
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	meta := bolt.ContainerByName(name)
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	uid, _ := strconv.Atoi(meta["uid"])
+	log.Check(log.WarnLevel, "Chowning checkpoint",
+		fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
+	return nil
+}
+
+func DumpRestore(name string) error {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err != nil {
+		return err
+	}
+	options := lxc.RestoreOptions{
+		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+		Verbose:   true,
+	}
+	return c.Restore(options)
 }
 
 // AttachExec executes a command inside Subutai container.
@@ -395,7 +454,7 @@ func GetConfigItem(path, item string) string {
 
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
-func SetContainerUID(c string) {
+func SetContainerUID(c string) string {
 	uid := "65536"
 	if bolt, err := db.New(); err == nil {
 		uid = bolt.GetUuidEntry(c)
@@ -423,6 +482,7 @@ func SetContainerUID(c string) {
 
 		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
 	}
+	return uid
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
@@ -439,6 +499,14 @@ func SetDNS(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/tail", resolv, 0644))
 	log.Check(log.DebugLevel, "Writing resolv.conf",
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
+}
+
+func CriuHax(name string) {
+	SetContainerConf(name, [][]string{
+		{"lxc.console", "none"},
+		{"lxc.tty", "0"},
+		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
+	})
 }
 
 // SetEnvID is deprecated function and should be removed.

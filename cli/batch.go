@@ -47,6 +47,7 @@ func Batch(data string) {
 		output = append(output, cmdout)
 	}
 
-	result, err := json.Marshal(output)
-	fmt.Println(string(result))
+	if result, err := json.Marshal(output); err == nil {
+		fmt.Println(string(result))
+	}
 }
