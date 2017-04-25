@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
@@ -33,6 +34,12 @@ func ProxyAdd(vlan, domain, node, policy, cert string) {
 	} else if domain != "" {
 		if isVlanExist(vlan) {
 			log.Error("Domain already exist")
+		}
+		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.IsContainer(crt[0]) {
+			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
+				crt[0] += "/rootfs"
+			}
+			cert = config.Agent.LxcPrefix + crt[0] + strings.Join(crt[1:], ":")
 		}
 		addDomain(vlan, domain, cert)
 		switch policy {
