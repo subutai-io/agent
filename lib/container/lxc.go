@@ -160,6 +160,53 @@ func Stop(name string) {
 	}
 }
 
+func Freeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Freezing LXC container", c.Freeze())
+}
+
+func Unfreeze(name string) {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	log.Check(log.DebugLevel, "Unfreezing LXC container", c.Unfreeze())
+}
+
+func Dump(name string, stop bool) error {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err != nil {
+		return err
+	}
+	options := lxc.CheckpointOptions{
+		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+		Verbose:   true,
+		Stop:      stop,
+	}
+	if err = c.Checkpoint(options); err != nil {
+		return err
+	}
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	meta := bolt.ContainerByName(name)
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	uid, _ := strconv.Atoi(meta["uid"])
+	log.Check(log.WarnLevel, "Chowning checkpoint",
+		fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
+	return nil
+}
+
+func DumpRestore(name string) error {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err != nil {
+		return err
+	}
+	options := lxc.RestoreOptions{
+		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
+		Verbose:   true,
+	}
+	return c.Restore(options)
+}
+
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !IsContainer(name) {

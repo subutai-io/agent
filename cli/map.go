@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"fmt"
+
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/fs"
@@ -17,12 +19,16 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-func MapPort(protocol, internal, external, policy, domain, cert string, remove bool) {
+func MapPort(protocol, internal, external, policy, domain, cert string, list, remove bool) {
+	if list {
+		for _, v := range mapList(protocol) {
+			fmt.Println(v)
+		}
+		return
+	}
+
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")
-	}
-	if len(external) == 0 {
-		log.Error("\"-e port\" must be specified")
 	}
 
 	if remove {
@@ -31,7 +37,7 @@ func MapPort(protocol, internal, external, policy, domain, cert string, remove b
 		log.Error("\"-d domain\" is mandatory for http protocol")
 	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
 		log.Error("\"-c certificate\" is missing or invalid pem file")
-	} else if len(internal) != 0 && !validSocket(internal) {
+	} else if len(internal) != 0 && !ovs.ValidSocket(internal) {
 		log.Error("Invalid internal socket \"" + internal + "\"")
 	} else if (external == "8443" || external == "8444" || external == "8086") &&
 		internal != "10.10.10.1:"+external {
@@ -56,6 +62,21 @@ func MapPort(protocol, internal, external, policy, domain, cert string, remove b
 	}
 	// reload nginx
 	restart()
+}
+
+func mapList(protocol string) (list []string) {
+	bolt, err := db.New()
+	log.Check(log.ErrorLevel, "Openning portmap database to get list", err)
+	switch protocol {
+	case "tcp", "udp", "http", "https":
+		list = bolt.PortmapList(protocol)
+	default:
+		for _, v := range []string{"tcp", "udp", "http", "https"} {
+			list = append(list, bolt.PortmapList(v)...)
+		}
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	return
 }
 
 func mapRemove(protocol, internal, external string) {
@@ -105,17 +126,6 @@ func isFree(protocol, port string) (res bool) {
 func random(min, max int) int {
 	rand.Seed(time.Now().Unix())
 	return rand.Intn(max-min) + min
-}
-
-func validSocket(socket string) bool {
-	if addr := strings.Split(socket, ":"); len(addr) == 2 {
-		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
-			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func portIsNew(protocol, internal, domain string, external *string) (new bool) {
@@ -222,7 +232,7 @@ func balanceMethod(protocol, port, policy string) {
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	switch policy {
-	case "round-robin":
+	case "round-robin", "round_robin":
 		policy = "#round-robin"
 	//  "least_conn":
 	case "least_time":

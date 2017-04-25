@@ -134,7 +134,7 @@ func addDomain(vlan, domain, cert string) {
 		}
 		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")
