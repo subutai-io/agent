@@ -249,6 +249,7 @@ func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 	opts.StdoutFd = wop.Fd()
 	opts.StderrFd = wep.Fd()
 	opts.Cwd = req.WorkingDir
+	opts.ClearEnv = true
 
 	var exitCode int
 	var cmd bytes.Buffer
