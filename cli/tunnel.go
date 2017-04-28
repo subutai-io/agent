@@ -14,6 +14,7 @@ import (
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -33,6 +34,7 @@ func TunAdd(socket, timeout string, global bool) {
 	if len(strings.Split(socket, ":")) == 1 {
 		socket = socket + ":22"
 	}
+	prepareKey()
 
 	if item := getTunnel(socket); item != nil {
 		if len(timeout) > 0 {
@@ -84,6 +86,13 @@ func TunAdd(socket, timeout string, global bool) {
 		line, _, err = r.ReadLine()
 	}
 	log.Error("Cannot get tunnel port")
+}
+
+func prepareKey() {
+	if s, err := os.Stat(config.Agent.DataPrefix + "ssh.pem"); err != nil || s.Mode().Perm() != 0600 {
+		fs.Copy(config.Agent.AppPrefix+"etc/ssh.pem", config.Agent.DataPrefix+"ssh.pem")
+		log.Check(log.WarnLevel, "Setting key permissions", os.Chmod(config.Agent.DataPrefix+"ssh.pem", 0600))
+	}
 }
 
 // TunList performs tunnel check and shows "alive" tunnels
@@ -152,11 +161,7 @@ func getArgs(socket string) ([]string, string) {
 	cdn, err := net.LookupIP(config.CDN.URL)
 	log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
 	tunsrv = cdn[0].String()
-	key := config.Agent.AppPrefix + "etc/ssh.pem"
-	if _, err := os.Stat(config.Agent.DataPrefix + "ssh.pem"); err == nil {
-		key = config.Agent.DataPrefix + "ssh.pem"
-	}
-	args = []string{"-i", key, "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
+	args = []string{"-i", config.Agent.DataPrefix + "ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	return args, tunsrv
 }
 
