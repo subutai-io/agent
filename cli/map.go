@@ -30,16 +30,11 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")
 	} else if protocol == "tcp" || protocol == "udp" {
-		domain = "dummy"
-	}
-
-	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + ".conf"
-	if protocol == "http" || protocol == "https" {
-		conf = config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + "-" + domain + ".conf"
+		domain = protocol
 	}
 
 	if remove {
-		mapRemove(protocol, external, domain, internal, conf)
+		mapRemove(protocol, external, domain, internal)
 	} else if (protocol == "http" || protocol == "https") && len(domain) == 0 {
 		log.Error("\"-d domain\" is mandatory for http protocol")
 	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
@@ -52,20 +47,21 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 	} else if len(internal) != 0 {
 		// check external port and create nginx config
 		if portIsNew(protocol, internal, domain, &external) {
-			newConfig(protocol, external, domain, cert, conf)
+			newConfig(protocol, external, domain, cert)
 		}
 
 		// add containers to backend
-		addLine(conf, "#Add new host here", "	server "+internal+";", false)
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+"-"+domain+".conf",
+			"#Add new host here", "	server "+internal+";", false)
 
 		// save information to database
 		saveMapToDB(protocol, external, domain, internal)
 		containerMapToDB(protocol, external, domain, internal)
-		balanceMethod(protocol, external, domain, policy, conf)
+		balanceMethod(protocol, external, domain, policy)
 
 		log.Info(ovs.GetIp() + ":" + external)
 	} else if len(policy) != 0 {
-		balanceMethod(protocol, external, domain, policy, conf)
+		balanceMethod(protocol, external, domain, policy)
 	}
 	// reload nginx
 	restart()
@@ -86,7 +82,7 @@ func mapList(protocol string) (list []string) {
 	return
 }
 
-func mapRemove(protocol, external, domain, internal, conf string) {
+func mapRemove(protocol, external, domain, internal string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database to remove mapping", err)
 	defer bolt.Close()
@@ -102,9 +98,10 @@ func mapRemove(protocol, external, domain, internal, conf string) {
 		} else {
 			internal = internal + ":"
 		}
-		addLine(conf, "server "+internal, " ", true)
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+"-"+domain+".conf",
+			"server "+internal, " ", true)
 	} else {
-		os.Remove(conf)
+		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + "-" + domain + ".conf")
 		if protocol == "https" {
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + "-" + domain + ".key")
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + "-" + domain + ".crt")
@@ -163,9 +160,10 @@ func portIsNew(protocol, internal, domain string, external *string) (new bool) {
 	return new
 }
 
-func newConfig(protocol, port, domain, cert, conf string) {
+func newConfig(protocol, port, domain, cert string) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
 		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/"+protocol, 0755))
+	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + port + "-" + domain + ".conf"
 
 	switch protocol {
 	case "https":
@@ -203,7 +201,7 @@ func newConfig(protocol, port, domain, cert, conf string) {
 	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+port+"-"+domain+";", true)
 }
 
-func balanceMethod(protocol, port, domain, policy, conf string) {
+func balanceMethod(protocol, port, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + port + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
@@ -241,7 +239,8 @@ func balanceMethod(protocol, port, domain, policy, conf string) {
 		log.Warn("Unsupported balancing method \"" + policy + "\"")
 		return
 	}
-	addLine(conf, replaceString, "	"+policy+"; #policy", replace)
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+"-"+domain+".conf",
+		replaceString, "	"+policy+"; #policy", replace)
 }
 
 func saveMapToDB(protocol, external, domain, internal string) {
