@@ -5,8 +5,6 @@ import (
 
 	"github.com/boltdb/bolt"
 
-	"strings"
-
 	"github.com/subutai-io/agent/config"
 )
 
@@ -346,21 +344,18 @@ func (i *Instance) PortInMap(protocol, external, domain, internal string) (res b
 		if b := tx.Bucket(portmap); b != nil {
 			if b = b.Bucket([]byte(protocol)); b != nil {
 				if b = b.Bucket([]byte(external)); b != nil {
-					if b = b.Bucket([]byte(domain)); b != nil {
-						if len(internal) == 0 {
-							res = true
-							return nil
-						} else if !strings.Contains(internal, ":") {
-							b.ForEach(func(k, v []byte) error {
-								if strings.Contains(string(k), internal+":") {
+					if len(domain) > 0 {
+						if b = b.Bucket([]byte(domain)); b != nil {
+							if len(internal) > 0 {
+								if b = b.Bucket([]byte(internal)); b != nil {
 									res = true
 								}
-								return nil
-							})
-						} else if b.Bucket([]byte(internal)) != nil {
-							res = true
-							return nil
+							} else {
+								res = true
+							}
 						}
+					} else {
+						res = true
 					}
 				}
 			}

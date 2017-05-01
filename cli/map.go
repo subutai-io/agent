@@ -104,8 +104,8 @@ func mapRemove(protocol, external, domain, internal, conf string) {
 	} else {
 		os.Remove(conf)
 		if protocol == "https" {
-			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + ".key")
-			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + ".crt")
+			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + "-" + domain + ".key")
+			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + "-" + domain + ".crt")
 		}
 	}
 }
@@ -139,24 +139,26 @@ func portIsNew(protocol, internal, domain string, external *string) (new bool) {
 			log.Error("Parameter \"external\" should be integer in range of 1000-65536")
 		}
 		if isFree(protocol, *external) {
-			new = true
-		} else {
-			bolt, err := db.New()
-			log.Check(log.ErrorLevel, "Openning portmap database to read existing mappings", err)
-			if bolt.PortInMap(protocol, *external, domain, internal) {
-				log.Error("Map is already exists")
-			} else if !bolt.PortInMap(protocol, *external, domain, "") {
-				log.Error("Port is busy")
-			}
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			return true
 		}
+
+		bolt, err := db.New()
+		log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err)
+		if !bolt.PortInMap(protocol, *external, "", "") {
+			log.Error("Port is busy")
+		} else if bolt.PortInMap(protocol, *external, domain, internal) {
+			log.Error("Map is already exists")
+		} else if !bolt.PortInMap(protocol, *external, domain, "") {
+			new = true
+		}
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	} else {
 		for *external = strconv.Itoa(random(1000, 65536)); !isFree(protocol, *external); *external = strconv.Itoa(random(1000, 65536)) {
 			continue
 		}
 		new = true
 	}
-	return
+	return new
 }
 
 func newConfig(protocol, port, domain, cert, conf string) {
@@ -170,23 +172,23 @@ func newConfig(protocol, port, domain, cert, conf string) {
 		addLine(conf, "listen      80;", "	listen "+port+";", true)
 		addLine(conf, "listen	443;", "	listen "+port+";", true)
 		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
-		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+port+";", true)
-		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+port+" {", true)
+		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+port+"-"+domain+";", true)
+		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+port+"-"+domain+" {", true)
 
 		crt, key := gpg.ParsePem(cert)
-		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+".crt", crt, 0644))
-		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+".key", key, 0644))
+		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".crt", crt, 0644))
+		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".key", key, 0644))
 
 		addLine(conf, "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
-			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+port+".crt;", true)
+			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".crt;", true)
 		addLine(conf, "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
-			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+port+".key;", true)
+			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".key;", true)
 	case "http":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example", conf)
 		addLine(conf, "listen 	80;", "	listen "+port+";", true)
-		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
-		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+port+";", true)
-		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+port+" {", true)
+		addLine(conf, "server_name DOMAIN;", "server_name "+domain+"-"+domain+";", true)
+		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+port+"-"+domain+";", true)
+		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+port+"-"+domain+" {", true)
 	case "tcp":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
 		addLine(conf, "listen PORT;", "	listen "+port+";", true)
@@ -195,12 +197,12 @@ func newConfig(protocol, port, domain, cert, conf string) {
 		addLine(conf, "listen PORT;", "	listen "+port+" udp;", true)
 	}
 	addLine(conf, "server localhost:81;", " ", true)
-	addLine(conf, "upstream PROTO-PORT {", "upstream "+protocol+"-"+port+" {", true)
-	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+port+";", true)
+	addLine(conf, "upstream PROTO-PORT {", "upstream "+protocol+"-"+port+"-"+domain+" {", true)
+	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+port+"-"+domain+";", true)
 }
 
 func balanceMethod(protocol, port, domain, policy, conf string) {
-	replaceString := "upstream " + protocol + "-" + port + " {"
+	replaceString := "upstream " + protocol + "-" + port + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database to check if port is mapped", err)
