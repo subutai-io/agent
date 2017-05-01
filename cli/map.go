@@ -59,7 +59,8 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		addLine(conf, "#Add new host here", "	server "+internal+";", false)
 
 		// save information to database
-		saveMapToDB(protocol, internal, external, domain)
+		saveMapToDB(protocol, external, domain, internal)
+		containerMapToDB(protocol, external, domain, internal)
 		balanceMethod(protocol, external, domain, policy, conf)
 
 		log.Info(ovs.GetIp() + ":" + external)
@@ -92,6 +93,7 @@ func mapRemove(protocol, external, domain, internal, conf string) {
 	if !bolt.PortInMap(protocol, external, domain, internal) {
 		return
 	}
+	log.Debug("Removing mapping: " + protocol + " " + external + " " + domain + " " + internal)
 	l := bolt.PortMapDelete(protocol, external, domain, internal)
 
 	if l > 0 {
@@ -242,19 +244,18 @@ func balanceMethod(protocol, port, domain, policy, conf string) {
 	addLine(conf, replaceString, "	"+policy+"; #policy", replace)
 }
 
-func saveMapToDB(protocol, internal, external, domain string) {
+func saveMapToDB(protocol, external, domain, internal string) {
 	bolt, err := db.New()
-	ops := make(map[string]string)
 	log.Check(log.ErrorLevel, "Openning database to save portmap", err)
-	c := bolt.ContainerByKey("ip", strings.Split(internal, ":")[0])
-	if len(c) > 0 {
-		ops["container"] = c[0]
-	}
-	if len(domain) > 0 {
-		ops["domain"] = domain
-	}
-	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, external, domain, internal, ops))
+	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, external, domain, internal))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 
-// func mapToContainer(protocol, external, domain, internal, )
+func containerMapToDB(protocol, external, domain, internal string) {
+	bolt, err := db.New()
+	log.Check(log.ErrorLevel, "Openning database to save portmap", err)
+	for _, name := range bolt.ContainerByKey("ip", strings.Split(internal, ":")[0]) {
+		bolt.ContainerMapping(name, protocol, external, domain, internal)
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+}

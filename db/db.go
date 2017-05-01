@@ -201,6 +201,51 @@ func (i *Instance) ContainerQuota(name, res, quota string) (err error) {
 	return err
 }
 
+func (i *Instance) ContainerMapping(name, protocol, external, domain, internal string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				if b, err = b.CreateBucketIfNotExists([]byte("portmap")); err == nil {
+					if n, err := b.NextSequence(); err == nil {
+						if b, err = b.CreateBucketIfNotExists([]byte(strconv.Itoa(int(n)))); err == nil {
+							b.Put([]byte("protocol"), []byte(protocol))
+							b.Put([]byte("external"), []byte(external))
+							b.Put([]byte("domain"), []byte(domain))
+							b.Put([]byte("internal"), []byte(internal))
+						}
+					}
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) GetContainerMapping(name string) (list []map[string]string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				if b = b.Bucket([]byte("portmap")); b != nil {
+					b.ForEach(func(k, v []byte) error {
+						l := make(map[string]string)
+						if c := b.Bucket(k); c != nil {
+							c.ForEach(func(kk, vv []byte) error {
+								l[string(kk)] = string(vv)
+								return nil
+							})
+						}
+						list = append(list, l)
+						return nil
+					})
+				}
+			}
+		}
+		return nil
+	})
+	return
+}
+
 func (i *Instance) ContainerByName(name string) map[string]string {
 	c := make(map[string]string)
 	i.db.View(func(tx *bolt.Tx) error {
@@ -237,21 +282,18 @@ func (i *Instance) ContainerByKey(key, value string) (list []string) {
 	return
 }
 
-func (i *Instance) PortMapSet(protocol, external, domain, internal string, ops map[string]string) (err error) {
+func (i *Instance) PortMapSet(protocol, external, domain, internal string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b, err = b.CreateBucketIfNotExists([]byte(protocol)); err == nil {
 				if b, err = b.CreateBucketIfNotExists([]byte(external)); err == nil {
 					if b, err = b.CreateBucketIfNotExists([]byte(domain)); err == nil {
-						if b, err = b.CreateBucketIfNotExists([]byte(internal)); err == nil {
-							for k, v := range ops {
-								b.Put([]byte(k), []byte(v))
-							}
+						if b, err = b.CreateBucketIfNotExists([]byte(internal)); err != nil {
+							return err
 						}
 					}
 				}
 			}
-			return err
 		}
 		return nil
 	})
@@ -283,26 +325,6 @@ func (i *Instance) GetMapMethod(protocol, external, domain string) (policy strin
 						policy = string(b.Get([]byte("policy")))
 					}
 				}
-			}
-		}
-		return nil
-	})
-	return
-}
-
-// REPLACE
-func (i *Instance) ExtPorts(protocol, internal string) (list []string) {
-	i.db.View(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(portmap); b != nil {
-			if b = b.Bucket([]byte(protocol)); b != nil {
-				b.ForEach(func(k, v []byte) error {
-					if c := b.Bucket(k); c != nil {
-						if kk, _ := c.Cursor().Seek([]byte(internal + ":")); kk != nil {
-							list = append(list, string(k))
-						}
-					}
-					return nil
-				})
 			}
 		}
 		return nil
