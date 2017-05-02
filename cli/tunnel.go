@@ -34,7 +34,6 @@ func TunAdd(socket, timeout string, global bool) {
 	if len(strings.Split(socket, ":")) == 1 {
 		socket = socket + ":22"
 	}
-	prepareKey()
 
 	if item := getTunnel(socket); item != nil {
 		if len(timeout) > 0 {
@@ -53,6 +52,7 @@ func TunAdd(socket, timeout string, global bool) {
 		return
 	}
 
+	prepareKey()
 	args, tunsrv := getArgs(socket)
 	cmd := exec.Command("ssh", args...)
 

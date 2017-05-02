@@ -21,7 +21,7 @@ func Copy(source string, dest string) {
 	defer df.Close()
 
 	_, err = io.Copy(df, sf)
-	log.Check(log.FatalLevel, "Coping file "+source+" to "+dest, err)
+	log.Check(log.FatalLevel, "Copying file "+source+" to "+dest, err)
 }
 
 // Tar function creates archive file of specified folder
