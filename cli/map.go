@@ -213,15 +213,6 @@ func balanceMethod(protocol, port, domain, policy string) {
 	if !bolt.PortInMap(protocol, port, domain, "") {
 		log.Error("Port is not mapped")
 	}
-	if p := bolt.GetMapMethod(protocol, port, domain); len(p) != 0 && p != policy {
-		replaceString = "; #policy"
-		replace = true
-	} else if p == policy {
-		return
-	}
-	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, domain, policy))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
 	switch policy {
 	case "round-robin", "round_robin":
 		policy = "#round-robin"
@@ -231,6 +222,8 @@ func balanceMethod(protocol, port, domain, policy string) {
 			policy = policy + " connect"
 		} else {
 			policy = policy + " header"
+			log.Warn("This policy is not supported in http upstream")
+			return
 		}
 	case "hash":
 		policy = policy + " $remote_addr"
@@ -240,9 +233,19 @@ func balanceMethod(protocol, port, domain, policy string) {
 			return
 		}
 	default:
-		log.Warn("Unsupported balancing method \"" + policy + "\"")
+		log.Debug("Unsupported balancing method \"" + policy + "\", ignoring")
 		return
 	}
+
+	if p := bolt.GetMapMethod(protocol, port, domain); len(p) != 0 && p != policy {
+		replaceString = "; #policy"
+		replace = true
+	} else if p == policy {
+		return
+	}
+	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, domain, policy))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
 }
