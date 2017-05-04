@@ -336,23 +336,21 @@ func (i *Instance) PortMapDelete(protocol, external, domain, internal string) (l
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(portmap); b != nil {
 			if b := b.Bucket([]byte(protocol)); b != nil {
-				if len(external) > 0 {
-					if len(domain) > 0 {
-						if b = b.Bucket([]byte(external)); b != nil {
-							if len(internal) > 0 {
-								if b = b.Bucket([]byte(domain)); b != nil {
-									b.DeleteBucket([]byte(internal))
-									left = b.Stats().BucketN - 2
-								}
-							} else {
-								b.DeleteBucket([]byte(domain))
+				if len(domain) > 0 {
+					if b = b.Bucket([]byte(external)); b != nil {
+						if len(internal) > 0 {
+							if b = b.Bucket([]byte(domain)); b != nil {
+								b.DeleteBucket([]byte(internal))
 								left = b.Stats().BucketN - 2
 							}
+						} else {
+							b.DeleteBucket([]byte(domain))
+							left = 0
 						}
-					} else {
-						b.DeleteBucket([]byte(external))
-						left = b.Stats().BucketN - 2
 					}
+				} else {
+					b.DeleteBucket([]byte(external))
+					left = 0
 				}
 			}
 		}
@@ -396,11 +394,13 @@ func (i *Instance) PortmapList(protocol string) (list []string) {
 						c.ForEach(func(kk, vv []byte) error {
 							if d := c.Bucket(kk); d != nil {
 								d.ForEach(func(kkk, vvv []byte) error {
-									if line := protocol + "\t" + string(k) + "\t" + string(kkk); len(line) > 0 {
-										if protocol == "http" || protocol == "https" {
-											line = line + "\t" + string(kk)
+									if d.Bucket(kkk) != nil {
+										if line := protocol + "\t" + string(k) + "\t" + string(kkk); len(line) > 0 {
+											if protocol == "http" || protocol == "https" {
+												line = line + "\t" + string(kk)
+											}
+											list = append(list, line)
 										}
-										list = append(list, line)
 									}
 									return nil
 								})
