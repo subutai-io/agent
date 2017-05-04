@@ -116,6 +116,6 @@ func removePortMap(name string) {
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	for _, v := range list {
-		MapPort(v["protocol"], v["internal"], v["external"], "", v["domain"], "", false, true)
+		MapPort(v["protocol"], v["internal"], v["external"], "", v["domain"], "", false, true, false)
 	}
 }

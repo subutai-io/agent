@@ -161,7 +161,7 @@ func getArgs(socket string) ([]string, string) {
 	cdn, err := net.LookupIP(config.CDN.URL)
 	log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
 	tunsrv = cdn[0].String()
-	args = []string{"-i", config.Agent.DataPrefix + "ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
+	args = []string{"-i", config.Agent.DataPrefix + "ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	return args, tunsrv
 }
 

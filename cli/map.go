@@ -19,7 +19,7 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-func MapPort(protocol, internal, external, policy, domain, cert string, list, remove bool) {
+func MapPort(protocol, internal, external, policy, domain, cert string, list, remove, sslbcknd bool) {
 	if list {
 		for _, v := range mapList(protocol) {
 			fmt.Println(v)
@@ -47,7 +47,7 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 	} else if len(internal) != 0 {
 		// check external port and create nginx config
 		if portIsNew(protocol, internal, domain, &external) {
-			newConfig(protocol, external, domain, cert)
+			newConfig(protocol, external, domain, cert, sslbcknd)
 		}
 
 		// add containers to backend
@@ -90,9 +90,8 @@ func mapRemove(protocol, external, domain, internal string) {
 		return
 	}
 	log.Debug("Removing mapping: " + protocol + " " + external + " " + domain + " " + internal)
-	l := bolt.PortMapDelete(protocol, external, domain, internal)
 
-	if l > 0 {
+	if bolt.PortMapDelete(protocol, external, domain, internal) > 0 {
 		if strings.Contains(internal, ":") {
 			internal = internal + ";"
 		} else {
@@ -160,7 +159,7 @@ func portIsNew(protocol, internal, domain string, external *string) (new bool) {
 	return new
 }
 
-func newConfig(protocol, port, domain, cert string) {
+func newConfig(protocol, port, domain, cert string, sslbcknd bool) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
 		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/"+protocol, 0755))
 	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + port + "-" + domain + ".conf"
@@ -169,10 +168,14 @@ func newConfig(protocol, port, domain, cert string) {
 	case "https":
 		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(config.Agent.DataPrefix+"/web/ssl/", 0755))
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost-ssl.example", conf)
-		addLine(conf, "listen      80;", "	listen "+port+";", true)
+		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+port+"$request_uri;  # enforce https", true)
 		addLine(conf, "listen	443;", "	listen "+port+";", true)
 		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
-		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+port+"-"+domain+";", true)
+		if sslbcknd {
+			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass https://https-"+port+"-"+domain+";", true)
+		} else {
+			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+port+"-"+domain+";", true)
+		}
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+port+"-"+domain+" {", true)
 
 		crt, key := gpg.ParsePem(cert)
@@ -186,7 +189,8 @@ func newConfig(protocol, port, domain, cert string) {
 	case "http":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example", conf)
 		addLine(conf, "listen 	80;", "	listen "+port+";", true)
-		addLine(conf, "server_name DOMAIN;", "server_name "+domain+"-"+domain+";", true)
+		addLine(conf, "return 301 http://$host$request_uri;", "	    return 301 http://$host:"+port+"$request_uri;", true)
+		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
 		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+port+"-"+domain+";", true)
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+port+"-"+domain+" {", true)
 	case "tcp":
@@ -209,15 +213,6 @@ func balanceMethod(protocol, port, domain, policy string) {
 	if !bolt.PortInMap(protocol, port, domain, "") {
 		log.Error("Port is not mapped")
 	}
-	if p := bolt.GetMapMethod(protocol, port, domain); len(p) != 0 && p != policy {
-		replaceString = "; #policy"
-		replace = true
-	} else if p == policy {
-		return
-	}
-	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, domain, policy))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
 	switch policy {
 	case "round-robin", "round_robin":
 		policy = "#round-robin"
@@ -227,6 +222,8 @@ func balanceMethod(protocol, port, domain, policy string) {
 			policy = policy + " connect"
 		} else {
 			policy = policy + " header"
+			log.Warn("This policy is not supported in http upstream")
+			return
 		}
 	case "hash":
 		policy = policy + " $remote_addr"
@@ -236,9 +233,19 @@ func balanceMethod(protocol, port, domain, policy string) {
 			return
 		}
 	default:
-		log.Warn("Unsupported balancing method \"" + policy + "\"")
+		log.Debug("Unsupported balancing method \"" + policy + "\", ignoring")
 		return
 	}
+
+	if p := bolt.GetMapMethod(protocol, port, domain); len(p) != 0 && p != policy {
+		replaceString = "; #policy"
+		replace = true
+	} else if p == policy {
+		return
+	}
+	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, domain, policy))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
 }
@@ -246,7 +253,9 @@ func balanceMethod(protocol, port, domain, policy string) {
 func saveMapToDB(protocol, external, domain, internal string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning database to save portmap", err)
-	log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, external, domain, internal))
+	if !bolt.PortInMap(protocol, external, domain, internal) {
+		log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, external, domain, internal))
+	}
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 
