@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/archiver/extractor"
-	"github.com/cheggaaa/pb"
 	"github.com/nightlyone/lockfile"
+	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
