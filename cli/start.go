@@ -18,7 +18,7 @@ func LxcStart(name string) {
 	state := container.State(name)
 	for i := 0; i < 60; i++ {
 		if state == "RUNNING" || state == "STARTING" {
-			container.CollectInfo(name)
+			container.AddMetadata(name, map[string]string{})
 			log.Info(name + " started")
 			return
 		}

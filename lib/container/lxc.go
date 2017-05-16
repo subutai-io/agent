@@ -116,15 +116,13 @@ func SetApt(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list.d/subutai-repo.list", kurjun, 0644))
 }
 
-func CollectInfo(name string) {
+func AddMetadata(name string, meta map[string]string) {
+	_, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.FatalLevel, "Looking for container "+name, err)
+
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	if len(bolt.ContainerByName(name)) == 0 {
-		meta := make(map[string]string)
-		meta["ip"] = GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4")
-		meta["parent"] = GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
-	}
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 

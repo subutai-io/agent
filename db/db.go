@@ -246,6 +246,19 @@ func (i *Instance) GetContainerMapping(name string) (list []map[string]string) {
 	return
 }
 
+func (i *Instance) ContainerList() (list []string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			b.ForEach(func(k, v []byte) error {
+				list = append(list, string(k))
+				return nil
+			})
+		}
+		return nil
+	})
+	return
+}
+
 func (i *Instance) ContainerByName(name string) map[string]string {
 	c := make(map[string]string)
 	i.db.View(func(tx *bolt.Tx) error {

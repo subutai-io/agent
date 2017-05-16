@@ -121,7 +121,6 @@ func info(name string) (result []string) {
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 
 	nic := "eth0"
-
 	listip, _ := c.IPAddress(nic)
 	ip := strings.Join(listip, " ")
 
