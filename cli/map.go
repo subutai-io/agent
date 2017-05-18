@@ -33,10 +33,10 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		domain = protocol
 	}
 
-	if remove {
-		mapRemove(protocol, external, domain, internal)
-	} else if (protocol == "http" || protocol == "https") && len(domain) == 0 {
+	if (protocol == "http" || protocol == "https") && len(domain) == 0 {
 		log.Error("\"-d domain\" is mandatory for http protocol")
+	} else if remove {
+		mapRemove(protocol, external, domain, internal)
 	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
 		log.Error("\"-c certificate\" is missing or invalid pem file")
 	} else if len(internal) != 0 && !ovs.ValidSocket(internal) {
