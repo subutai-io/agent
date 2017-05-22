@@ -18,7 +18,9 @@ func LxcAttach(name string, cmd []string) {
 	log.Check(log.ErrorLevel, "Creating container object", err)
 
 	options := lxc.DefaultAttachOptions
-	options.EnvToKeep = []string{"TERM", "USER", "LS_COLORS"}
+	options.EnvToKeep = []string{"TERM", "LS_COLORS"}
+	options.Env = []string{"HOME=/root", "USER=root"}
+
 	options.ClearEnv = true
 
 	if len(cmd) > 0 {
