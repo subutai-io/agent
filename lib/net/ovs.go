@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-
-	"github.com/subutai-io/agent/log"
 )
 
 // RateLimit sets throughput limits for container's network interfaces if "quota" is specified
@@ -42,8 +40,7 @@ func RateLimit(nic string, rate ...string) string {
 // GetIp returns IP address that should be used for host access
 func GetIp() string {
 	iface := "eth0"
-	out, err := exec.Command("ovs-vsctl", "list-ports", "wan").Output()
-	if !log.Check(log.DebugLevel, "Getting WAN ports", err) {
+	if out, err := exec.Command("ovs-vsctl", "list-ports", "wan").Output(); err == nil {
 		scanner := bufio.NewScanner(bytes.NewReader(out))
 		iface = "wan"
 		for scanner.Scan() {

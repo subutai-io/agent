@@ -358,12 +358,12 @@ func (i *Instance) PortMapDelete(protocol, external, domain, internal string) (l
 							}
 						} else {
 							b.DeleteBucket([]byte(domain))
-							left = 0
+							left = b.Stats().BucketN - 2
 						}
 					}
 				} else {
 					b.DeleteBucket([]byte(external))
-					left = 0
+					left = b.Stats().BucketN - 2
 				}
 			}
 		}
