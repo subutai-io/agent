@@ -22,7 +22,6 @@ import (
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
 func LxcDestroy(id string, vlan bool) {
-	var v string
 	var msg string
 	if len(id) == 0 {
 		log.Error("Please specify container/template name or vlan id")
@@ -67,15 +66,20 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	if id == "everything" {
-		for _, c := range container.Containers() {
-			if vlan := container.GetConfigItem(config.Agent.LxcPrefix+c+"/config", "#vlan_id"); len(vlan) != 0 {
-				if vlan != v {
-					LxcDestroy(vlan, true)
-					cleanupNet(vlan)
-					v = vlan
-				}
-			} else {
-				LxcDestroy(c, false)
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		list := bolt.ContainerList()
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		for _, name := range list {
+			bolt, err := db.New()
+			log.Check(log.WarnLevel, "Opening database", err)
+			container := bolt.ContainerByName(name)
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+			LxcDestroy(name, false)
+			if v, ok := container["vlan"]; ok {
+				cleanupNet(v)
 			}
 		}
 		msg = id + " is destroyed"

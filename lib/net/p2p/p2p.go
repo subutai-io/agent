@@ -50,6 +50,8 @@ func RemoveByIface(name string) {
 			Remove(line[2])
 		}
 	}
+	log.Check(log.WarnLevel, "Disabling p2p link",
+		exec.Command("ifconfig", name, "down").Run())
 	iptablesCleanUp(name)
 }
 

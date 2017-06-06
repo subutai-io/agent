@@ -33,18 +33,19 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		domain = protocol
 	}
 
-	if remove {
-		mapRemove(protocol, external, domain, internal)
-	} else if (protocol == "http" || protocol == "https") && len(domain) == 0 {
+	switch {
+	case (protocol == "http" || protocol == "https") && len(domain) == 0:
 		log.Error("\"-d domain\" is mandatory for http protocol")
-	} else if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
+	case remove:
+		mapRemove(protocol, external, domain, internal)
+	case protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)):
 		log.Error("\"-c certificate\" is missing or invalid pem file")
-	} else if len(internal) != 0 && !ovs.ValidSocket(internal) {
+	case len(internal) != 0 && !ovs.ValidSocket(internal):
 		log.Error("Invalid internal socket \"" + internal + "\"")
-	} else if (external == "8443" || external == "8444" || external == "8086") &&
-		internal != "10.10.10.1:"+external {
+	case (external == "8443" || external == "8444" || external == "8086") &&
+		internal != "10.10.10.1:"+external:
 		log.Error("Reserved system ports")
-	} else if len(internal) != 0 {
+	case len(internal) != 0:
 		// check external port and create nginx config
 		if portIsNew(protocol, internal, domain, &external) {
 			newConfig(protocol, external, domain, cert, sslbcknd)
@@ -60,10 +61,9 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		balanceMethod(protocol, external, domain, policy)
 
 		log.Info(ovs.GetIp() + ":" + external)
-	} else if len(policy) != 0 {
+	case len(policy) != 0:
 		balanceMethod(protocol, external, domain, policy)
 	}
-	// reload nginx
 	restart()
 }
 
@@ -100,6 +100,9 @@ func mapRemove(protocol, external, domain, internal string) {
 		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+"-"+domain+".conf",
 			"server "+internal, " ", true)
 	} else {
+		if bolt.PortMapDelete(protocol, external, domain, "") == 0 {
+			bolt.PortMapDelete(protocol, external, "", "")
+		}
 		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + "-" + domain + ".conf")
 		if protocol == "https" {
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + external + "-" + domain + ".key")
@@ -146,9 +149,8 @@ func portIsNew(protocol, internal, domain string, external *string) (new bool) {
 			log.Error("Port is busy")
 		} else if bolt.PortInMap(protocol, *external, domain, internal) {
 			log.Error("Map is already exists")
-		} else if !bolt.PortInMap(protocol, *external, domain, "") {
-			new = true
 		}
+		new = !bolt.PortInMap(protocol, *external, domain, "")
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	} else {
 		for *external = strconv.Itoa(random(1000, 65536)); !isFree(protocol, *external); *external = strconv.Itoa(random(1000, 65536)) {
@@ -261,7 +263,7 @@ func saveMapToDB(protocol, external, domain, internal string) {
 
 func containerMapToDB(protocol, external, domain, internal string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning database to save portmap", err)
+	log.Check(log.ErrorLevel, "Openning database to add portmap to container", err)
 	for _, name := range bolt.ContainerByKey("ip", strings.Split(internal, ":")[0]) {
 		bolt.ContainerMapping(name, protocol, external, domain, internal)
 	}

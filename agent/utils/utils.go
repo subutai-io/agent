@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/subutai-io/agent/config"
+	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -32,9 +33,13 @@ func GetInterfaces() []Iface {
 	log.Check(log.WarnLevel, "Getting network interfaces", err)
 
 	list := []Iface{}
+	wan := false
 	for _, ifac := range ifaces {
 		if ifac.Name == "lo0" || ifac.Name == "lo" || !strings.Contains(ifac.Flags.String(), "up") {
 			continue
+		}
+		if ifac.Name == "wan" {
+			wan = true
 		}
 		inter := new(Iface)
 		inter.InterfaceName = ifac.Name
@@ -50,6 +55,9 @@ func GetInterfaces() []Iface {
 				}
 			}
 		}
+	}
+	if !wan {
+		list = append(list, Iface{InterfaceName: "wan", IP: ovs.GetIp()})
 	}
 	return list
 }
