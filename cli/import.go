@@ -146,10 +146,10 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 	log.Check(log.FatalLevel, "Creating file "+t.file, err)
 	defer out.Close()
 
-	url := config.CDN.Kurjun + "/template/download?id=" + t.id
+	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
 	if len(t.owner) > 0 {
-		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file
+		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file + "?token=" + token
 	}
 	response, err := kurjun.Get(url)
 	log.Check(log.FatalLevel, "Getting "+url, err)
