@@ -195,6 +195,9 @@ func newConfig(protocol, port, domain, cert string, sslbcknd bool) {
 		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
 		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+port+"-"+domain+";", true)
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+port+"-"+domain+" {", true)
+		if port != "80" {
+			httpRedirect(port, domain)
+		}
 	case "tcp":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
 		addLine(conf, "listen PORT;", "	listen "+port+";", true)
@@ -250,6 +253,18 @@ func balanceMethod(protocol, port, domain, policy string) {
 
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
+}
+
+func httpRedirect(port, domain string) {
+	var redirect = `server {
+	    listen      80; #redirect
+    	server_name ` + domain + `;
+    	return 301 http://$host$request_uri;
+}`
+
+	addLine(config.Agent.DataPrefix+"nginx-includes/http/"+port+"-"+domain+".conf",
+		"#redirect placeholder", redirect, true)
+
 }
 
 func saveMapToDB(protocol, external, domain, internal string) {
