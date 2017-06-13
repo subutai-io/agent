@@ -46,33 +46,26 @@ func SubvolumeClone(src, dst string) {
 // SubvolumeDestroy deletes BTRFS subvolume and all subdirectories.
 // It also destroys quota groups.
 func SubvolumeDestroy(path string) {
-	svol := []string{path}
-	if !IsSubvolume(path) {
-		svol = []string{path + "/var", path + "/opt", path + "/home", path + "/rootfs", path}
-	}
-	for _, v := range svol {
-		nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", v).Output()
-		log.Check(log.DebugLevel, "Getting nested subvolumes in "+v, err)
-		scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
-		for scanner.Scan() {
-			line := strings.Fields(scanner.Text())
-			if len(line) > 8 {
-				SubvolumeDestroy(GetBtrfsRoot() + line[8])
-			}
+	nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", path).Output()
+	log.Check(log.DebugLevel, "Getting nested subvolumes in "+path, err)
+
+	scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
+	for scanner.Scan() {
+		if line := strings.Fields(scanner.Text()); len(line) > 8 {
+			SubvolumeDestroy(GetBtrfsRoot() + line[8])
 		}
-		qgroupDestroy(v)
-		out, err := exec.Command("btrfs", "subvolume", "delete", v).CombinedOutput()
-		log.Check(log.DebugLevel, "Destroying subvolume "+v+": "+string(out), err)
 	}
-	log.Check(log.DebugLevel, "Removing path "+path, exec.Command("rm", "-rf", path).Run())
+	qgroupDestroy(id(path))
+
+	out, err := exec.Command("btrfs", "subvolume", "delete", path).CombinedOutput()
+	log.Check(log.DebugLevel, "Destroying subvolume "+path+": "+string(out), err)
 }
 
 // qgroupDestroy delete quota group for BTRFS subvolume.
-func qgroupDestroy(path string) {
-	index := id(path)
-	log.Check(log.DebugLevel, "Cleaning group quota", exec.Command("btrfs", "qgroup", "limit", "none", "1/"+index, config.Agent.LxcPrefix).Run())
+func qgroupDestroy(index string) {
 	out, err := exec.Command("btrfs", "qgroup", "destroy", index, config.Agent.LxcPrefix).CombinedOutput()
-	log.Check(log.DebugLevel, "Destroying qgroup "+path+" "+index+": "+string(out), err)
+	log.Check(log.DebugLevel, "Destroying qgroup "+index+": "+string(out), err)
+	log.Check(log.DebugLevel, "Destroying qgroup of parent", exec.Command("btrfs", "qgroup", "destroy", "1/"+index, config.Agent.LxcPrefix).Run())
 }
 
 // NEED REFACTORING
