@@ -89,8 +89,7 @@ func Receive(src, dst, delta string, parent bool) {
 	if parent {
 		args = append(args, "-p", src)
 	}
-	log.Debug(strings.Join(args, " "))
-	log.Check(log.WarnLevel, "Receiving delta", exec.Command("btrfs", args...).Run())
+	log.Check(log.WarnLevel, "Receiving delta "+strings.Join(args, " "), exec.Command("btrfs", args...).Run())
 }
 
 // Send creates delta-file using BTRFS subvolume, it can depend on some parent.
@@ -109,11 +108,9 @@ func Send(src, dst, delta string) error {
 		SetVolReadOnly(tmpVolume, true)
 
 		if src != dst {
-			err = exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
-		} else {
-			err = exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
+			return exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
 		}
-		return err
+		return exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
 	}
 	return nil
 }
@@ -128,8 +125,7 @@ func ReadOnly(container string, flag bool) {
 
 // SetVolReadOnly sets readonly flag for BTRFS subvolume.
 func SetVolReadOnly(subvol string, flag bool) {
-	arg := []string{"property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)}
-	out, err := exec.Command("btrfs", arg...).CombinedOutput()
+	out, err := exec.Command("btrfs", "property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)).CombinedOutput()
 	log.Check(log.FatalLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
 }
 
@@ -146,11 +142,8 @@ func Stat(path, index string, raw bool) (value string) {
 	ind := id(path)
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 3 {
-			if strings.HasSuffix(line[0], "/"+ind) {
-				value = line[row[index]]
-			}
+		if line := strings.Fields(scanner.Text()); len(line) > 3 && strings.HasSuffix(line[0], "/"+ind) {
+			value = line[row[index]]
 		}
 	}
 	return value
