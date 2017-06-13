@@ -48,7 +48,7 @@ func SubvolumeClone(src, dst string) {
 func SubvolumeDestroy(path string) {
 	svol := []string{path}
 	if !IsSubvolume(path) {
-		svol = []string{path + "/var", path + "/opt", path + "/home", path + "/rootfs"}
+		svol = []string{path + "/var", path + "/opt", path + "/home", path + "/rootfs", path}
 	}
 	for _, v := range svol {
 		nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", v).Output()
@@ -70,6 +70,7 @@ func SubvolumeDestroy(path string) {
 // qgroupDestroy delete quota group for BTRFS subvolume.
 func qgroupDestroy(path string) {
 	index := id(path)
+	log.Check(log.DebugLevel, "Cleaning group quota", exec.Command("btrfs", "qgroup", "limit", "none", "1/"+index, config.Agent.LxcPrefix).Run())
 	out, err := exec.Command("btrfs", "qgroup", "destroy", index, config.Agent.LxcPrefix).CombinedOutput()
 	log.Check(log.DebugLevel, "Destroying qgroup "+path+" "+index+": "+string(out), err)
 }
