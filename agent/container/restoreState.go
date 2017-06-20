@@ -1,71 +1,37 @@
 package container
 
 import (
-	"os"
-	"os/exec"
+	"time"
 
-	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 )
 
-var (
-	contsStatus map[string]int
-)
-
-func init() {
-	contsStatus = make(map[string]int)
-}
-
 // StateRestore checks container state and starting or stopping containers if required.
 func StateRestore() {
-	for _, cont := range Active(false) {
-		var start, stop bool
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	running := bolt.ContainerByKey("state", "running")
+	stopped := bolt.ContainerByKey("state", "stopped")
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-		switch contsStatus[cont.Name] {
-		case 100:
-		case 5:
-			{
-				log.Debug("Failed to START container " + cont.Name + " after 5 attempts")
-				contsStatus[cont.Name] = 100
+	for _, v := range running {
+		if container.State(v) != "RUNNING" {
+			started := container.Start(v)
+			for i := 0; i < 5 && !started; i++ {
+				time.Sleep(time.Second)
+				started = container.Start(v)
 			}
-		case -5:
-			{
-				log.Debug("Failed to STOP container " + cont.Name + " after 5 attempts")
-				contsStatus[cont.Name] = 100
-			}
-		case 10:
-			{
-				log.Debug(".start and .stop files exist on " + cont.Name + " cont ")
-				contsStatus[cont.Name] = 100
-			}
-		default:
-			{
-				if _, err := os.Stat(config.Agent.LxcPrefix + cont.Name + "/.start"); err == nil {
-					start = true
-				}
-				if _, err := os.Stat(config.Agent.LxcPrefix + cont.Name + "/.stop"); err == nil {
-					stop = true
-				}
-				if start && stop {
-					contsStatus[cont.Name] = 10
-					break
-				}
-				switch {
-				case start && cont.Status != "RUNNING":
-					{
-						err := exec.Command("subutai", "start", cont.Name).Run()
-						log.Check(log.DebugLevel, "Trying to start "+cont.Name, err)
-						contsStatus[cont.Name]++
-					}
-				case stop && cont.Status != "STOPPED":
-					{
-						err := exec.Command("subutai", "stop", cont.Name).Run()
-						log.Check(log.DebugLevel, "Trying to stop "+cont.Name, err)
-						contsStatus[cont.Name]--
-					}
-				default:
-					contsStatus[cont.Name] = 0
-				}
+		}
+	}
+
+	for _, v := range stopped {
+		if container.State(v) != "STOPPED" {
+			stopped := container.Stop(v)
+			for i := 0; i < 5 && !stopped; i++ {
+				time.Sleep(time.Second)
+				stopped = container.Stop(v)
 			}
 		}
 	}

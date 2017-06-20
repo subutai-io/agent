@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"time"
-
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 )
@@ -11,21 +9,14 @@ import (
 // If state is not changing for 60 seconds, then the "start" operation is considered to have failed.
 func LxcStart(name string) {
 	if container.IsContainer(name) && container.State(name) == "STOPPED" {
-		container.Start(name)
-	} else {
-		return
-	}
-	state := container.State(name)
-	for i := 0; i < 60; i++ {
-		if state == "RUNNING" || state == "STARTING" {
-			container.AddMetadata(name, map[string]string{})
-			log.Info(name + " started")
-			return
+		started := container.Start(name)
+		for i := 0; i < 60 && !started; i++ {
+			log.Info("Waiting for container start (60 sec)")
+			started = container.Start(name)
 		}
-		log.Info("Waiting for container start (60 sec)")
-		time.Sleep(time.Second)
-		container.Start(name)
-		state = container.State(name)
+		if !started {
+			log.Error(name + " start failed")
+		}
+		log.Info(name + " started")
 	}
-	log.Error(name + " start failed.")
 }

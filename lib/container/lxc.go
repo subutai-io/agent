@@ -19,6 +19,8 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 
+	"time"
+
 	"gopkg.in/lxc/go-lxc.v2"
 )
 
@@ -68,25 +70,7 @@ func State(name string) (state string) {
 	if err != nil {
 		return "UNKNOWN"
 	}
-	switch c.State() {
-	case lxc.STOPPED:
-		return "STOPPED"
-	case lxc.RUNNING:
-		return "RUNNING"
-	case lxc.STARTING:
-		return "STARTING"
-	case lxc.STOPPING:
-		return "STOPPING"
-	case lxc.ABORTING:
-		return "ABORTING"
-	case lxc.FREEZING:
-		return "FREEZING"
-	case lxc.FROZEN:
-		return "FROZEN"
-	case lxc.THAWED:
-		return "THAWED"
-	}
-	return "UNKNOWN"
+	return c.State().String()
 }
 
 // SetApt configures APT configuration inside Subutai container.
@@ -127,35 +111,27 @@ func AddMetadata(name string, meta map[string]string) {
 }
 
 // Start starts the Subutai container.
-func Start(name string) {
+func Start(name string) bool {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Starting LXC container", c.Start())
-
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); err == nil {
-		log.Check(log.WarnLevel, "Deleting .stop file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.stop"))
+	if !c.Wait(lxc.RUNNING, time.Second*2) {
+		return false
 	}
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); os.IsNotExist(err) {
-		f, err := os.Create(config.Agent.LxcPrefix + name + "/.start")
-		log.Check(log.WarnLevel, "Creating .start file to "+name, err)
-		log.Check(log.WarnLevel, "Closing .start file "+name, f.Close())
-	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return true
 }
 
 // Stop stops the Subutai container.
-func Stop(name string) {
+func Stop(name string) bool {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Stopping LXC container", c.Stop())
-
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); err == nil {
-		log.Check(log.WarnLevel, "Creating .start file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.start"))
+	if !c.Wait(lxc.STOPPED, time.Second*2) {
+		return false
 	}
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); os.IsNotExist(err) {
-		f, err := os.Create(config.Agent.LxcPrefix + name + "/.stop")
-		log.Check(log.WarnLevel, "Creating .stop file to "+name, err)
-		log.Check(log.WarnLevel, "Closing .stop file "+name, f.Close())
-	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return true
 }
 
 func Freeze(name string) {
