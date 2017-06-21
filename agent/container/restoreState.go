@@ -12,26 +12,17 @@ import (
 func StateRestore() {
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	running := bolt.ContainerByKey("state", "running")
-	stopped := bolt.ContainerByKey("state", "stopped")
+	active := bolt.ContainerByKey("state", "RUNNING")
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	for _, v := range running {
+	for _, v := range active {
 		if container.State(v) != "RUNNING" {
+			log.Debug("Starting container " + v)
 			started := container.Start(v)
 			for i := 0; i < 5 && !started; i++ {
+				log.Debug("Retrying container " + v + " start")
 				time.Sleep(time.Second)
 				started = container.Start(v)
-			}
-		}
-	}
-
-	for _, v := range stopped {
-		if container.State(v) != "STOPPED" {
-			stopped := container.Stop(v)
-			for i := 0; i < 5 && !stopped; i++ {
-				time.Sleep(time.Second)
-				stopped = container.Stop(v)
 			}
 		}
 	}

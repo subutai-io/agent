@@ -19,8 +19,6 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 
-	"time"
-
 	"gopkg.in/lxc/go-lxc.v2"
 )
 
@@ -66,11 +64,10 @@ func IsContainer(name string) bool {
 
 // State returns container stat in human readable format.
 func State(name string) (state string) {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
-		return "UNKNOWN"
+	if c, err := lxc.NewContainer(name, config.Agent.LxcPrefix); err == nil {
+		return c.State().String()
 	}
-	return c.State().String()
+	return "UNKNOWN"
 }
 
 // SetApt configures APT configuration inside Subutai container.
@@ -100,10 +97,10 @@ func SetApt(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list.d/subutai-repo.list", kurjun, 0644))
 }
 
+// AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) {
 	_, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
-
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
 	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
@@ -115,7 +112,7 @@ func Start(name string) bool {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Starting LXC container", c.Start())
-	if !c.Wait(lxc.RUNNING, time.Second*2) {
+	if c.State().String() != "RUNNING" {
 		return false
 	}
 	AddMetadata(name, map[string]string{"state": State(name)})
@@ -127,7 +124,7 @@ func Stop(name string) bool {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Stopping LXC container", c.Stop())
-	if !c.Wait(lxc.STOPPED, time.Second*2) {
+	if c.State().String() != "STOPPED" {
 		return false
 	}
 	AddMetadata(name, map[string]string{"state": State(name)})
@@ -138,12 +135,14 @@ func Freeze(name string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Freezing LXC container", c.Freeze())
+	AddMetadata(name, map[string]string{"state": State(name)})
 }
 
 func Unfreeze(name string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
 	log.Check(log.DebugLevel, "Unfreezing LXC container", c.Unfreeze())
+	AddMetadata(name, map[string]string{"state": State(name)})
 }
 
 func Dump(name string, stop bool) error {
