@@ -46,32 +46,26 @@ func SubvolumeClone(src, dst string) {
 // SubvolumeDestroy deletes BTRFS subvolume and all subdirectories.
 // It also destroys quota groups.
 func SubvolumeDestroy(path string) {
-	svol := []string{path}
-	if !IsSubvolume(path) {
-		svol = []string{path + "/var", path + "/opt", path + "/home", path + "/rootfs"}
-	}
-	for _, v := range svol {
-		nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", v).Output()
-		log.Check(log.DebugLevel, "Getting nested subvolumes in "+v, err)
-		scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
-		for scanner.Scan() {
-			line := strings.Fields(scanner.Text())
-			if len(line) > 8 {
-				SubvolumeDestroy(GetBtrfsRoot() + line[8])
-			}
+	nestedvol, err := exec.Command("btrfs", "subvolume", "list", "-o", path).Output()
+	log.Check(log.DebugLevel, "Getting nested subvolumes in "+path, err)
+
+	scanner := bufio.NewScanner(bytes.NewReader(nestedvol))
+	for scanner.Scan() {
+		if line := strings.Fields(scanner.Text()); len(line) > 8 {
+			SubvolumeDestroy(GetBtrfsRoot() + line[8])
 		}
-		qgroupDestroy(v)
-		out, err := exec.Command("btrfs", "subvolume", "delete", v).CombinedOutput()
-		log.Check(log.DebugLevel, "Destroying subvolume "+v+": "+string(out), err)
 	}
-	log.Check(log.DebugLevel, "Removing path "+path, exec.Command("rm", "-rf", path).Run())
+	qgroupDestroy(id(path))
+
+	out, err := exec.Command("btrfs", "subvolume", "delete", path).CombinedOutput()
+	log.Check(log.DebugLevel, "Destroying subvolume "+path+": "+string(out), err)
 }
 
 // qgroupDestroy delete quota group for BTRFS subvolume.
-func qgroupDestroy(path string) {
-	index := id(path)
+func qgroupDestroy(index string) {
 	out, err := exec.Command("btrfs", "qgroup", "destroy", index, config.Agent.LxcPrefix).CombinedOutput()
-	log.Check(log.DebugLevel, "Destroying qgroup "+path+" "+index+": "+string(out), err)
+	log.Check(log.DebugLevel, "Destroying qgroup "+index+": "+string(out), err)
+	log.Check(log.DebugLevel, "Destroying qgroup of parent", exec.Command("btrfs", "qgroup", "destroy", "1/"+index, config.Agent.LxcPrefix).Run())
 }
 
 // NEED REFACTORING
@@ -95,8 +89,7 @@ func Receive(src, dst, delta string, parent bool) {
 	if parent {
 		args = append(args, "-p", src)
 	}
-	log.Debug(strings.Join(args, " "))
-	log.Check(log.WarnLevel, "Receiving delta", exec.Command("btrfs", args...).Run())
+	log.Check(log.WarnLevel, "Receiving delta "+strings.Join(args, " "), exec.Command("btrfs", args...).Run())
 }
 
 // Send creates delta-file using BTRFS subvolume, it can depend on some parent.
@@ -115,11 +108,9 @@ func Send(src, dst, delta string) error {
 		SetVolReadOnly(tmpVolume, true)
 
 		if src != dst {
-			err = exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
-		} else {
-			err = exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
+			return exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
 		}
-		return err
+		return exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
 	}
 	return nil
 }
@@ -134,8 +125,7 @@ func ReadOnly(container string, flag bool) {
 
 // SetVolReadOnly sets readonly flag for BTRFS subvolume.
 func SetVolReadOnly(subvol string, flag bool) {
-	arg := []string{"property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)}
-	out, err := exec.Command("btrfs", arg...).CombinedOutput()
+	out, err := exec.Command("btrfs", "property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)).CombinedOutput()
 	log.Check(log.FatalLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
 }
 
@@ -152,11 +142,8 @@ func Stat(path, index string, raw bool) (value string) {
 	ind := id(path)
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 3 {
-			if strings.HasSuffix(line[0], "/"+ind) {
-				value = line[row[index]]
-			}
+		if line := strings.Fields(scanner.Text()); len(line) > 3 && strings.HasSuffix(line[0], "/"+ind) {
+			value = line[row[index]]
 		}
 	}
 	return value
