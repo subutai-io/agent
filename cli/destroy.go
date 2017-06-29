@@ -62,7 +62,7 @@ func LxcDestroy(id string, vlan bool) {
 		}
 		removePortMap(id)
 		net.DelIface(c["interface"])
-		container.Destroy(id)
+		log.Check(log.ErrorLevel, "Destroying container", container.Destroy(id))
 	}
 
 	if id == "everything" {

@@ -9,12 +9,12 @@ import (
 // If state is not changing for 60 seconds, then the "start" operation is considered to have failed.
 func LxcStart(name string) {
 	if container.IsContainer(name) && container.State(name) == "STOPPED" {
-		started := container.Start(name)
-		for i := 0; i < 60 && !started; i++ {
+		startErr := container.Start(name)
+		for i := 0; i < 60 && startErr != nil; i++ {
 			log.Info("Waiting for container start (60 sec)")
-			started = container.Start(name)
+			startErr = container.Start(name)
 		}
-		if !started {
+		if startErr != nil {
 			log.Error(name + " start failed")
 		}
 		log.Info(name + " started")

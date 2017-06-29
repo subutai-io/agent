@@ -18,11 +18,11 @@ func StateRestore() {
 	for _, v := range active {
 		if container.State(v) != "RUNNING" {
 			log.Debug("Starting container " + v)
-			started := container.Start(v)
-			for i := 0; i < 5 && !started; i++ {
+			startErr := container.Start(v)
+			for i := 0; i < 5 && startErr != nil; i++ {
 				log.Debug("Retrying container " + v + " start")
 				time.Sleep(time.Second)
-				started = container.Start(v)
+				startErr = container.Start(v)
 			}
 		}
 	}

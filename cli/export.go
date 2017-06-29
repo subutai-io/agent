@@ -48,7 +48,7 @@ func LxcExport(name, version, prefsize, token string, private bool) {
 		"-subutai-template_" + version + "_" + runtime.GOARCH
 
 	if !container.IsTemplate(name) {
-		LxcPromote(name)
+		LxcPromote(name, "")
 	}
 	// check: parent is template
 	parent := container.GetParent(name)

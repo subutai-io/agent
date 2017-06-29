@@ -91,8 +91,7 @@ func LxcList(name string, c, t, i, a, p bool) {
 // addParent adds parent to each template in list
 func addParent(list []string) []string {
 	for i := range list {
-		parent := container.GetParent(strings.Fields(list[i])[0])
-		list[i] = list[i] + "\t" + parent
+		list[i] = list[i] + "\t" + container.GetParent(strings.Fields(list[i])[0])
 	}
 	return list
 }
@@ -101,14 +100,15 @@ func addParent(list []string) []string {
 func addAncestors(list []string) []string {
 	for i := range list {
 		child := strings.Fields(list[i])[0]
+		parent := container.GetParent(child)
 		result := ""
-		for child != container.GetParent(child) {
+		for child != parent {
 			if result != "" {
-				result = result + "," + container.GetParent(child)
+				result = result + "," + parent
 			} else {
-				result = container.GetParent(child)
+				result = parent
 			}
-			child = container.GetParent(child)
+			child = parent
 		}
 		list[i] = list[i] + "\t" + result
 	}
