@@ -16,6 +16,7 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/template"
@@ -26,11 +27,6 @@ var (
 	lock   lockfile.Lockfile
 	owners = []string{"subutai", "jenkins", "docker", ""}
 )
-
-type progress struct {
-	Total int `json:"total"`
-	Done  int `json:"done"`
-}
 
 type templ struct {
 	name      string
@@ -189,6 +185,14 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 
 // idToName retrieves template name from global repository by passed id string
 func idToName(id string, kurjun *http.Client, token string) string {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	if name := bolt.TemplateName(id); len(name) > 0 {
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		return name
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
 	var meta []metainfo
 
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
@@ -405,4 +409,9 @@ func LxcImport(name, version, token string, torrent bool) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
+
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
