@@ -38,7 +38,7 @@ func main() {
 		commit = config.Template.Branch + "/" + commit
 	}
 
-	if base, err := db.New(); err == nil {
+	if base, err := db.New(); err == nil && len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
 		if len(config.Management.Host) < 7 {
 			config.Management.Host = base.DiscoveryLoad()
 		}
