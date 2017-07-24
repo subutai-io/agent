@@ -157,7 +157,7 @@ func sendHeartbeat() bool {
 	}
 
 	pool = container.Active(false)
-	beat := heartbeat{
+	res := response{Beat: heartbeat{
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
 		ID:         fingerprint,
@@ -166,8 +166,7 @@ func sendHeartbeat() bool {
 		Containers: alert.Quota(pool),
 		Alert:      alert.Current(pool),
 		Interfaces: utils.GetInterfaces(),
-	}
-	res := response{Beat: beat}
+	}}
 	jbeat, err := json.Marshal(&res)
 	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
 	lastHeartbeatTime = time.Now()
