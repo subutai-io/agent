@@ -28,6 +28,7 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -40,6 +41,7 @@ type response struct {
 type heartbeat struct {
 	Type       string                `json:"type"`
 	Hostname   string                `json:"hostname"`
+	Address    string                `json:"address"`
 	ID         string                `json:"id"`
 	Arch       string                `json:"arch"`
 	Instance   string                `json:"instance"`
@@ -160,6 +162,7 @@ func sendHeartbeat() bool {
 	res := response{Beat: heartbeat{
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
+		Address:    net.GetIp(),
 		ID:         fingerprint,
 		Arch:       instanceArch,
 		Instance:   instanceType,
