@@ -73,12 +73,8 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
-		var oldmeta metainfo
-		if log.Check(log.WarnLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta)) {
-			return
-		}
-		meta = append(meta, oldmeta)
+	if err != nil || log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		return
 	}
 
 	if len(meta) == 0 {
