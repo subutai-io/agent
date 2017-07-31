@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
+// MapPort exposes internal container ports to external RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
 func MapPort(protocol, internal, external, policy, domain, cert string, list, remove, sslbcknd bool) {
 	if list {
 		for _, v := range mapList(protocol) {
@@ -33,6 +34,13 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		domain = protocol
 	}
 
+	port := external
+	if ovs.ValidSocket(external) {
+		port = strings.Split(external, ":")[1]
+	} else {
+		external = "0.0.0.0:" + port
+	}
+
 	switch {
 	case (protocol == "http" || protocol == "https") && len(domain) == 0:
 		log.Error("\"-d domain\" is mandatory for http protocol")
@@ -42,8 +50,8 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		log.Error("\"-c certificate\" is missing or invalid pem file")
 	case len(internal) != 0 && !ovs.ValidSocket(internal):
 		log.Error("Invalid internal socket \"" + internal + "\"")
-	case (external == "8443" || external == "8444" || external == "8086") &&
-		internal != "10.10.10.1:"+external:
+	case (port == "8443" || port == "8444" || port == "8086") &&
+		internal != "10.10.10.1:"+port:
 		log.Error("Reserved system ports")
 	case len(internal) != 0:
 		// check external port and create nginx config
@@ -60,7 +68,11 @@ func MapPort(protocol, internal, external, policy, domain, cert string, list, re
 		containerMapToDB(protocol, external, domain, internal)
 		balanceMethod(protocol, external, domain, policy)
 
-		log.Info(ovs.GetIp() + ":" + external)
+		if strings.Contains(external, "0.0.0.0:") {
+			log.Info(ovs.GetIp() + ":" + port)
+		} else {
+			log.Info(external)
+		}
 	case len(policy) != 0:
 		balanceMethod(protocol, external, domain, policy)
 	}
@@ -86,9 +98,10 @@ func mapRemove(protocol, external, domain, internal string) {
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database to remove mapping", err)
 	defer bolt.Close()
-	if !bolt.PortInMap(protocol, external, domain, internal) {
-		return
-	}
+	// Commenting this section out to insure config deletion even if db doesn't have it
+	// if !bolt.PortInMap(protocol, external, domain, internal) {
+	// 	return
+	// }
 	log.Debug("Removing mapping: " + protocol + " " + external + " " + domain + " " + internal)
 
 	if bolt.PortMapDelete(protocol, external, domain, internal) > 0 {
@@ -111,15 +124,15 @@ func mapRemove(protocol, external, domain, internal string) {
 	}
 }
 
-func isFree(protocol, port string) (res bool) {
+func isFree(protocol, external string) (res bool) {
 	switch protocol {
 	case "tcp", "http", "https":
-		if ln, err := net.Listen("tcp", ovs.GetIp()+":"+port); err == nil {
+		if ln, err := net.Listen("tcp", external); err == nil {
 			ln.Close()
 			res = true
 		}
 	case "udp":
-		if addr, err := net.ResolveUDPAddr("udp", ovs.GetIp()+":"+port); err == nil {
+		if addr, err := net.ResolveUDPAddr("udp", external); err == nil {
 			if ln, err := net.ListenUDP("udp", addr); err == nil {
 				ln.Close()
 				res = true
@@ -135,9 +148,10 @@ func random(min, max int) int {
 }
 
 func portIsNew(protocol, internal, domain string, external *string) (new bool) {
-	if len(*external) != 0 {
-		if port, err := strconv.Atoi(*external); err != nil || port < 1000 || port > 65536 {
-			log.Error("Parameter \"external\" should be integer in range of 1000-65536")
+	ext := strings.Split(*external, ":")
+	if len(ext[1]) != 0 {
+		if port, err := strconv.Atoi(ext[1]); err != nil || port < 1000 || port > 65536 {
+			log.Error("Port number in \"external\" should be integer in range of 1000-65536")
 		}
 		if isFree(protocol, *external) {
 			return true
@@ -153,69 +167,70 @@ func portIsNew(protocol, internal, domain string, external *string) (new bool) {
 		new = !bolt.PortInMap(protocol, *external, domain, "")
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	} else {
-		for *external = strconv.Itoa(random(1000, 65536)); !isFree(protocol, *external); *external = strconv.Itoa(random(1000, 65536)) {
+		for ext[1] = strconv.Itoa(random(1000, 65536)); !isFree(protocol, ext[0]+":"+ext[1]); ext[1] = strconv.Itoa(random(1000, 65536)) {
 			continue
 		}
+		*external = ext[0] + ":" + ext[1]
 		new = true
 	}
 	return new
 }
 
-func newConfig(protocol, port, domain, cert string, sslbcknd bool) {
+func newConfig(protocol, external, domain, cert string, sslbcknd bool) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
 		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/"+protocol, 0755))
-	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + port + "-" + domain + ".conf"
+	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + external + "-" + domain + ".conf"
 
 	switch protocol {
 	case "https":
 		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(config.Agent.DataPrefix+"/web/ssl/", 0755))
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost-ssl.example", conf)
-		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+port+"$request_uri;  # enforce https", true)
-		addLine(conf, "listen	443;", "	listen "+port+";", true)
+		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+external+"$request_uri;  # enforce https", true)
+		addLine(conf, "listen	443;", "	listen "+external+";", true)
 		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
 		if sslbcknd {
-			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass https://https-"+port+"-"+domain+";", true)
+			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass https://https-"+strings.Replace(external, ":", "-", -1)+"-"+domain+";", true)
 		} else {
-			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+port+"-"+domain+";", true)
+			addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://https-"+strings.Replace(external, ":", "-", -1)+"-"+domain+";", true)
 		}
-		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+port+"-"+domain+" {", true)
+		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+strings.Replace(external, ":", "-", -1)+"-"+domain+" {", true)
 
 		crt, key := gpg.ParsePem(cert)
-		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".crt", crt, 0644))
-		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".key", key, 0644))
+		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+external+"-"+domain+".crt", crt, 0644))
+		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+external+"-"+domain+".key", key, 0644))
 
 		addLine(conf, "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
-			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".crt;", true)
+			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+external+"-"+domain+".crt;", true)
 		addLine(conf, "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
-			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+port+"-"+domain+".key;", true)
+			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+external+"-"+domain+".key;", true)
 	case "http":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example", conf)
-		addLine(conf, "listen 	80;", "	listen "+port+";", true)
-		addLine(conf, "return 301 http://$host$request_uri;", "	    return 301 http://$host:"+port+"$request_uri;", true)
+		addLine(conf, "listen 	80;", "	listen "+external+";", true)
+		addLine(conf, "return 301 http://$host$request_uri;", "	    return 301 http://$host:"+external+"$request_uri;", true)
 		addLine(conf, "server_name DOMAIN;", "server_name "+domain+";", true)
-		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+port+"-"+domain+";", true)
-		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+port+"-"+domain+" {", true)
-		if port != "80" {
-			httpRedirect(port, domain)
+		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+strings.Replace(external, ":", "-", -1)+"-"+domain+";", true)
+		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+strings.Replace(external, ":", "-", -1)+"-"+domain+" {", true)
+		if strings.HasSuffix(external, ":80") {
+			httpRedirect(external, domain)
 		}
 	case "tcp":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
-		addLine(conf, "listen PORT;", "	listen "+port+";", true)
+		addLine(conf, "listen PORT;", "	listen "+external+";", true)
 	case "udp":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
-		addLine(conf, "listen PORT;", "	listen "+port+" udp;", true)
+		addLine(conf, "listen PORT;", "	listen "+external+" udp;", true)
 	}
 	addLine(conf, "server localhost:81;", " ", true)
-	addLine(conf, "upstream PROTO-PORT {", "upstream "+protocol+"-"+port+"-"+domain+" {", true)
-	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+port+"-"+domain+";", true)
+	addLine(conf, "upstream PROTO-PORT {", "upstream "+protocol+"-"+strings.Replace(external, ":", "-", -1)+"-"+domain+" {", true)
+	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+strings.Replace(external, ":", "-", -1)+"-"+domain+";", true)
 }
 
-func balanceMethod(protocol, port, domain, policy string) {
-	replaceString := "upstream " + protocol + "-" + port + "-" + domain + " {"
+func balanceMethod(protocol, external, domain, policy string) {
+	replaceString := "upstream " + protocol + "-" + strings.Replace(external, ":", "-", -1) + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
 	log.Check(log.ErrorLevel, "Openning portmap database to check if port is mapped", err)
-	if !bolt.PortInMap(protocol, port, domain, "") {
+	if !bolt.PortInMap(protocol, external, domain, "") {
 		log.Error("Port is not mapped")
 	}
 	switch policy {
@@ -242,27 +257,27 @@ func balanceMethod(protocol, port, domain, policy string) {
 		return
 	}
 
-	if p := bolt.GetMapMethod(protocol, port, domain); len(p) != 0 && p != policy {
+	if p := bolt.GetMapMethod(protocol, external, domain); len(p) != 0 && p != policy {
 		replaceString = "; #policy"
 		replace = true
 	} else if p == policy {
 		return
 	}
-	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, port, domain, policy))
+	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, external, domain, policy))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+port+"-"+domain+".conf",
+	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+external+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
 }
 
-func httpRedirect(port, domain string) {
+func httpRedirect(external, domain string) {
 	var redirect = `server {
 	    listen      80; #redirect
     	server_name ` + domain + `;
     	return 301 http://$host$request_uri;
 }`
 
-	addLine(config.Agent.DataPrefix+"nginx-includes/http/"+port+"-"+domain+".conf",
+	addLine(config.Agent.DataPrefix+"nginx-includes/http/"+external+"-"+domain+".conf",
 		"#redirect placeholder", redirect, true)
 
 }
