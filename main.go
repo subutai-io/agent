@@ -38,14 +38,16 @@ func main() {
 		commit = config.Template.Branch + "/" + commit
 	}
 
-	if base, err := db.New(); err == nil {
-		if len(config.Management.Host) < 7 {
-			config.Management.Host = base.DiscoveryLoad()
+	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
+		if base, err := db.New(); err == nil {
+			if len(config.Management.Host) < 7 {
+				config.Management.Host = base.DiscoveryLoad()
+			}
+			if len(config.Influxdb.Server) < 7 {
+				config.Influxdb.Server = base.DiscoveryLoad()
+			}
+			base.Close()
 		}
-		if len(config.Influxdb.Server) < 7 {
-			config.Influxdb.Server = base.DiscoveryLoad()
-		}
-		base.Close()
 	}
 
 	app.Version = version + " " + commit
