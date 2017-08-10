@@ -46,6 +46,10 @@ func Monitor() {
 			go client()
 		}
 		time.Sleep(30 * time.Second)
+		if pk := getKey(); pk != nil {
+			gpg.ImportPk(pk)
+			config.Management.GpgUser = extractKeyID(pk)
+		}
 	}
 }
 
@@ -118,11 +122,6 @@ func save(ip string) {
 		monitor.InitInfluxdb()
 	}
 	config.Management.Host = ip
-
-	if pk := getKey(); pk != nil {
-		gpg.ImportPk(pk)
-		config.Management.GpgUser = extractKeyID(pk)
-	}
 }
 
 func getKey() []byte {
