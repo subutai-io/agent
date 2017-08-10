@@ -45,11 +45,11 @@ func Monitor() {
 		} else {
 			go client()
 		}
-		time.Sleep(30 * time.Second)
 		if pk := getKey(); pk != nil {
 			gpg.ImportPk(pk)
 			config.Management.GpgUser = extractKeyID(pk)
 		}
+		time.Sleep(30 * time.Second)
 	}
 }
 
