@@ -35,6 +35,14 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	}
 }
 
+// ImportManagementKey adds GPG public key to local keyring to encrypt messages to Management server.
+func ImportManagementKey() {
+	if pk := getKey(); pk != nil {
+		gpg.ImportPk(pk)
+		config.Management.GpgUser = extractKeyID(pk)
+	}
+}
+
 // Monitor provides service for auto discovery based on SSDP protocol.
 // It starts SSDP server if management container active, otherwise it starts client for waiting another SSDP server.
 func Monitor() {
@@ -44,10 +52,6 @@ func Monitor() {
 			save("10.10.10.1")
 		} else {
 			go client()
-		}
-		if pk := getKey(); pk != nil {
-			gpg.ImportPk(pk)
-			config.Management.GpgUser = extractKeyID(pk)
 		}
 		time.Sleep(30 * time.Second)
 	}
