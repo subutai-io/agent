@@ -149,7 +149,6 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 	if len(socket) > 1 && socket[1] != "" {
 		if port, err := strconv.Atoi(socket[1]); err != nil || port < 1000 || port > 65536 {
 			if !(strings.Contains(protocol, "http") && (port == 80 || port == 443)) {
-				fmt.Println(port)
 				log.Error("Port number in \"external\" should be integer in range of 1000-65536")
 			}
 		}
