@@ -77,7 +77,7 @@ func DecryptWrapper(args ...string) string {
 }
 
 // EncryptWrapper encrypts GPG message.
-func EncryptWrapper(user, recipient string, message []byte, args ...string) string {
+func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]byte, error) {
 	gpg := "gpg --batch --passphrase " + config.Agent.GpgPassword + " --trust-model always --armor -u " + user + " -r " + recipient + " --sign --encrypt --no-tty"
 	if len(args) >= 2 {
 		gpg = gpg + " --no-default-keyring --keyring " + args[0] + " --secret-keyring " + args[1]
@@ -89,13 +89,7 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) stri
 		log.Check(log.DebugLevel, "Writing to stdin of gpg", err)
 		log.Check(log.DebugLevel, "Closing stdin of gpg", stdin.Close())
 	}
-
-	output, err := command.Output()
-	if log.Check(log.WarnLevel, "Encrypting message", err) {
-		return ""
-	}
-
-	return string(output)
+	return command.Output()
 }
 
 // GenerateKey generates GPG-key for Subutai Agent.

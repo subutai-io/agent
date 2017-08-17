@@ -5,20 +5,16 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
-	"time"
 
-        "github.com/subutai-io/agent/agent/container"
-        "github.com/subutai-io/agent/agent/utils"
-        "github.com/subutai-io/agent/config"
-        "github.com/subutai-io/agent/lib/gpg"
-        "github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/container"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/log"
 )
 
 type rHost struct {
@@ -50,62 +46,15 @@ func Request(user, pass string) {
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 
-	if pk := getKey(); pk != nil {
-		gpg.ImportPk(pk)
-		config.Management.GpgUser = extractKeyID(pk)
-
-		client := &http.Client{}
-		if config.Management.Allowinsecure {
-			client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
-		}
-		resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
-			bytes.NewBuffer([]byte(gpg.EncryptWrapper(user, config.Management.GpgUser, rh))))
-
-		if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
-			log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
-		}
-	}
-}
-
-func getKey() []byte {
-	client := &http.Client{Timeout: time.Second * 5}
+	client := &http.Client{}
 	if config.Management.Allowinsecure {
-		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	}
-	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
-	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
-		return nil
+	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
+	resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
+		bytes.NewBuffer(msg))
+
+	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
+		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		key, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			return key
-		}
-	}
-
-	log.Warn("Failed to fetch PK from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
-	return nil
-}
-
-func extractKeyID(k []byte) string {
-	command := exec.Command("gpg")
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return ""
-	}
-
-	_, err = stdin.Write(k)
-	log.Check(log.DebugLevel, "Writing to stdin pipe", err)
-	log.Check(log.DebugLevel, "Closing stdin pipe", stdin.Close())
-	out, err := command.Output()
-	log.Check(log.WarnLevel, "Extracting ID from Key", err)
-
-	if line := strings.Fields(string(out)); len(line) > 1 {
-		if key := strings.Split(line[1], "/"); len(key) > 1 {
-			return key[1]
-		}
-	}
-	return ""
 }

@@ -92,7 +92,7 @@ const defaultConfig = `
 	db = metrics
 
 	[template]
-	version = 4.0.0
+	version = 5.0.0
 	branch =
 	arch = amd64
 `

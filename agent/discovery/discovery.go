@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fromkeith/gossdp"
@@ -14,6 +16,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
@@ -29,6 +32,14 @@ func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fm
 func (h handler) Response(message gossdp.ResponseMessage) {
 	if len(config.Management.Fingerprint) == 0 || config.Management.Fingerprint == message.DeviceId {
 		save(message.Location)
+	}
+}
+
+// ImportManagementKey adds GPG public key to local keyring to encrypt messages to Management server.
+func ImportManagementKey() {
+	if pk := getKey(); pk != nil {
+		gpg.ImportPk(pk)
+		config.Management.GpgUser = extractKeyID(pk)
 	}
 }
 
@@ -52,7 +63,7 @@ func server() error {
 		go s.Start()
 		defer s.Stop()
 		s.AdvertiseServer(gossdp.AdvertisableServer{
-			ServiceType: "urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4",
+			ServiceType: "urn:" + os.Getenv("SNAP_NAME") + ":management:peer:5",
 			DeviceUuid:  fingerprint(),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
@@ -74,7 +85,7 @@ func client() error {
 		go c.Start()
 		defer c.Stop()
 
-		err = c.ListenFor("urn:" + os.Getenv("SNAP_NAME") + ":management:peer:4")
+		err = c.ListenFor("urn:" + os.Getenv("SNAP_NAME") + ":management:peer:5")
 		time.Sleep(2 * time.Second)
 	}
 	return err
@@ -115,4 +126,46 @@ func save(ip string) {
 		monitor.InitInfluxdb()
 	}
 	config.Management.Host = ip
+}
+
+func getKey() []byte {
+	client := &http.Client{Timeout: time.Second * 5}
+	if config.Management.Allowinsecure {
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
+	}
+	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
+	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 {
+		if key, err := ioutil.ReadAll(resp.Body); err == nil {
+			return key
+		}
+	}
+
+	log.Warn("Failed to fetch PK from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
+	return nil
+}
+
+func extractKeyID(k []byte) string {
+	command := exec.Command("gpg")
+	stdin, err := command.StdinPipe()
+	if err != nil {
+		return ""
+	}
+
+	_, err = stdin.Write(k)
+	log.Check(log.DebugLevel, "Writing to stdin pipe", err)
+	log.Check(log.DebugLevel, "Closing stdin pipe", stdin.Close())
+	out, err := command.Output()
+	log.Check(log.WarnLevel, "Extracting ID from Key", err)
+
+	if line := strings.Fields(string(out)); len(line) > 1 {
+		if key := strings.Split(line[1], "/"); len(key) > 1 {
+			return key[1]
+		}
+	}
+	return ""
 }
