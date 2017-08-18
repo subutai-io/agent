@@ -50,8 +50,9 @@ func Request(user, pass string) {
 	if config.Management.Allowinsecure {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	}
+	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
 	resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
-		bytes.NewBuffer([]byte(gpg.EncryptWrapper(user, config.Management.GpgUser, rh))))
+		bytes.NewBuffer(msg))
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
 		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
