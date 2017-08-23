@@ -47,8 +47,8 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		log.Error("\"-c certificate\" is missing or invalid pem file")
 	case len(sockInt) != 0 && !ovs.ValidSocket(sockInt):
 		log.Error("Invalid internal socket \"" + sockInt + "\"")
-	case (strings.HasSuffix(sockExt, ":8443") || strings.HasSuffix(sockExt, ":8444") || strings.HasSuffix(sockExt, ":8086") &&
-		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]):
+	case (strings.HasSuffix(sockExt, ":8443") || strings.HasSuffix(sockExt, ":8444") || strings.HasSuffix(sockExt, ":8086")) &&
+		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]:
 		log.Error("Reserved system ports")
 	case len(sockInt) != 0:
 		// check sockExt port and create nginx config
