@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 )
@@ -13,6 +15,7 @@ func LxcStart(name string) {
 		for i := 0; i < 60 && startErr != nil; i++ {
 			log.Info("Waiting for container start (60 sec)")
 			startErr = container.Start(name)
+			time.Sleep(time.Second)
 		}
 		if startErr != nil {
 			log.Error(name + " start failed")

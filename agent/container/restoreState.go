@@ -39,6 +39,9 @@ func StateRestore() {
 				time.Sleep(time.Second)
 				startErr = container.Start(v)
 			}
+			if startErr != nil {
+				container.AddMetadata(v, map[string]string{"state": "STOPPED"})
+			}
 		}
 	}
 }
