@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// Migrate binding intends to make more or less "live" migration of containers between Subutai peers based on CRIU functionality.
+// Not stable yet.
 func Migrate(name, stage, destination string) {
 	if len(name) == 0 || len(stage) == 0 {
 		log.Error("Specify container name and migration stage")
@@ -45,7 +47,7 @@ func Migrate(name, stage, destination string) {
 		log.Check(log.WarnLevel, "Removing start trigger", os.Remove(config.Agent.LxcPrefix+name+"/.start"))
 		//container freeze
 		log.Warn("Freezing container")
-		container.Freeze(name)
+		log.Check(log.ErrorLevel, "Freezing container", container.Freeze(name))
 		//diffirential backup
 		log.Info("Creating diffirential data backup")
 		archive := BackupContainer(name, false, false)
@@ -64,13 +66,13 @@ func Migrate(name, stage, destination string) {
 		container.DumpRestore(name)
 		//Unfreeze
 		log.Info("Unfreezing container")
-		container.Unfreeze(name)
+		log.Check(log.ErrorLevel, "Unfreezing container", container.Unfreeze(name))
 		_, err := os.Create(config.Agent.LxcPrefix + name + "/.start")
 		log.Check(log.WarnLevel, "Creating start trigger", err)
 	case "5", "unfreeze":
 		//Unfreeze
 		log.Info("Unfreezing container")
-		container.Unfreeze(name)
+		log.Check(log.ErrorLevel, "Unfreezing container", container.Unfreeze(name))
 		_, err := os.Create(config.Agent.LxcPrefix + name + "/.start")
 		log.Check(log.WarnLevel, "Restoring start trigger", err)
 	}

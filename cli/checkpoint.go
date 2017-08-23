@@ -8,6 +8,7 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
+// Checkpoint creates container memory dump on disk using CRIU functionality
 func Checkpoint(name string, restore, stop bool) {
 	switch restore {
 	case true:

@@ -64,27 +64,8 @@ func IsContainer(name string) bool {
 
 // State returns container stat in human readable format.
 func State(name string) (state string) {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
-		return "UNKNOWN"
-	}
-	switch c.State() {
-	case lxc.STOPPED:
-		return "STOPPED"
-	case lxc.RUNNING:
-		return "RUNNING"
-	case lxc.STARTING:
-		return "STARTING"
-	case lxc.STOPPING:
-		return "STOPPING"
-	case lxc.ABORTING:
-		return "ABORTING"
-	case lxc.FREEZING:
-		return "FREEZING"
-	case lxc.FROZEN:
-		return "FROZEN"
-	case lxc.THAWED:
-		return "THAWED"
+	if c, err := lxc.NewContainer(name, config.Agent.LxcPrefix); err == nil {
+		return c.State().String()
 	}
 	return "UNKNOWN"
 }
@@ -102,7 +83,6 @@ func SetApt(name string) {
 	if len(gateway) == 0 {
 		gateway = "10.10.10.254"
 	}
-
 	repo := []byte("deb http://" + gateway + "/apt/main trusty main restricted universe multiverse\n" +
 		"deb http://" + gateway + "/apt/main trusty-updates main restricted universe multiverse\n" +
 		"deb http://" + gateway + "/apt/security trusty-security main restricted universe multiverse\n")
@@ -116,63 +96,77 @@ func SetApt(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list.d/subutai-repo.list", kurjun, 0644))
 }
 
-func AddMetadata(name string, meta map[string]string) {
-	_, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-
+// AddMetadata adds container information to database
+func AddMetadata(name string, meta map[string]string) error {
+	if !IsContainer(name) {
+		return errors.New("Container does not exists")
+	}
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
 	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	return nil
 }
 
 // Start starts the Subutai container.
-func Start(name string) {
+func Start(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-	log.Check(log.DebugLevel, "Starting LXC container", c.Start())
-
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); err == nil {
-		log.Check(log.WarnLevel, "Deleting .stop file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.stop"))
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
 	}
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); os.IsNotExist(err) {
-		f, err := os.Create(config.Agent.LxcPrefix + name + "/.start")
-		log.Check(log.WarnLevel, "Creating .start file to "+name, err)
-		log.Check(log.WarnLevel, "Closing .start file "+name, f.Close())
+	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
+	if c.State().String() != "RUNNING" {
+		return errors.New("Unable to start container " + name)
 	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return nil
 }
 
 // Stop stops the Subutai container.
-func Stop(name string) {
+func Stop(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-	log.Check(log.DebugLevel, "Stopping LXC container", c.Stop())
-
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); err == nil {
-		log.Check(log.WarnLevel, "Creating .start file to "+name, os.Remove(config.Agent.LxcPrefix+name+"/.start"))
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
 	}
-	if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.stop"); os.IsNotExist(err) {
-		f, err := os.Create(config.Agent.LxcPrefix + name + "/.stop")
-		log.Check(log.WarnLevel, "Creating .stop file to "+name, err)
-		log.Check(log.WarnLevel, "Closing .stop file "+name, f.Close())
+	log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
+	if c.State().String() != "STOPPED" {
+		return errors.New("Unable to stop container " + name)
 	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return nil
 }
 
-func Freeze(name string) {
+// Freeze pause container processes
+func Freeze(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-	log.Check(log.DebugLevel, "Freezing LXC container", c.Freeze())
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
+	}
+	if err = c.Freeze(); log.Check(log.DebugLevel, "Freezing container "+name, err) {
+		return err
+	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return nil
 }
 
-func Unfreeze(name string) {
+// Unfreeze unpause container processes
+func Unfreeze(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-	log.Check(log.DebugLevel, "Unfreezing LXC container", c.Unfreeze())
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
+	}
+
+	if err := c.Unfreeze(); log.Check(log.DebugLevel, "Unfreezing container "+name, err) {
+		return err
+	}
+	AddMetadata(name, map[string]string{"state": State(name)})
+	return nil
 }
 
+// Dump creates container memory dump on disk
 func Dump(name string, stop bool) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
+	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
 	options := lxc.CheckpointOptions{
@@ -180,7 +174,7 @@ func Dump(name string, stop bool) error {
 		Verbose:   true,
 		Stop:      stop,
 	}
-	if err = c.Checkpoint(options); err != nil {
+	if err = c.Checkpoint(options); log.Check(log.DebugLevel, "Creating container checkpoint", err) {
 		return err
 	}
 	bolt, err := db.New()
@@ -193,6 +187,7 @@ func Dump(name string, stop bool) error {
 	return nil
 }
 
+// DumpRestore restores container memory from dump on disk
 func DumpRestore(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err != nil {
@@ -238,10 +233,8 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 
 	_, err = container.RunCommand(command, options)
 	log.Check(log.DebugLevel, "Executing command inside container", err)
-
 	log.Check(log.DebugLevel, "Closing write buffer for stdout", bufW.Close())
 	defer bufR.Close()
-
 	log.Check(log.DebugLevel, "Closing write buffer for stderr", bufWErr.Close())
 	defer bufRErr.Close()
 
@@ -254,10 +247,15 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 }
 
 // Destroy deletes the Subutai container.
-func Destroy(name string) {
+func Destroy(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if !log.Check(log.WarnLevel, "Creating container object", err) && c.State() == lxc.RUNNING {
-		log.Check(log.FatalLevel, "Stopping container", c.Stop())
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
+	}
+	if c.State() == lxc.RUNNING {
+		if err = c.Stop(); log.Check(log.DebugLevel, "Stopping container", err) {
+			return err
+		}
 	}
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
@@ -267,28 +265,29 @@ func Destroy(name string) {
 	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
+	return nil
 }
 
 // GetParent return a parent of the Subutai container.
 func GetParent(name string) string {
-	if !IsContainer(name) {
-		return "Container does not exists"
-	}
-	configFileName := config.Agent.LxcPrefix + name + "/config"
-	return GetConfigItem(configFileName, "subutai.parent")
+	return GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
 }
 
 // Clone create the duplicate container from the Subutai template.
-func Clone(parent, child string) {
+func Clone(parent, child string) error {
 	var backend lxc.BackendStore
 	log.Check(log.DebugLevel, "Setting LXC backend to BTRFS", backend.Set("btrfs"))
 
 	c, err := lxc.NewContainer(parent, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+parent, err)
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
+	}
 
 	fs.SubvolumeCreate(config.Agent.LxcPrefix + child)
 	err = c.Clone(child, lxc.CloneOptions{Backend: backend})
-	log.Check(log.FatalLevel, "Cloning container", err)
+	if log.Check(log.DebugLevel, "Cloning container", err) {
+		return err
+	}
 
 	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/home", config.Agent.LxcPrefix+child+"/home")
 	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/opt", config.Agent.LxcPrefix+child+"/opt")
@@ -304,6 +303,7 @@ func Clone(parent, child string) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
 		{"lxc.network.mtu", "1300"},
 	})
+	return nil
 }
 
 // ResetNet sets default parameters of the network configuration for container.
@@ -342,11 +342,11 @@ func QuotaRAM(name string, size ...string) int {
 // If passed value < 100, we assume that this value mean percents.
 // If passed value > 100, we assume that this value mean MHz.
 func QuotaCPU(name string, size ...string) int {
-	c, cErr := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.DebugLevel, "Looking for container: "+name, cErr)
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	cfsPeriod := 100000
-	tmp, cErr := strconv.Atoi(size[0])
-	log.Check(log.DebugLevel, "Parsing quota size", cErr)
+	tmp, err := strconv.Atoi(size[0])
+	log.Check(log.DebugLevel, "Parsing quota size", err)
 	quota := float32(tmp)
 
 	if quota > 100 {
@@ -403,14 +403,15 @@ func QuotaNet(name string, size ...string) string {
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
-func SetContainerConf(container string, conf [][]string) {
+func SetContainerConf(container string, conf [][]string) error {
 	confPath := config.Agent.LxcPrefix + container + "/config"
 	newconf := ""
 
 	file, err := os.Open(confPath)
-	log.Check(log.FatalLevel, "Opening container config "+confPath, err)
+	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
+		return err
+	}
 	scanner := bufio.NewScanner(bufio.NewReader(file))
-
 	for scanner.Scan() {
 		newline := scanner.Text() + "\n"
 		for i := 0; i < len(conf); i++ {
@@ -432,8 +433,7 @@ func SetContainerConf(container string, conf [][]string) {
 			newconf = newconf + conf[i][0] + " = " + conf[i][1] + "\n"
 		}
 	}
-
-	log.Check(log.FatalLevel, "Writing container config "+confPath, ioutil.WriteFile(confPath, []byte(newconf), 0644))
+	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
 }
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.
@@ -453,7 +453,7 @@ func GetConfigItem(path, item string) string {
 
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
-func SetContainerUID(c string) string {
+func SetContainerUID(c string) (string, error) {
 	uid := "65536"
 	if bolt, err := db.New(); err == nil {
 		uid = bolt.GetUuidEntry(c)
@@ -467,21 +467,22 @@ func SetContainerUID(c string) string {
 		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})
 
-	if s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs"); err == nil {
-		parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
-
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, uid, "65536").Run()
-		log.Check(log.DebugLevel, "uidmapshift rootfs", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, uid, "65536").Run()
-		log.Check(log.DebugLevel, "uidmapshift home", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, uid, "65536").Run()
-		log.Check(log.DebugLevel, "uidmapshift opt", err)
-		err = exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, uid, "65536").Run()
-		log.Check(log.DebugLevel, "uidmapshift var", err)
-
-		log.Check(log.ErrorLevel, "Setting chmod 755 on lxc home", os.Chmod(config.Agent.LxcPrefix+c, 0755))
+	s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs")
+	if log.Check(log.DebugLevel, "Reading container rootfs stat", err) {
+		return uid, err
 	}
-	return uid
+
+	parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
+	log.Check(log.DebugLevel, "uidmapshift rootfs",
+		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, uid, "65536").Run())
+	log.Check(log.DebugLevel, "uidmapshift home",
+		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, uid, "65536").Run())
+	log.Check(log.DebugLevel, "uidmapshift opt",
+		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, uid, "65536").Run())
+	log.Check(log.DebugLevel, "uidmapshift var",
+		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, uid, "65536").Run())
+
+	return uid, os.Chmod(config.Agent.LxcPrefix+c, 0755)
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
@@ -500,26 +501,13 @@ func SetDNS(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
 }
 
+// CriuHax adds container config needed by CRIU
 func CriuHax(name string) {
 	SetContainerConf(name, [][]string{
 		{"lxc.console", "none"},
 		{"lxc.tty", "0"},
 		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
 	})
-}
-
-// SetEnvID is deprecated function and should be removed.
-func SetEnvID(name, envID string) {
-	err := os.MkdirAll(config.Agent.LxcPrefix+name+"/rootfs/etc/subutai", 755)
-	log.Check(log.FatalLevel, "Creating etc/subutai directory", err)
-
-	config, err := os.Create(config.Agent.LxcPrefix + name + "/rootfs/etc/subutai/lxc-config")
-	log.Check(log.FatalLevel, "Creating /etc/subutai/lxc-config file", err)
-	defer config.Close()
-
-	_, err = config.WriteString("[Subutai-Agent]\n" + envID + "\n")
-	log.Check(log.FatalLevel, "Writing environment id to config", err)
-	log.Check(log.DebugLevel, "Synced /etc/subutai/lxc-config", config.Sync())
 }
 
 // SetStaticNet sets static IP-address for the Subutai container.
