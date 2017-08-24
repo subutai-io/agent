@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -266,21 +265,17 @@ func ParsePem(cert string) (crt, key []byte) {
 }
 
 // KurjunUserPK gets user's public GPG-key from Kurjun.
-func KurjunUserPK(owner string) []string {
-	var keys []string
+func KurjunUserPK(owner string) string {
 	kurjun, err := config.CheckKurjun()
 	log.Check(log.DebugLevel, "Checking Kurjun", err)
 
-	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
+	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/key?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
 	defer response.Body.Close()
 
 	key, err := ioutil.ReadAll(response.Body)
 	log.Check(log.FatalLevel, "Reading key body", err)
-	if json.Unmarshal(key, &keys) == nil {
-		return keys
-	}
-	return nil
+	return string(key)
 }
 
 // VerifySignature check if signature retrieved from Kurjun is valid.
@@ -290,9 +285,10 @@ func VerifySignature(key, signature string) string {
 
 	if block, _ := clearsign.Decode([]byte(signature)); block != nil {
 		_, err = openpgp.CheckDetachedSignature(entity, bytes.NewBuffer(block.Bytes), block.ArmoredSignature.Body)
-		if !log.Check(log.DebugLevel, "Checking signature", err) {
-			return string(block.Bytes)
+		if log.Check(log.ErrorLevel, "Checking signature", err) {
+			return ""
 		}
+		return string(block.Bytes)
 	}
 	return ""
 }
