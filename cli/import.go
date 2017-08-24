@@ -331,7 +331,17 @@ func LxcImport(name, version, token string, torrent bool) {
 		log.Error("Template is not signed")
 	}
 
-	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
+	for owner, signature := range t.signature {
+		// if v.Author == "public" || v.Author == "subutai" || v.Author == "jenkins" {
+		signedhash := gpg.VerifySignature(gpg.KurjunUserPK(owner), signature)
+		if t.id != signedhash {
+			log.Error("Signature does not match with template id")
+		}
+		log.Info("Template's owner signature verified")
+		log.Debug("Signature belongs to " + owner)
+		break
+		// }
+	}
 
 	if !checkLocal(&t) {
 		log.Info("Downloading " + t.name)
@@ -400,18 +410,4 @@ func LxcImport(name, version, token string, torrent bool) {
 	log.Check(log.WarnLevel, "Opening database", err)
 	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-}
-
-func verifySignature(id string, list map[string]string) error {
-	for owner, signature := range list {
-		for _, key := range gpg.KurjunUserPK(owner) {
-			if id == gpg.VerifySignature(key, signature) {
-				log.Info("Template's owner signature verified")
-				log.Debug("Signature belongs to " + owner)
-				return nil
-			}
-			log.Debug("Signature does not match with template id")
-		}
-	}
-	return fmt.Errorf("Failed to verify signature")
 }
