@@ -15,10 +15,7 @@ import (
 
 // Create adds new P2P interface to the Resource Host. This interface connected to the swarm.
 func Create(interfaceName, localPeepIPAddr, hash, key, ttl, portRange string) {
-	cmd := []string{"start", "-key", key, "-dev", interfaceName, "-ttl", ttl, "-hash", hash}
-	if len(config.Template.Branch) > 0 {
-		cmd = append(cmd, []string{"-dht", config.Template.Branch + "cdn.subut.ai:6881"}...)
-	}
+	cmd := []string{"start", "-key", key, "-dev", interfaceName, "-ttl", ttl, "-hash", hash, "-dht", "dht." + config.Template.Branch + "cdn.subut.ai:6881"}
 	if localPeepIPAddr != "dhcp" {
 		cmd = append(cmd, "-ip", localPeepIPAddr)
 	}
@@ -50,6 +47,8 @@ func RemoveByIface(name string) {
 			Remove(line[2])
 		}
 	}
+	log.Check(log.WarnLevel, "Disabling p2p link",
+		exec.Command("ifconfig", name, "down").Run())
 	iptablesCleanUp(name)
 }
 

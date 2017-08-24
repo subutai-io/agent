@@ -33,7 +33,7 @@ var (
 //
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
-func LxcExport(name, version, prefsize, token string, private bool) {
+func LxcExport(name, version, prefsize, token, description string, private bool) {
 	size := "tiny"
 	for _, s := range allsizes {
 		if prefsize == s {
@@ -48,7 +48,7 @@ func LxcExport(name, version, prefsize, token string, private bool) {
 		"-subutai-template_" + version + "_" + runtime.GOARCH
 
 	if !container.IsTemplate(name) {
-		LxcPromote(name)
+		LxcPromote(name, "")
 	}
 	// check: parent is template
 	parent := container.GetParent(name)
@@ -72,10 +72,19 @@ func LxcExport(name, version, prefsize, token string, private bool) {
 		{"subutai.template.size", size},
 	})
 
+	if len(description) != 0 {
+		container.SetContainerConf(name, [][]string{
+			{"subutai.template.description", "\"" + description + "\""},
+		})
+	}
+
 	src := config.Agent.LxcPrefix + name
 	fs.Copy(src+"/fstab", dst+"/fstab")
 	fs.Copy(src+"/config", dst+"/config")
 	fs.Copy(src+"/packages", dst+"/packages")
+	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
+		fs.Copy(src+"/icon.png", dst+"/icon.png")
+	}
 	if parent != name {
 		fs.Copy(src+"/diff/var.diff", dst+"/diff/var.diff")
 		fs.Copy(src+"/diff/opt.diff", dst+"/diff/opt.diff")

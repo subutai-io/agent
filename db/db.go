@@ -12,6 +12,7 @@ var (
 	uuidmap    = []byte("uuidmap")
 	sshtunnels = []byte("sshtunnels")
 	containers = []byte("containers")
+	templates  = []byte("templates")
 	portmap    = []byte("portmap")
 )
 
@@ -33,7 +34,7 @@ func New() (*Instance, error) {
 
 func initdb(db *bolt.DB) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{uuidmap, sshtunnels, containers, portmap} {
+		for _, b := range [][]byte{uuidmap, sshtunnels, containers, templates, portmap} {
 			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
 				return err
 			}
@@ -153,6 +154,45 @@ func (i *Instance) DiscoveryLoad() (ip string) {
 	return ip
 }
 
+func (i *Instance) TemplateAdd(name, id string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(templates); b != nil {
+			if err = b.Put([]byte(name), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) TemplateDel(name string) (err error) {
+	i.db.Update(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(templates); b != nil {
+			if err = b.Delete([]byte(name)); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) TemplateName(id string) (name string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(templates); b != nil {
+			b.ForEach(func(k, v []byte) error {
+				if id == string(v) {
+					name = string(k)
+				}
+				return nil
+			})
+		}
+		return nil
+	})
+	return
+}
+
 func (i *Instance) ContainerAdd(name string, options map[string]string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(containers); b != nil {
@@ -240,6 +280,19 @@ func (i *Instance) GetContainerMapping(name string) (list []map[string]string) {
 					})
 				}
 			}
+		}
+		return nil
+	})
+	return
+}
+
+func (i *Instance) ContainerList() (list []string) {
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(containers); b != nil {
+			b.ForEach(func(k, v []byte) error {
+				list = append(list, string(k))
+				return nil
+			})
 		}
 		return nil
 	})
@@ -345,12 +398,12 @@ func (i *Instance) PortMapDelete(protocol, external, domain, internal string) (l
 							}
 						} else {
 							b.DeleteBucket([]byte(domain))
-							left = 0
+							left = b.Stats().BucketN - 2
 						}
 					}
 				} else {
 					b.DeleteBucket([]byte(external))
-					left = 0
+					left = b.Stats().BucketN - 2
 				}
 			}
 		}

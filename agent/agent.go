@@ -28,6 +28,7 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -40,6 +41,7 @@ type response struct {
 type heartbeat struct {
 	Type       string                `json:"type"`
 	Hostname   string                `json:"hostname"`
+	Address    string                `json:"address"`
 	ID         string                `json:"id"`
 	Arch       string                `json:"arch"`
 	Instance   string                `json:"instance"`
@@ -157,17 +159,17 @@ func sendHeartbeat() bool {
 	}
 
 	pool = container.Active(false)
-	beat := heartbeat{
+	res := response{Beat: heartbeat{
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
+		Address:    net.GetIp(),
 		ID:         fingerprint,
 		Arch:       instanceArch,
 		Instance:   instanceType,
 		Containers: alert.Quota(pool),
 		Alert:      alert.Current(pool),
 		Interfaces: utils.GetInterfaces(),
-	}
-	res := response{Beat: beat}
+	}}
 	jbeat, err := json.Marshal(&res)
 	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
 	lastHeartbeatTime = time.Now()
@@ -176,21 +178,20 @@ func sendHeartbeat() bool {
 	}
 	lastHeartbeat = jbeat
 
-	message, err := json.Marshal(map[string]string{
-		"hostId":   fingerprint,
-		"response": gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat),
-	})
-	log.Check(log.WarnLevel, "Marshal response json", err)
+	if encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat); err == nil {
+		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
+		log.Check(log.WarnLevel, "Marshal response json", err)
 
-	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
-	if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
-		log.Debug(resp.Status)
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
+			log.Check(log.DebugLevel, "Closing Management server response: "+resp.Status, resp.Body.Close())
 
-		if resp.StatusCode == http.StatusAccepted {
-			return true
+			if resp.StatusCode == http.StatusAccepted {
+				return true
+			}
 		}
 	}
+	go discovery.ImportManagementKey()
 	lastHeartbeat = []byte{}
 	return false
 }
@@ -204,7 +205,7 @@ func forceHeartbeat() {
 
 func execute(rsp executer.EncRequest) {
 	var req executer.Request
-	var md, contName, pub, keyring, payload string
+	var md, contName, pub, keyring string
 
 	if rsp.HostID == fingerprint {
 		md = gpg.DecryptWrapper(rsp.Request)
@@ -237,21 +238,19 @@ func execute(rsp executer.EncRequest) {
 	}
 
 	for sOut != nil {
-		elem, ok := <-sOut
-		if ok {
+		if elem, ok := <-sOut; ok {
 			resp := executer.Response{ResponseOpts: elem}
 			jsonR, err := json.Marshal(resp)
 			log.Check(log.WarnLevel, "Marshal response", err)
+
+			var payload []byte
 			if rsp.HostID == fingerprint {
-				payload = gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jsonR)
+				payload, err = gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jsonR)
 			} else {
-				payload = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
+				payload, err = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
 			}
-			if len(payload) != 0 {
-				message, err := json.Marshal(map[string]string{
-					"hostId":   elem.ID,
-					"response": payload,
-				})
+			if err == nil && len(payload) > 0 {
+				message, err := json.Marshal(map[string]string{"hostId": elem.ID, "response": string(payload)})
 				log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
 				go sendResponse(message)
 			}

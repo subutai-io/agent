@@ -99,7 +99,7 @@ func ProxyCheck(vlan, node string, domain bool) {
 // restart reloads nginx process
 func restart() {
 	log.Check(log.FatalLevel, "Reloading nginx",
-		exec.Command("nginx.sh", "-s", "reload").Run())
+		exec.Command("nginx", "-s", "reload").Run())
 }
 
 // addDomain creates new domain config from pattern and adjusts it

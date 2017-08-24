@@ -77,7 +77,7 @@ func BackupContainer(container string, full, stop bool) string {
 		case "STOPPED":
 			stop = false
 		case "RUNNING":
-			lxcContainer.Stop(container)
+			log.Check(log.ErrorLevel, "Stopping container", lxcContainer.Stop(container))
 		}
 	}
 
@@ -117,7 +117,7 @@ func BackupContainer(container string, full, stop bool) string {
 		ioutil.WriteFile(changelogName, []byte(strings.Join(changelog, "\n")), 0644))
 
 	if stop {
-		lxcContainer.Start(container)
+		log.Check(log.WarnLevel, "Starting container", lxcContainer.Start(container))
 	}
 
 	fs.Tar(tmpBackupDir, tarballName)

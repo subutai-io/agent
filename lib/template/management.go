@@ -29,8 +29,10 @@ func MngInit() {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/var var none bind,rw 0 0"},
 	})
-	container.SetApt("management")
 	gpg.GenerateKey("management")
+	container.SetApt("management")
+	container.SetDNS("management")
+	container.AddMetadata("management", map[string]string{"ip": "10.10.10.1"})
 	container.Start("management")
 
 	//TODO move mapping functions from cli package and get rid of exec

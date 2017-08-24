@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/archiver/extractor"
-	"github.com/cheggaaa/pb"
 	"github.com/nightlyone/lockfile"
+	"gopkg.in/cheggaaa/pb.v1"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/template"
@@ -26,11 +27,6 @@ var (
 	lock   lockfile.Lockfile
 	owners = []string{"subutai", "jenkins", "docker", ""}
 )
-
-type progress struct {
-	Total int `json:"total"`
-	Done  int `json:"done"`
-}
 
 type templ struct {
 	name      string
@@ -77,12 +73,8 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
-		var oldmeta metainfo
-		if log.Check(log.WarnLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta)) {
-			return
-		}
-		meta = append(meta, oldmeta)
+	if err != nil || log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
+		return
 	}
 
 	if len(meta) == 0 {
@@ -146,61 +138,40 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 	log.Check(log.FatalLevel, "Creating file "+t.file, err)
 	defer out.Close()
 
-	url := config.CDN.Kurjun + "/template/download?id=" + t.id
+	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
-	if torrent {
-		url = "http://" + config.Management.Host + ":8338/kurjun/rest/template/download?id=" + t.id
-	} else if len(t.owner) > 0 {
-		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file
+	if len(t.owner) > 0 {
+		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file + "?token=" + token
 	}
 	response, err := kurjun.Get(url)
 	log.Check(log.FatalLevel, "Getting "+url, err)
 
-	if torrent && response.StatusCode == http.StatusAccepted {
-		var bar *pb.ProgressBar
-		for ; response.StatusCode == http.StatusAccepted; response, _ = kurjun.Get(url) {
-			body, err := ioutil.ReadAll(response.Body)
-			response.Body.Close()
-			log.Check(log.WarnLevel, "Reading response from "+url, err)
-			var t progress
-			log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &t))
-			if bar == nil {
-				bar = pb.New(t.Total).SetUnits(pb.U_BYTES)
-				bar.Start()
-			}
-			bar.Set(t.Done)
-			time.Sleep(time.Second)
-		}
-		bar.Update()
-		_, err = io.Copy(out, response.Body)
-		response.Body.Close()
-	} else {
-		defer response.Body.Close()
-		bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
-		bar.Start()
-		rd := bar.NewProxyReader(response.Body)
-		_, err = io.Copy(out, rd)
-
-		for c := 0; err != nil && c < 5; _, err = io.Copy(out, rd) {
-			log.Info("Download interrupted, retrying")
-			time.Sleep(3 * time.Second)
-			c++
-
-			//Repeating GET request to CDN, while need to continue interrupted download
-			out, err = os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-			log.Check(log.FatalLevel, "Creating file "+t.file, err)
-			defer out.Close()
-			response, err = kurjun.Get(url)
-			log.Check(log.FatalLevel, "Getting "+url, err)
-			defer response.Body.Close()
-			bar = pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
-			bar.Start()
-			rd = bar.NewProxyReader(response.Body)
-		}
-		log.Check(log.FatalLevel, "Writing response body to file", err)
+	defer response.Body.Close()
+	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
+	if response.ContentLength <= 0 {
+		bar.NotPrint = true
 	}
+	bar.Start()
+	rd := bar.NewProxyReader(response.Body)
+	_, err = io.Copy(out, rd)
+	for c := 0; err != nil && c < 5; _, err = io.Copy(out, rd) {
+		log.Info("Download interrupted, retrying")
+		time.Sleep(3 * time.Second)
+		c++
 
-	time.Sleep(time.Millisecond * 300) // Added sleep to prevent output collision with progress bar.
+		//Repeating GET request to CDN, while need to continue interrupted download
+		out, err = os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+		log.Check(log.FatalLevel, "Creating file "+t.file, err)
+		defer out.Close()
+		response, err = kurjun.Get(url)
+		log.Check(log.FatalLevel, "Getting "+url, err)
+		defer response.Body.Close()
+		bar = pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
+		bar.Start()
+		rd = bar.NewProxyReader(response.Body)
+	}
+	log.Check(log.FatalLevel, "Writing response body to file", err)
+	bar.Finish()
 
 	if id := strings.Split(t.id, "."); len(id) > 0 && id[len(id)-1] == md5sum(config.Agent.LxcPrefix+"tmpdir/"+t.file) {
 		return true
@@ -210,6 +181,14 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 
 // idToName retrieves template name from global repository by passed id string
 func idToName(id string, kurjun *http.Client, token string) string {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	if name := bolt.TemplateName(id); len(name) > 0 {
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		return name
+	}
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
 	var meta []metainfo
 
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
@@ -416,6 +395,11 @@ func LxcImport(name, version, token string, torrent bool) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
+
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 
 func verifySignature(id string, list map[string]string) error {
