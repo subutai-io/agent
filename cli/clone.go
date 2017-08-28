@@ -36,7 +36,7 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	if container.IsContainer(child) {
 		log.Error("Container " + child + " already exist")
 	}
-	container.Clone(parent, child)
+	log.Check(log.ErrorLevel, "Clonning the container", container.Clone(parent, child))
 	gpg.GenerateKey(child)
 
 	if len(token) != 0 {
@@ -44,7 +44,6 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	}
 
 	if len(envID) != 0 {
-		container.SetEnvID(child, envID)
 		meta["environment"] = envID
 	}
 
@@ -54,7 +53,7 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 		meta["vlan"] = ip[1]
 	}
 
-	meta["uid"] = container.SetContainerUID(child)
+	meta["uid"], _ = container.SetContainerUID(child)
 
 	//Need to change it in parent templates
 	container.SetApt(child)

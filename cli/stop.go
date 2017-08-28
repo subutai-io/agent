@@ -8,11 +8,14 @@ import (
 // LxcStop stops a Subutai container with an additional state check.
 func LxcStop(name string) {
 	if container.IsContainer(name) && container.State(name) == "RUNNING" {
-		container.Stop(name)
-	}
-	if container.State(name) == "STOPPED" {
+		stopErr := container.Stop(name)
+		for i := 0; i < 60 && stopErr != nil; i++ {
+			log.Info("Waiting for container stop (60 sec)")
+			stopErr = container.Stop(name)
+		}
+		if stopErr != nil {
+			log.Error(name + " stop failed")
+		}
 		log.Info(name + " stopped")
-	} else {
-		log.Error(name + " stop failed")
 	}
 }

@@ -16,7 +16,7 @@ func LxcRename(src, dst string) {
 	}
 	if container.State(src) == "RUNNING" {
 		run = true
-		container.Stop(src)
+		log.Check(log.ErrorLevel, "Stopping container", container.Stop(src))
 	}
 
 	err := os.Rename(config.Agent.LxcPrefix+src, config.Agent.LxcPrefix+dst)
@@ -34,7 +34,7 @@ func LxcRename(src, dst string) {
 	})
 
 	if run {
-		container.Start(dst)
+		log.Check(log.ErrorLevel, "Starting container", container.Start(dst))
 	}
 
 	log.Info("Container " + src + " successfully renamed to " + dst)
