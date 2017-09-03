@@ -207,7 +207,7 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		addLine(conf, "server_name DOMAIN;", "	server_name "+domain+";", true)
 		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+";", true)
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+" {", true)
-		if strings.HasSuffix(sockExt, ":80") {
+		if !strings.HasSuffix(sockExt, ":80") {
 			httpRedirect(sockExt, domain)
 		}
 	case "tcp":
@@ -271,7 +271,7 @@ func httpRedirect(sockExt, domain string) {
 	var redirect = `server {
 	    listen      80; #redirect
     	server_name ` + domain + `;
-    	return 301 http://$host$request_uri;
+    	return 301 http://$host:` + strings.Split(sockExt, ":")[1] + `$request_uri;
 }`
 
 	addLine(config.Agent.DataPrefix+"nginx-includes/http/"+sockExt+"-"+domain+".conf",
