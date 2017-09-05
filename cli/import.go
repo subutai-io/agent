@@ -34,6 +34,7 @@ type templ struct {
 	version   string
 	branch    string
 	id        string
+	md5       string
 	owner     []string
 	signature map[string]string
 }
@@ -44,6 +45,10 @@ type metainfo struct {
 	Owner []string          `json:"owner"`
 	File  string            `json:"filename"`
 	Signs map[string]string `json:"signature"`
+	Hash  struct {
+		Md5    string
+		Sha256 string
+	} `json:"hash"`
 }
 
 // templateID retrieves the id of a template on global repository with specified version.
@@ -87,6 +92,7 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	}
 	t.id = meta[0].ID
 	t.file = meta[0].File
+	t.md5 = meta[0].Hash.Md5
 	t.signature = meta[0].Signs
 }
 
@@ -121,7 +127,8 @@ func checkLocal(t *templ) bool {
 				}
 				return false
 			}
-			if id := strings.Split(t.id, "."); len(id) > 0 && id[len(id)-1] == md5sum(config.Agent.LxcPrefix+"tmpdir/"+f.Name()) {
+			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + f.Name())
+			if t.id == hash || t.md5 == hash {
 				return true
 			}
 		}
@@ -173,7 +180,8 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 	log.Check(log.FatalLevel, "Writing response body to file", err)
 	bar.Finish()
 
-	if id := strings.Split(t.id, "."); len(id) > 0 && id[len(id)-1] == md5sum(config.Agent.LxcPrefix+"tmpdir/"+t.file) {
+	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+	if t.id == hash || t.md5 == hash {
 		return true
 	}
 	return false
