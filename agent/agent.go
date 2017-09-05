@@ -45,7 +45,6 @@ type heartbeat struct {
 	ID         string                `json:"id"`
 	Arch       string                `json:"arch"`
 	Instance   string                `json:"instance"`
-	Interfaces []utils.Iface         `json:"interfaces,omitempty"`
 	Containers []container.Container `json:"containers,omitempty"`
 	Alert      []alert.Load          `json:"alert,omitempty"`
 }
@@ -168,7 +167,6 @@ func sendHeartbeat() bool {
 		Instance:   instanceType,
 		Containers: alert.Quota(pool),
 		Alert:      alert.Current(pool),
-		Interfaces: utils.GetInterfaces(),
 	}}
 	jbeat, err := json.Marshal(&res)
 	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
