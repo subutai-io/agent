@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/clearsign"
@@ -128,8 +129,20 @@ func GenerateKey(name string) {
 
 	log.Check(log.FatalLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
 	if !container.IsContainer(name) {
-		log.Check(log.FatalLevel, "Importing secret key", exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").Run())
-		log.Check(log.FatalLevel, "Importing public key", exec.Command("gpg", "--import", "/root/.gnupg/public.pub").Run())
+		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
+		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
+			os.RemoveAll(config.Agent.DataPrefix + ".gnupg")
+			time.Sleep(time.Second)
+			GenerateKey(name)
+			return
+		}
+		out, err = exec.Command("gpg", "--import", "/root/.gnupg/public.pub").CombinedOutput()
+		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
+			os.RemoveAll(config.Agent.DataPrefix + ".gnupg")
+			time.Sleep(time.Second)
+			GenerateKey(name)
+			return
+		}
 	}
 }
 
