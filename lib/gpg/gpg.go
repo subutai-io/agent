@@ -127,7 +127,7 @@ func GenerateKey(name string) {
 	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	if _, err := os.Stat("/root/.gnupg/secret.sec"); os.IsNotExist(err) && !container.IsContainer(name) {
+	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
 		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
 	}
 	if !container.IsContainer(name) {
