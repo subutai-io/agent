@@ -101,13 +101,11 @@ func GenerateKey(name string) {
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
 	if !container.IsContainer(name) {
-		if _, err := os.Stat("/root/.gnupg/secret.sec"); os.IsNotExist(err) {
-			err := os.MkdirAll("/root/.gnupg/", 0700)
-			log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
-			path = "/root/.gnupg"
-			email = name
-			pass = config.Agent.GpgPassword
-		}
+		err := os.MkdirAll("/root/.gnupg/", 0700)
+		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
+		path = "/root/.gnupg"
+		email = name
+		pass = config.Agent.GpgPassword
 	}
 	// err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/defaults", ident, 0644)
 	conf, err := os.Create(path + "/defaults")
@@ -129,7 +127,9 @@ func GenerateKey(name string) {
 	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	if _, err := os.Stat("/root/.gnupg/secret.sec"); os.IsNotExist(err) && !container.IsContainer(name) {
+		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	}
 	if !container.IsContainer(name) {
 		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
