@@ -97,37 +97,39 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]b
 // GenerateKey generates GPG-key for Subutai Agent.
 // This key used for encrypting messages for Subutai Agent.
 func GenerateKey(name string) {
-	path := config.Agent.LxcPrefix + name
-	email := name + "@subutai.io"
-	pass := config.Agent.GpgPassword
-	if !container.IsContainer(name) {
-		err := os.MkdirAll("/root/.gnupg/", 0700)
-		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
-		path = "/root/.gnupg"
-		email = name
-		pass = config.Agent.GpgPassword
-	}
-	// err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/defaults", ident, 0644)
-	conf, err := os.Create(path + "/defaults")
-	if log.Check(log.FatalLevel, "Writing default key ident", err) {
-		return
-	}
-	_, err = conf.WriteString("%echo Generating default keys\n" +
-		"Key-Type: RSA\n" +
-		"Key-Length: 2048\n" +
-		"Name-Real: " + name + "\n" +
-		"Name-Comment: " + name + " GPG key\n" +
-		"Name-Email: " + email + "\n" +
-		"Expire-Date: 0\n" +
-		"Passphrase: " + pass + "\n" +
-		"%pubring " + path + "/public.pub\n" +
-		"%secring " + path + "/secret.sec\n" +
-		"%commit\n" +
-		"%echo Done\n")
-	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
-	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
+	if _, err := os.Stat("/root/.gnupg/secret.sec"); os.IsNotExist(err) {
+		path := config.Agent.LxcPrefix + name
+		email := name + "@subutai.io"
+		pass := config.Agent.GpgPassword
+		if !container.IsContainer(name) {
+			err := os.MkdirAll("/root/.gnupg/", 0700)
+			log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
+			path = "/root/.gnupg"
+			email = name
+			pass = config.Agent.GpgPassword
+		}
+		// err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/defaults", ident, 0644)
+		conf, err := os.Create(path + "/defaults")
+		if log.Check(log.FatalLevel, "Writing default key ident", err) {
+			return
+		}
+		_, err = conf.WriteString("%echo Generating default keys\n" +
+			"Key-Type: RSA\n" +
+			"Key-Length: 2048\n" +
+			"Name-Real: " + name + "\n" +
+			"Name-Comment: " + name + " GPG key\n" +
+			"Name-Email: " + email + "\n" +
+			"Expire-Date: 0\n" +
+			"Passphrase: " + pass + "\n" +
+			"%pubring " + path + "/public.pub\n" +
+			"%secring " + path + "/secret.sec\n" +
+			"%commit\n" +
+			"%echo Done\n")
+		log.Check(log.DebugLevel, "Writing defaults for gpg", err)
+		log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	log.Check(log.FatalLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	}
 	if !container.IsContainer(name) {
 		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
