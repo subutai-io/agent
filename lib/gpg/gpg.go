@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/clearsign"
@@ -133,17 +133,17 @@ func GenerateKey(name string) {
 	if !container.IsContainer(name) {
 		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
-			os.RemoveAll(config.Agent.DataPrefix + ".gnupg")
-			time.Sleep(time.Second)
-			GenerateKey(name)
-			return
+			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			for _, f := range list {
+				os.Remove(f)
+			}
 		}
 		out, err = exec.Command("gpg", "--import", "/root/.gnupg/public.pub").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
-			os.RemoveAll(config.Agent.DataPrefix + ".gnupg")
-			time.Sleep(time.Second)
-			GenerateKey(name)
-			return
+			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			for _, f := range list {
+				os.Remove(f)
+			}
 		}
 	}
 }
