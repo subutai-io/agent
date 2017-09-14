@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/gpg"
+	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -23,7 +24,7 @@ type rHost struct {
 	Pk         string                `json:"publicKey"`
 	Cert       string                `json:"cert"`
 	Secret     string                `json:"secret"`
-	Ifaces     []utils.Iface         `json:"interfaces"`
+	Address    string                `json:"address"`
 	Arch       string                `json:"arch"`
 	Containers []container.Container `json:"hostInfos"`
 }
@@ -41,7 +42,7 @@ func Request(user, pass string) {
 		UUID:       gpg.GetFingerprint(user),
 		Arch:       strings.ToUpper(runtime.GOARCH),
 		Cert:       utils.PublicCert(),
-		Ifaces:     utils.GetInterfaces(),
+		Address:    ovs.GetIp(),
 		Containers: container.Active(true),
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)

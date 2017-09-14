@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/crypto/openpgp"
@@ -126,10 +127,24 @@ func GenerateKey(name string) {
 	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	log.Check(log.FatalLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
+		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+	}
 	if !container.IsContainer(name) {
-		log.Check(log.FatalLevel, "Importing secret key", exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").Run())
-		log.Check(log.FatalLevel, "Importing public key", exec.Command("gpg", "--import", "/root/.gnupg/public.pub").Run())
+		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
+		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
+			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			for _, f := range list {
+				os.Remove(f)
+			}
+		}
+		out, err = exec.Command("gpg", "--import", "/root/.gnupg/public.pub").CombinedOutput()
+		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
+			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			for _, f := range list {
+				os.Remove(f)
+			}
+		}
 	}
 }
 

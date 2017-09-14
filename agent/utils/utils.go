@@ -10,14 +10,12 @@ import (
 	"encoding/pem"
 	"io/ioutil"
 	"math/big"
-	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/subutai-io/agent/config"
-	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -25,41 +23,6 @@ import (
 type Iface struct {
 	InterfaceName string `json:"interfaceName"`
 	IP            string `json:"ip"`
-}
-
-// GetInterfaces returns list of network interfaces with addresses for Resource Host
-func GetInterfaces() []Iface {
-	ifaces, err := net.Interfaces()
-	log.Check(log.WarnLevel, "Getting network interfaces", err)
-
-	list := []Iface{}
-	wan := false
-	for _, ifac := range ifaces {
-		if ifac.Name == "lo0" || ifac.Name == "lo" || !strings.Contains(ifac.Flags.String(), "up") {
-			continue
-		}
-		if ifac.Name == "wan" {
-			wan = true
-		}
-		inter := new(Iface)
-		inter.InterfaceName = ifac.Name
-		if addrs, err := ifac.Addrs(); err == nil {
-			for _, addr := range addrs {
-				switch v := addr.(type) {
-				case *net.IPNet:
-					ipv4 := v.IP.To4().String()
-					if ipv4 != "<nil>" {
-						inter.IP = ipv4
-						list = append(list, *inter)
-					}
-				}
-			}
-		}
-	}
-	if !wan {
-		list = append(list, Iface{InterfaceName: "wan", IP: ovs.GetIp()})
-	}
-	return list
 }
 
 // PublicCert returns Public SSL certificate for Resource Host
