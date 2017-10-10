@@ -47,8 +47,7 @@ func RemoveByIface(name string) {
 			Remove(line[2])
 		}
 	}
-	log.Check(log.WarnLevel, "Disabling p2p link",
-		exec.Command("ifconfig", name, "down").Run())
+	log.Check(log.WarnLevel, "Disabling p2p link", exec.Command("ifconfig", name, "down").Run())
 	iptablesCleanUp(name)
 }
 
@@ -88,4 +87,27 @@ func Peers(hash string) {
 	out, err := exec.Command("p2p", args...).Output()
 	log.Check(log.FatalLevel, "Getting list of p2p participants", err)
 	fmt.Println(string(out))
+}
+
+// Interfaces returns list of interfaces that is used by P2P in the system
+func Interfaces() (list []net.Interface, err error) {
+	l, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := exec.Command("p2p", "show", "-interfaces", "-all").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		for _, f := range l {
+			if f.Name == scanner.Text() {
+				list = append(list, f)
+			}
+		}
+	}
+	return list, nil
 }

@@ -245,12 +245,16 @@ func main() {
 			gcli.BoolFlag{Name: "delete, d", Usage: "delete p2p instance by swarm hash"},
 			gcli.BoolFlag{Name: "update, u", Usage: "update p2p instance encryption key (hash newkey ttl)"},
 			gcli.BoolFlag{Name: "list, l", Usage: "list of p2p instances"},
+			gcli.BoolFlag{Name: "interfaces, i", Usage: "list of p2p interfaces"},
 			gcli.BoolFlag{Name: "peers, p", Usage: "list of p2p swarm participants by hash"},
 			gcli.BoolFlag{Name: "version, v", Usage: "print p2p version"}},
 		Action: func(c *gcli.Context) error {
-			if c.Bool("v") {
+			switch {
+			case c.Bool("i"):
+				cli.P2PInterfaces()
+			case c.Bool("v"):
 				cli.P2Pversion()
-			} else {
+			default:
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
 			}
 			return nil

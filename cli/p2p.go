@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/subutai-io/agent/lib/net/p2p"
@@ -54,4 +55,14 @@ func P2P(create, remove, update, list, peers bool, args []string) {
 // P2Pversion prints version of p2p daemon
 func P2Pversion() {
 	p2p.Version()
+}
+
+// P2PInterfaces prints list of interfaces used by P2P
+func P2PInterfaces() {
+	list, err := p2p.Interfaces()
+	log.Check(log.ErrorLevel, "Getting list of p2p interfaces", err)
+
+	for _, iface := range list {
+		fmt.Println(iface.Name)
+	}
 }
