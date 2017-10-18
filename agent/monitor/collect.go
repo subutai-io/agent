@@ -59,6 +59,9 @@ func Collect() {
 
 func InitInfluxdb() {
 	var err error
+	if dbclient != nil {
+		dbclient.Close()
+	}
 	dbclient, err = client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
 		Username:           config.Influxdb.User,
