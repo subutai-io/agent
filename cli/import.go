@@ -40,12 +40,13 @@ type templ struct {
 }
 
 type metainfo struct {
-	ID    string            `json:"id"`
-	Name  string            `json:"name"`
-	Owner []string          `json:"owner"`
-	File  string            `json:"filename"`
-	Signs map[string]string `json:"signature"`
-	Hash  struct {
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Owner   []string          `json:"owner"`
+	Version string            `json:"version"`
+	File    string            `json:"filename"`
+	Signs   map[string]string `json:"signature"`
+	Hash    struct {
 		Md5    string
 		Sha256 string
 	} `json:"hash"`
@@ -57,10 +58,8 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	var meta []metainfo
 
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
-	if t.name == "management" && len(t.branch) != 0 {
-		url = config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + t.version + "-" + t.branch + "&token=" + token
-	} else if t.name == "management" {
-		url = config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + t.version + "&token=" + token
+	if t.name == "management" && len(t.version) != 0 {
+		url = url + "&version=" + t.version
 	}
 
 	response, err := kurjun.Get(url)
@@ -69,7 +68,7 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 
 	if err == nil && response.StatusCode == 404 && t.name == "management" {
 		log.Warn("Requested management version not found, getting latest available")
-		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + t.branch + "&token=" + token)
+		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + config.Template.Branch + "&token=" + token)
 	}
 	if log.Check(log.WarnLevel, "Getting kurjun response", err) || response.StatusCode != 200 {
 		return
@@ -86,10 +85,8 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 		return
 	}
 
-	if t.name != meta[0].Name {
-		log.Info("Found: " + t.name + " -> " + meta[0].Name)
-		t.name = meta[0].Name
-	}
+	t.name = meta[0].Name
+	t.version = meta[0].Version
 	t.id = meta[0].ID
 	t.file = meta[0].File
 	t.md5 = meta[0].Hash.Md5
@@ -296,41 +293,16 @@ func LxcImport(name, version, token string, torrent bool) {
 		return
 	}
 
-	t.version = config.Template.Version
-	t.branch = config.Template.Branch
-	if len(version) != 0 {
-		if strings.Contains(version, "-") {
-			verstr := strings.Split(version, "-")
-			if len(verstr) == 2 {
-				t.version = verstr[0]
-				t.branch = verstr[1]
-			} else {
-				log.Error("Invalid version")
-			}
-		} else {
-			if strings.Contains(version, ".") {
-				t.version = version
-				t.branch = config.Template.Branch
-			} else {
-				t.version = config.Template.Version
-				t.branch = version
-			}
-		}
-	}
-
-	log.Info("Version: " + t.version + ", branch: " + t.branch)
-
-	if t.branch == "" || t.name != "management" {
-		t.file = t.name + "-subutai-template_" + t.version + "_" + config.Template.Arch + ".tar.gz"
-	} else {
-		t.file = t.name + "-subutai-template_" + t.version + "-" + t.branch + "_" + config.Template.Arch + ".tar.gz"
-	}
+	// t.version = config.Template.Version
+	// t.branch = config.Template.Branch
+	t.version = version
 
 	if kurjun == nil {
 		kurjun, _ = config.CheckKurjun()
 	}
 	if kurjun != nil {
 		templateID(&t, kurjun, token)
+		log.Info("Version: " + t.version)
 	} else {
 		log.Info("Trying to import from local storage")
 	}
