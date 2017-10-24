@@ -271,7 +271,9 @@ func LxcImport(name, version, token string, torrent bool) {
 
 	if id := strings.Split(name, "id:"); len(id) > 1 {
 		kurjun, _ = config.CheckKurjun()
-		name = idToName(id[1], kurjun, token)
+		if kurjun != nil {
+			name = idToName(id[1], kurjun, token)
+		}
 	}
 
 	var t templ
