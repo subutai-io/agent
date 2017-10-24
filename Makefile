@@ -1,17 +1,11 @@
 APP=subutai
 CC=go
-VERSION=$(shell git describe --abbrev=0 --tags)
-ifeq (${GIT_BRANCH}, )
-	GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
-endif
-ifneq (${GIT_BRANCH}, )
-	VERSION=$(shell git describe --abbrev=0 --tags | awk -F'.' '{print $$1"."$$2"."$$3+1}')-SNAPSHOT
-endif
+VERSION=$(shell git describe --tags)
+GIT_BRANCH=-$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
 ifeq (${GOPATH}, )
 	GOPATH=${HOME}/go
 endif
-COMMIT=$(shell git rev-parse HEAD)
-LDFLAGS=-ldflags "-r /snap/subutai-dev/current/lib -w -s -X main.version=${VERSION} -X main.commit=${COMMIT} -X github.com/subutai-io/agent/config.version=$(VERSION)"
+LDFLAGS=-ldflags "-r /snap/subutai-dev/current/lib -w -s -X main.version=${VERSION}${GIT_BRANCH} -X github.com/subutai-io/agent/config.version=${VERSION}${GIT_BRANCH}"
 
 all:
 	@if [ ! -d "$(GOPATH)/src/github.com/subutai-io/agent" ]; then mkdir -p $(GOPATH)/src/github.com/subutai-io/; ln -s $(shell pwd) $(GOPATH)/src/github.com/subutai-io/agent; fi

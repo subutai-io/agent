@@ -16,7 +16,6 @@ import (
 )
 
 var version = "unknown"
-var commit = "unknown"
 
 func init() {
 	if os.Getuid() != 0 {
@@ -34,9 +33,6 @@ func init() {
 func main() {
 	app := gcli.NewApp()
 	app.Name = "Subutai"
-	if len(config.Template.Branch) != 0 {
-		commit = config.Template.Branch + "/" + commit
-	}
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
 		if base, err := db.New(); err == nil {
@@ -50,7 +46,7 @@ func main() {
 		}
 	}
 
-	app.Version = version + " " + commit
+	app.Version = version
 	app.Usage = "daemon and command line interface binary"
 
 	app.Flags = []gcli.Flag{gcli.BoolFlag{
