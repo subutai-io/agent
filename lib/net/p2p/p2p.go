@@ -73,7 +73,7 @@ func UpdateKey(hash, newkey, ttl string) {
 
 // Version returns version of the P2P on the Resource Host.
 func Version() {
-	out, err := exec.Command("p2p", "version").CombinedOutput()
+	out, err := exec.Command("p2p", "-v").CombinedOutput()
 	fmt.Printf("%s", out)
 	log.Check(log.FatalLevel, "Getting p2p version", err)
 }
