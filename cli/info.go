@@ -29,7 +29,7 @@ var (
 
 type hostStat struct {
 	Host string `json:"host"`
-	CPU  struct {
+	CPU struct {
 		Model     string      `json:"model"`
 		CoreCount int         `json:"coreCount"`
 		Idle      interface{} `json:"idle"`
@@ -49,7 +49,7 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk      struct {
+	Disk struct {
 		Home   int `json:"home"`
 		Opt    int `json:"opt"`
 		Rootfs int `json:"rootfs"`
@@ -298,6 +298,24 @@ func Info(command, host, interval string) {
 		for k := range usedPorts() {
 			fmt.Println(k)
 		}
+	} else if command == "os" {
+		out, _ := exec.Command("lsb_release", "-a").Output()
+
+		output := strings.Split(string(out), "\n")
+
+		version := "Failed to determine OS name using 'lsb_release -a' command"
+
+		for _, line := range output {
+
+			if strings.HasPrefix(line, "Description") {
+
+				version = strings.TrimSpace(strings.Replace(line, "Description:", "", 1))
+
+				break
+			}
+		}
+
+		fmt.Printf("%s\n", version)
 	}
 
 	initdb()
