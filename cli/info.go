@@ -299,7 +299,8 @@ func Info(command, host, interval string) {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
-		out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
+		//out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
+		out, err := ioutil.ReadFile("/etc/os-release")
 
 		if log.Check(log.ErrorLevel, "Determining OS name", err) {
 
@@ -316,7 +317,7 @@ func Info(command, host, interval string) {
 
 			if strings.HasPrefix(line, "PRETTY_NAME") {
 
-				version = strings.TrimSpace(strings.Replace(line, "PRETTY_NAME=", "", 1))
+				version = strings.Trim(strings.Replace(line, "PRETTY_NAME=", "", 1), "\"")
 
 				break
 			}
