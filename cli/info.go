@@ -299,11 +299,18 @@ func Info(command, host, interval string) {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
-		out, _ := exec.Command("lsb_release", "-a").Output()
+		out, err := exec.Command("lsb_release", "-a").Output()
+
+		if log.Check(log.InfoLevel, "Determining OS name", err) {
+
+			fmt.Println("Failed to determine OS name: " + err.Error())
+
+			return
+		}
 
 		output := strings.Split(string(out), "\n")
 
-		version := "Failed to determine OS name using 'lsb_release -a' command"
+		var version string
 
 		for _, line := range output {
 
