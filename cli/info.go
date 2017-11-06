@@ -299,8 +299,7 @@ func Info(command, host, interval string) {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
-		//out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
-		out, err := ioutil.ReadFile("/etc/os-release")
+		out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
 		if log.Check(log.ErrorLevel, "Determining OS name", err) {
 
