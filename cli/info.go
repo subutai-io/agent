@@ -299,9 +299,9 @@ func Info(command, host, interval string) {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
-		out, err := exec.Command("lsb_release", "-a").Output()
+		out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
-		if log.Check(log.InfoLevel, "Determining OS name", err) {
+		if log.Check(log.ErrorLevel, "Determining OS name", err) {
 
 			fmt.Println("Failed to determine OS name: " + err.Error())
 
@@ -314,9 +314,9 @@ func Info(command, host, interval string) {
 
 		for _, line := range output {
 
-			if strings.HasPrefix(line, "Description") {
+			if strings.HasPrefix(line, "PRETTY_NAME") {
 
-				version = strings.TrimSpace(strings.Replace(line, "Description:", "", 1))
+				version = strings.TrimSpace(strings.Replace(line, "PRETTY_NAME=", "", 1))
 
 				break
 			}
