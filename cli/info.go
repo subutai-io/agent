@@ -314,9 +314,9 @@ func Info(command, host, interval string) {
 
 		for _, line := range output {
 
-			if strings.HasPrefix(line, "PRETTY_NAME") {
+			if strings.HasPrefix(line, "DISTRIB_DESCRIPTION") {
 
-				version = strings.Trim(strings.Replace(line, "PRETTY_NAME=", "", 1), "\"")
+				version = strings.Trim(strings.Replace(line, "DISTRIB_DESCRIPTION=", "", 1), "\"")
 
 				break
 			}
