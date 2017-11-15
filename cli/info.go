@@ -299,30 +299,8 @@ func Info(command, host, interval string) {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
-		out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
-		if log.Check(log.ErrorLevel, "Determining OS name", err) {
-
-			fmt.Println("Failed to determine OS name: " + err.Error())
-
-			return
-		}
-
-		output := strings.Split(string(out), "\n")
-
-		var version string
-
-		for _, line := range output {
-
-			if strings.HasPrefix(line, "DISTRIB_DESCRIPTION") {
-
-				version = strings.Trim(strings.Replace(line, "DISTRIB_DESCRIPTION=", "", 1), "\"")
-
-				break
-			}
-		}
-
-		fmt.Printf("%s\n", version)
+		fmt.Printf("%s\n", getOsName())
 	}
 
 	initdb()
@@ -337,6 +315,39 @@ func Info(command, host, interval string) {
 		host, err := os.Hostname()
 		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))
+	}
+}
+
+func getOsName() string {
+
+	out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
+
+	log.Check(log.ErrorLevel, "Determining OS name", err)
+
+	output := strings.Split(string(out), "\n")
+
+	var version, version2 string
+
+	for _, line := range output {
+
+		if strings.HasPrefix(line, "DISTRIB_DESCRIPTION") {
+
+			version = strings.Trim(strings.Replace(line, "DISTRIB_DESCRIPTION=", "", 1), "\"")
+
+			break
+		}
+
+		if strings.HasPrefix(line, "PRETTY_NAME") {
+
+			version2 = strings.Trim(strings.Replace(line, "PRETTY_NAME=", "", 1), "\"")
+		}
+
+	}
+
+	if version != "" {
+		return version
+	} else {
+		return version2
 	}
 }
 
