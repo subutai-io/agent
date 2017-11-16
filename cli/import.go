@@ -264,6 +264,8 @@ func unlockSubutai() {
 func LxcImport(name, version, token string, torrent bool) {
 	var kurjun *http.Client
 
+	log.Debug("Inside LxcImport")
+
 	if container.IsContainer(name) && name == "management" && len(token) > 1 {
 		gpg.ExchageAndEncrypt("management", token)
 		return
