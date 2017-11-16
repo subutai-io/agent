@@ -24,8 +24,9 @@ import (
 )
 
 var (
-	lock   lockfile.Lockfile
-	owners = []string{"subutai", "jenkins", "docker", ""}
+	lock    lockfile.Lockfile
+	owners  = []string{"subutai", "jenkins", "docker", ""}
+	depList = []string{}
 )
 
 type templ struct {
@@ -342,7 +343,13 @@ func LxcImport(name, version, token string, torrent bool) {
 	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.name
 	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.file, templdir))
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
-	if parent != "" && parent != t.name && !container.IsTemplate(parent) {
+
+	if parent != "" && parent != t.name && !container.IsTemplate(parent) && !isOnDependencyList(parent) {
+
+		// Append the template and parent name to dependency list
+		appendToDependencyList(parent)
+		appendToDependencyList(t.name)
+
 		log.Info("Parent template required: " + parent)
 		LxcImport(parent, "", token, torrent)
 	}
@@ -399,4 +406,21 @@ func verifySignature(id string, list map[string]string) error {
 		}
 	}
 	return fmt.Errorf("Failed to verify signature")
+}
+
+// Verify if package is already on dependency list
+func isOnDependencyList(s string) bool {
+	for _, p := range depList {
+		if s == p {
+			return true
+		}
+	}
+	return false
+}
+
+// Append template to dependency list only if not in the list
+func appendToDependencyList(s string) {
+	if !isOnDependencyList(s) {
+		depList = append(depList, s)
+	}
 }
