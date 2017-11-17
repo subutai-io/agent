@@ -15,7 +15,8 @@ import (
 	cont "github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 
-	lxc "gopkg.in/lxc/go-lxc.v2"
+	"gopkg.in/lxc/go-lxc.v2"
+	"github.com/subutai-io/agent/db"
 )
 
 // Container describes Subutai container with all required options for the Management server.
@@ -27,7 +28,8 @@ type Container struct {
 	Arch       string        `json:"arch"`
 	Interfaces []utils.Iface `json:"interfaces"`
 	Parent     string        `json:"templateName,omitempty"`
-	Vlan       int           `json:"vlan,omitempty"`
+	Vlan       string        `json:"vlan,omitempty"`
+	EnvId      string        `json:"environmentId,omitempty"`
 	Pk         string        `json:"publicKey,omitempty"`
 	Quota      Quota         `json:"quota,omitempty"`
 }
@@ -78,12 +80,21 @@ func parsePasswd(path, name string) (uid string, gid string) {
 func Active(details bool) []Container {
 	contArr := []Container{}
 
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	defer bolt.Close()
+
 	for _, c := range cont.Containers() {
 		hostname, err := ioutil.ReadFile(config.Agent.LxcPrefix + c + "/rootfs/etc/hostname")
 		if err != nil {
 			continue
 		}
 		configpath := config.Agent.LxcPrefix + c + "/config"
+
+		meta := bolt.ContainerByName(c)
+
+		vlan := meta["vlan"]
+		envId := meta["environment"]
 
 		container := Container{
 			ID:         gpg.GetFingerprint(c),
@@ -93,6 +104,8 @@ func Active(details bool) []Container {
 			Arch:       strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
 			Interfaces: interfaces(c),
 			Parent:     cont.GetConfigItem(configpath, "subutai.parent"),
+			Vlan:       vlan,
+			EnvId:      envId,
 		}
 		if details {
 			container.Pk = gpg.GetContainerPk(c)
