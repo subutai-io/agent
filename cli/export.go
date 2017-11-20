@@ -115,6 +115,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer file.Close()
 
 	body := &bytes.Buffer{}
@@ -123,14 +124,15 @@ func upload(path, token string, private bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	_, err = io.Copy(part, file)
 	if err != nil {
 		return nil, err
 	}
+
 	if private {
 		_ = writer.WriteField("private", "true")
 	}
-	_ = writer.WriteField("token", token)
 
 	err = writer.Close()
 	if err != nil {
@@ -140,10 +142,14 @@ func upload(path, token string, private bool) ([]byte, error) {
 	config.CheckKurjun()
 
 	req, err := http.NewRequest("POST", config.CDN.Kurjun+"/template/upload", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if err != nil {
 		return nil, err
 	}
+
+	//set headers
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("token", token)
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
