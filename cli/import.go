@@ -261,7 +261,7 @@ func unlockSubutai() {
 //
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
-func LxcImport(name, version, token string, torrent bool) {
+func LxcImport(name, version, token string, torrent bool, auxDepList ...string) {
 	var kurjun *http.Client
 
 	if container.IsContainer(name) && name == "management" && len(token) > 1 {
@@ -342,9 +342,12 @@ func LxcImport(name, version, token string, torrent bool) {
 	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.name
 	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.file, templdir))
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
-	if parent != "" && parent != t.name && !container.IsTemplate(parent) {
+
+	if parent != "" && parent != t.name && !container.IsTemplate(parent) && !stringInList(parent, auxDepList) {
+		// Append the template and parent name to dependency list
+		auxDepList = append(auxDepList, parent, t.name)
 		log.Info("Parent template required: " + parent)
-		LxcImport(parent, "", token, torrent)
+		LxcImport(parent, "", token, torrent, auxDepList...)
 	}
 
 	log.Info("Installing template " + t.name)
@@ -399,4 +402,14 @@ func verifySignature(id string, list map[string]string) error {
 		}
 	}
 	return fmt.Errorf("Failed to verify signature")
+}
+
+// Verify if package is already on dependency list
+func stringInList(s string, list []string) bool {
+	for _, i := range list {
+		if s == i {
+			return true
+		}
+	}
+	return false
 }

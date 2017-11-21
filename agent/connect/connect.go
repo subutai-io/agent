@@ -19,14 +19,15 @@ import (
 )
 
 type rHost struct {
-	UUID       string                `json:"id"`
-	Hostname   string                `json:"hostname"`
-	Pk         string                `json:"publicKey"`
-	Cert       string                `json:"cert"`
-	Secret     string                `json:"secret"`
-	Address    string                `json:"address"`
-	Arch       string                `json:"arch"`
-	Containers []container.Container `json:"hostInfos"`
+	UUID         string                `json:"id"`
+	Hostname     string                `json:"hostname"`
+	Pk           string                `json:"publicKey"`
+	Cert         string                `json:"cert"`
+	Secret       string                `json:"secret"`
+	Address      string                `json:"address"`
+	Arch         string                `json:"arch"`
+	InstanceType string                `json:"instanceType"`
+	Containers   []container.Container `json:"hostInfos"`
 }
 
 //Request collecting connection request and sends to the Management server.
@@ -36,14 +37,15 @@ func Request(user, pass string) {
 	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
 
 	rh, err := json.Marshal(rHost{
-		Hostname:   hostname,
-		Secret:     pass,
-		Pk:         gpg.GetPk(user),
-		UUID:       gpg.GetFingerprint(user),
-		Arch:       strings.ToUpper(runtime.GOARCH),
-		Cert:       utils.PublicCert(),
-		Address:    ovs.GetIp(),
-		Containers: container.Active(true),
+		Hostname:     hostname,
+		Secret:       pass,
+		Pk:           gpg.GetPk(user),
+		UUID:         gpg.GetFingerprint(user),
+		Arch:         strings.ToUpper(runtime.GOARCH),
+		Cert:         utils.PublicCert(),
+		Address:      ovs.GetIp(),
+		InstanceType: utils.InstanceType(),
+		Containers:   container.Active(true),
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 
