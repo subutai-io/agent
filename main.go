@@ -62,6 +62,7 @@ func main() {
 		}}, {
 
 		Name: "backup", Usage: "backup Subutai container",
+		UseShortOptionHandling: true,
 		Flags: []gcli.Flag{
 			gcli.BoolFlag{Name: "full, f", Usage: "make full backup"},
 			gcli.BoolFlag{Name: "stop, s", Usage: "stop container at the time of backup"}},
@@ -180,6 +181,7 @@ func main() {
 		}}, {
 
 		Name: "list", Usage: "list Subutai container",
+		UseShortOptionHandling: true,
 		Flags: []gcli.Flag{
 			gcli.BoolFlag{Name: "container, c", Usage: "containers only"},
 			gcli.BoolFlag{Name: "template, t", Usage: "templates only"},
