@@ -78,7 +78,7 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 
 func mapList(protocol string) (list []string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning portmap database to get list", err)
+	log.Check(log.ErrorLevel, "Opening portmap database to get list", err)
 	switch protocol {
 	case "tcp", "udp", "http", "https":
 		list = bolt.PortmapList(protocol)
@@ -93,7 +93,7 @@ func mapList(protocol string) (list []string) {
 
 func mapRemove(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning portmap database to remove mapping", err)
+	log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err)
 	defer bolt.Close()
 	// Commenting this section out to insure config deletion even if db doesn't have it
 	// if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
@@ -101,7 +101,7 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 	// }
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
-	if bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 {
+	if bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 && sockInt != "" {
 		if strings.Contains(sockInt, ":") {
 			sockInt = sockInt + ";"
 		} else {
@@ -233,7 +233,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	switch policy {
 	case "round-robin", "round_robin":
 		policy = "#round-robin"
-	//  "least_conn":
+		//  "least_conn":
 	case "least_time":
 		if protocol == "tcp" {
 			policy = policy + " connect"
@@ -281,7 +281,7 @@ func httpRedirect(sockExt, domain string) {
 
 func saveMapToDB(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning database to save portmap", err)
+	log.Check(log.ErrorLevel, "Opening database to save portmap", err)
 	if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
 		log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, sockExt, domain, sockInt))
 	}
