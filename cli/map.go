@@ -101,7 +101,7 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 	// }
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
-	if bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 && sockInt != "" {
+	if sockInt != "" && bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 {
 		if strings.Contains(sockInt, ":") {
 			sockInt = sockInt + ";"
 		} else {
