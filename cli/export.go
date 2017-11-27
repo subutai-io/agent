@@ -153,6 +153,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	// create and start bar
 	bar := pb.New(int(fi.Size())).SetUnits(pb.U_BYTES)
 	bar.Start()
+	defer bar.Finish()
 
 	// create proxy reader
 	proxedBody := bar.NewProxyReader(body)
