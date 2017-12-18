@@ -55,7 +55,6 @@ func main() {
 
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
-		SkipFlagParsing: true,
 		Action: func(c *gcli.Context) error {
 			cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
 			return nil
