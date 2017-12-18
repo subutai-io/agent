@@ -14,6 +14,7 @@ import (
 // `name` should be available running Subutai container,
 // otherwise command will return error message and non-zero exit code.
 func LxcAttach(name string, cmd []string) {
+	log.Debug("Attaching to container " + name)
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.ErrorLevel, "Creating container object", err)
 
