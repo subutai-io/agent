@@ -54,6 +54,9 @@ func TunAdd(socket, timeout string, global bool) {
 
 	prepareKey()
 	args, tunsrv := getArgs(socket)
+
+	log.Debug("Executing command ssh " + strings.Join(args," "))
+
 	cmd := exec.Command("ssh", args...)
 
 	stderr, _ := cmd.StderrPipe()
