@@ -149,14 +149,23 @@ func GenerateKey(name string) {
 }
 
 // GetFingerprint returns fingerprint of the Subutai container.
-func GetFingerprint(email string) string {
+func GetFingerprint(email string, extraArgs ...string) string {
 	var out []byte
 	var err error
 	if email == config.Agent.GpgUser {
-		out, err = exec.Command("gpg", "--fingerprint", email).Output()
+		if extraArgs == nil {
+			out, err = exec.Command("gpg", "--fingerprint", email).Output()
+		} else {
+
+			out, err = exec.Command("gpg", "--fingerprint", "--homedir", extraArgs[0], email).Output()
+		}
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
-		out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		if extraArgs == nil {
+			out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		} else {
+			out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", "--homedir", extraArgs[0], email).Output()
+		}
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))

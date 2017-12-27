@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 )
@@ -29,7 +30,7 @@ var (
 
 type hostStat struct {
 	Host string `json:"host"`
-	CPU struct {
+	CPU  struct {
 		Model     string      `json:"model"`
 		CoreCount int         `json:"coreCount"`
 		Idle      interface{} `json:"idle"`
@@ -49,7 +50,7 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk struct {
+	Disk      struct {
 		Home   int `json:"home"`
 		Opt    int `json:"opt"`
 		Rootfs int `json:"rootfs"`
@@ -301,6 +302,9 @@ func Info(command, host, interval string) {
 	} else if command == "os" {
 
 		fmt.Printf("%s\n", getOsName())
+	} else if command == "id" {
+
+		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io", config.Agent.DataPrefix+".gnupg"))
 	}
 
 	initdb()
