@@ -303,8 +303,9 @@ func Info(command, host, interval string) {
 
 		fmt.Printf("%s\n", getOsName())
 	} else if command == "id" {
-
-		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io", config.Agent.DataPrefix+".gnupg"))
+		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+		defer os.Unsetenv("GNUPGHOME")
+		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	}
 
 	initdb()
