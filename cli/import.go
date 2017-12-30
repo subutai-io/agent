@@ -46,7 +46,7 @@ type metainfo struct {
 	Version string            `json:"version"`
 	File    string            `json:"filename"`
 	Signs   map[string]string `json:"signature"`
-	Hash struct {
+	Hash    struct {
 		Md5    string
 		Sha256 string
 	} `json:"hash"`
@@ -63,19 +63,18 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	}
 
 	response, err := kurjun.Get(url)
-	defer response.Body.Close()
 	log.Check(log.ErrorLevel, "Retrieving id, get: "+url, err)
+	defer response.Body.Close()
 
 	if err == nil && response.StatusCode == 404 && t.name == "management" {
 		log.Warn("Requested management version not found, getting latest available")
 		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + config.Template.Branch + "&token=" + token)
-		defer response.Body.Close()
 	}
-
 	if log.Check(log.WarnLevel, "Getting kurjun response", err) || response.StatusCode != 200 {
 		return
 	}
 
+	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 
 	if err != nil || log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
@@ -97,10 +96,10 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 // md5sum returns MD5 hash sum of specified file
 func md5sum(filePath string) string {
 	file, err := os.Open(filePath)
-	defer file.Close()
 	if err != nil {
 		return ""
 	}
+	defer file.Close()
 
 	hash := md5.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -140,8 +139,8 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 		return false
 	}
 	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-	defer out.Close()
 	log.Check(log.FatalLevel, "Creating file "+t.file, err)
+	defer out.Close()
 
 	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
@@ -149,9 +148,9 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file + "?token=" + token
 	}
 	response, err := kurjun.Get(url)
-	defer response.Body.Close()
 	log.Check(log.FatalLevel, "Getting "+url, err)
 
+	defer response.Body.Close()
 	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
 	if response.ContentLength <= 0 {
 		bar.NotPrint = true
@@ -166,11 +165,11 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 
 		//Repeating GET request to CDN, while need to continue interrupted download
 		out, err = os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-		defer out.Close()
 		log.Check(log.FatalLevel, "Creating file "+t.file, err)
+		defer out.Close()
 		response, err = kurjun.Get(url)
-		defer response.Body.Close()
 		log.Check(log.FatalLevel, "Getting "+url, err)
+		defer response.Body.Close()
 		bar = pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
 		bar.Start()
 		rd = bar.NewProxyReader(response.Body)
@@ -200,8 +199,8 @@ func idToName(id string, kurjun *http.Client, token string) string {
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
 	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
 	response, err := kurjun.Get(config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token)
-	defer response.Body.Close()
 	log.Check(log.ErrorLevel, "Getting kurjun response", err)
+	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 

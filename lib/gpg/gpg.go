@@ -178,9 +178,9 @@ func getMngKey(c string) {
 		client = &http.Client{Transport: tr}
 	}
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
-	defer resp.Body.Close()
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
+	defer resp.Body.Close()
 	if body, err := ioutil.ReadAll(resp.Body); err == nil {
 		err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
 		log.Check(log.FatalLevel, "Writing Management public key", err)
@@ -217,8 +217,8 @@ func writeData(c, t, n, m string) {
 
 func sendData(c string) {
 	asc, err := os.Open(config.Agent.LxcPrefix + c + "/stdin.txt.asc")
-	defer asc.Close()
 	log.Check(log.FatalLevel, "Reading encrypted stdin.txt.asc", err)
+	defer asc.Close()
 
 	client := utils.TLSConfig()
 	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
@@ -287,8 +287,8 @@ func KurjunUserPK(owner string) []string {
 	log.Check(log.DebugLevel, "Checking Kurjun", err)
 
 	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
-	defer response.Body.Close()
 	log.Check(log.FatalLevel, "Getting owner public key", err)
+	defer response.Body.Close()
 
 	key, err := ioutil.ReadAll(response.Body)
 	log.Check(log.FatalLevel, "Reading key body", err)

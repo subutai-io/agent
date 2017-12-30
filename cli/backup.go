@@ -34,8 +34,8 @@ func BackupContainer(container string, full, stop bool) string {
 		log.Fatal("Backup of container " + container + " already running")
 	} else {
 		f, err := os.Create(config.Agent.LxcPrefix + container + "/.backup")
-		defer f.Close()
 		log.Check(log.WarnLevel, "Creating .backup file to "+container+" container", err)
+		defer f.Close()
 	}
 
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
@@ -135,11 +135,11 @@ func getContainerMountPoints(container string) []string {
 	configPath := config.Agent.LxcPrefix + container + "/config"
 
 	file, err := os.Open(configPath)
-	defer file.Close()
 	if err != nil {
 		log.Error("Cannot open Container Config " + configPath)
 	}
 	log.Check(log.FatalLevel, "Opening container config file", err)
+	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
