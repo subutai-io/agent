@@ -93,8 +93,8 @@ func mapList(protocol string) (list []string) {
 
 func mapRemove(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err)
 	defer bolt.Close()
+	log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err)
 	// Commenting this section out to insure config deletion even if db doesn't have it
 	// if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
 	// 	return

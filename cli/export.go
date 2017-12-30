@@ -113,11 +113,10 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 
 func upload(path, token string, private bool) ([]byte, error) {
 	file, err := os.Open(path)
+	defer file.Close()
 	if err != nil {
 		return nil, err
 	}
-
-	defer file.Close()
 
 	body := &bytes.Buffer{}
 
@@ -169,6 +168,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +178,5 @@ func upload(path, token string, private bool) ([]byte, error) {
 		return nil, fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
 	}
 
-	defer resp.Body.Close()
 	return ioutil.ReadAll(resp.Body)
 }

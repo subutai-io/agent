@@ -203,7 +203,7 @@ func DumpRestore(name string) error {
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !IsContainer(name) {
-		return output, errors.New("Container does not exists")
+		return output, errors.New("Container does not exist")
 	}
 
 	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)

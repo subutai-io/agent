@@ -97,10 +97,11 @@ func fingerprint() string {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
 	}
 	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
+	defer resp.Body.Close()
+
 	if log.Check(log.WarnLevel, "Getting Management host GPG fingerprint", err) {
 		return ""
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
 		key, err := ioutil.ReadAll(resp.Body)
@@ -134,10 +135,11 @@ func getKey() []byte {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
 	}
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
+	defer resp.Body.Close()
+
 	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
 		return nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
 		if key, err := ioutil.ReadAll(resp.Body); err == nil {
