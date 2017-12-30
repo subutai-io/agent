@@ -69,12 +69,14 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 	if err == nil && response.StatusCode == 404 && t.name == "management" {
 		log.Warn("Requested management version not found, getting latest available")
 		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + config.Template.Branch + "&token=" + token)
+		if err == nil {
+			defer response.Body.Close()
+		}
 	}
 	if log.Check(log.WarnLevel, "Getting kurjun response", err) || response.StatusCode != 200 {
 		return
 	}
 
-	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 
 	if err != nil || log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
