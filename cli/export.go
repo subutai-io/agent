@@ -172,12 +172,12 @@ func upload(path, token string, private bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		out, err := ioutil.ReadAll(resp.Body)
 		return nil, fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
 	}
 
-	defer resp.Body.Close()
 	return ioutil.ReadAll(resp.Body)
 }
