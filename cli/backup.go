@@ -34,8 +34,10 @@ func BackupContainer(container string, full, stop bool) string {
 		log.Fatal("Backup of container " + container + " already running")
 	} else {
 		f, err := os.Create(config.Agent.LxcPrefix + container + "/.backup")
+		if err == nil {
+			defer f.Close()
+		}
 		log.Check(log.WarnLevel, "Creating .backup file to "+container+" container", err)
-		defer f.Close()
 	}
 
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
