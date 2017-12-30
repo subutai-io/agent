@@ -80,8 +80,8 @@ func Migrate(name, stage, destination string) {
 
 func transfer(src, dst, path string) {
 	client, err := sshClient(dst)
-	log.Check(log.ErrorLevel, "Creating connection", err)
 	defer client.Close()
+	log.Check(log.ErrorLevel, "Creating connection", err)
 
 	session, err := client.NewSession()
 	log.Check(log.ErrorLevel, "Creating session", err)

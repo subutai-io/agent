@@ -95,10 +95,10 @@ func Receive(src, dst, delta string, parent bool) {
 // Send creates delta-file using BTRFS subvolume, it can depend on some parent.
 func Send(src, dst, delta string) error {
 	tmpDir, err := ioutil.TempDir(config.Agent.LxcPrefix+"tmpdir/", "export")
+	defer os.RemoveAll(tmpDir)
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
 
 	if path := strings.Split(dst, "/"); len(path) > 0 {
 		tmpVolume := tmpDir + "/" + path[len(path)-1]

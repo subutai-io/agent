@@ -75,10 +75,10 @@ func stat() string {
 
 func ramMax() (int, error) {
 	file, err := os.Open("/sys/fs/cgroup/memory/memory.stat")
+	defer file.Close()
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
 
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {

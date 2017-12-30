@@ -73,10 +73,10 @@ func InitInfluxdb() {
 
 func parsefile(hostname, lxc, cgtype, filename string) {
 	file, err := os.Open(filename)
+	defer file.Close()
 	if err != nil {
 		return
 	}
-	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		line := strings.Split(scanner.Text(), " ")
@@ -255,10 +255,10 @@ func cpuStat() {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	file, err := os.Open("/proc/stat")
+	defer file.Close()
 	if err != nil {
 		return
 	}
-	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		line := strings.Fields(scanner.Text())

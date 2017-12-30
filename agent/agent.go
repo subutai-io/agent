@@ -108,8 +108,9 @@ func Start() {
 
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
+	defer resp.Body.Close()
+
 	if err == nil {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -130,8 +131,9 @@ func connectionMonitor() {
 			connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		} else {
 			resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
+			defer resp.Body.Close()
+
 			if err == nil && resp.StatusCode == http.StatusOK {
-				log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
 				log.Debug("Connection monitor check - success")
 			} else {
 				log.Debug("Connection monitor check - failed")
@@ -276,6 +278,8 @@ func command() {
 	var rsp []executer.EncRequest
 
 	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/requests/" + fingerprint)
+	defer resp.Body.Close()
+
 	if log.Check(log.WarnLevel, "Getting requests", err) {
 		return
 	}
