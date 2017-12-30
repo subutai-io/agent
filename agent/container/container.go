@@ -58,10 +58,10 @@ func Credentials(name, container string) (uid int, gid int) {
 
 func parsePasswd(path, name string) (uid string, gid string) {
 	file, err := os.Open(path)
-	defer file.Close()
 	if err != nil {
 		return "", ""
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
 
@@ -81,8 +81,8 @@ func Active(details bool) []Container {
 	contArr := []Container{}
 
 	bolt, err := db.New()
-	defer bolt.Close()
 	log.Check(log.WarnLevel, "Opening database", err)
+	defer bolt.Close()
 
 	for _, c := range cont.Containers() {
 		hostname, err := ioutil.ReadFile(config.Agent.LxcPrefix + c + "/rootfs/etc/hostname")

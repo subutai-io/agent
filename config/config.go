@@ -186,10 +186,10 @@ func SaveDefaultConfig(conf string) error {
 	}
 
 	f, err := os.Create(conf)
-	defer f.Close()
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	w := bufio.NewWriter(f)
 
 	c := reflect.ValueOf(&config).Elem()
