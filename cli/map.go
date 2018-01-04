@@ -226,6 +226,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + strings.Replace(sockExt, ":", "-", -1) + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
+	defer log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	log.Check(log.ErrorLevel, "Openning portmap database to check if port is mapped", err)
 	if !bolt.PortInMap(protocol, sockExt, domain, "") {
 		log.Error("Port is not mapped")
@@ -261,7 +262,6 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 		return
 	}
 	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, sockExt, domain, policy))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
