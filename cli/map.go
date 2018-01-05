@@ -226,7 +226,8 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + strings.Replace(sockExt, ":", "-", -1) + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning portmap database to check if port is mapped", err)
+	log.Check(log.ErrorLevel, "Opening portmap database to check if port is mapped", err)
+	defer bolt.Close()
 	if !bolt.PortInMap(protocol, sockExt, domain, "") {
 		log.Error("Port is not mapped")
 	}
@@ -261,7 +262,6 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 		return
 	}
 	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, sockExt, domain, policy))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
@@ -290,7 +290,7 @@ func saveMapToDB(protocol, sockExt, domain, sockInt string) {
 
 func containerMapToDB(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Openning database to add portmap to container", err)
+	log.Check(log.ErrorLevel, "Opening database to add portmap to container", err)
 	for _, name := range bolt.ContainerByKey("ip", strings.Split(sockInt, ":")[0]) {
 		bolt.ContainerMapping(name, protocol, sockExt, domain, sockInt)
 	}
