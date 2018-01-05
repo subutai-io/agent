@@ -118,7 +118,7 @@ func Start(name string) error {
 	if c.State().String() != "RUNNING" {
 		return errors.New("Unable to start container " + name)
 	}
-	AddMetadata(name, map[string]string{"state": State(name)})
+	AddMetadata(name, map[string]string{"state": "RUNNING"})
 	return nil
 }
 
