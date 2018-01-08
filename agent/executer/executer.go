@@ -234,20 +234,24 @@ func genericResponse(req RequestOptions) ResponseOptions {
 // AttachContainer executes request inside Container host
 // and sends output as response.
 func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptions) error {
+	defer close(outCh)
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err != nil {
 		return err
 	}
+	defer lxc.Release(c)
 
 	rop, wop, err := os.Pipe()
 	if err != nil {
 		return err
 	}
+	defer rop.Close()
+
 	rep, wep, err := os.Pipe()
 	if err != nil {
 		return err
 	}
-	defer rop.Close()
 	defer rep.Close()
 
 	opts := lxc.DefaultAttachOptions
@@ -296,8 +300,8 @@ func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 		}
 		response.ExitCode = strconv.Itoa(exitCode / 256)
 	}
+
 	outCh <- response
-	lxc.Release(c)
-	close(outCh)
+
 	return nil
 }

@@ -50,12 +50,16 @@ func queryInfluxDB(clnt client.Client, cmd string) (res []client.Result, err err
 //	last week is in 5 minute intervals,
 // After 7 days all statistics is are overwritten by new incoming data.
 func HostMetrics(host, start, end string) {
-	c, _ := client.NewHTTPClient(client.HTTPConfig{
+	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		InsecureSkipVerify: true,
 	})
+	if err == nil {
+		defer c.Close()
+	}
+
 	hostname, _ := os.Hostname()
 	if host != hostname {
 		tableCPU = "lxc_cpu"
@@ -80,24 +84,24 @@ func HostMetrics(host, start, end string) {
 	fmt.Print("{\"Metrics\":")
 	res, _ := queryInfluxDB(c, `
 			SELECT non_negative_derivative(mean(value),1s) as value
-			FROM `+timeRange+`.`+tableCPU+`
-			WHERE hostname = '`+host+`' AND time > '`+start+`' AND time < '`+end+`'
-			GROUP BY time(`+timeGroup+`), type fill(none);
+			FROM `+ timeRange+ `.`+ tableCPU+ `
+			WHERE hostname = '`+ host+ `' AND time > '`+ start+ `' AND time < '`+ end+ `'
+			GROUP BY time(`+ timeGroup+ `), type fill(none);
 
 			SELECT non_negative_derivative(mean(value),1s) as value
-			FROM `+timeRange+`.`+tableNet+`
-			WHERE hostname = '`+host+`' AND time > '`+start+`' AND time < '`+end+`'
-			GROUP BY time(`+timeGroup+`), iface, type fill(none);
+			FROM `+ timeRange+ `.`+ tableNet+ `
+			WHERE hostname = '`+ host+ `' AND time > '`+ start+ `' AND time < '`+ end+ `'
+			GROUP BY time(`+ timeGroup+ `), iface, type fill(none);
 
 			SELECT mean(value) as value
-			FROM `+timeRange+`.`+tableMem+`
-			WHERE hostname = '`+host+`' AND time > '`+start+`' AND time < '`+end+`'
-			GROUP BY time(`+timeGroup+`), type fill(none);
+			FROM `+ timeRange+ `.`+ tableMem+ `
+			WHERE hostname = '`+ host+ `' AND time > '`+ start+ `' AND time < '`+ end+ `'
+			GROUP BY time(`+ timeGroup+ `), type fill(none);
 
 			SELECT mean(value) as value
-			FROM `+timeRange+`.`+tableDisk+`
-			WHERE hostname = '`+host+`' AND time > '`+start+`' AND time < '`+end+`'
-			GROUP BY time(`+timeGroup+`), mount, type fill(none);
+			FROM `+ timeRange+ `.`+ tableDisk+ `
+			WHERE hostname = '`+ host+ `' AND time > '`+ start+ `' AND time < '`+ end+ `'
+			GROUP BY time(`+ timeGroup+ `), mount, type fill(none);
 		`)
 	out, _ := json.Marshal(res)
 	fmt.Print(string(out))
