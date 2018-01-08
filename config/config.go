@@ -27,6 +27,7 @@ type agentConfig struct {
 	LxcPrefix   string
 	DataPrefix  string
 	GpgPassword string
+	GpgHome     string
 }
 type managementConfig struct {
 	Host          string
@@ -67,6 +68,7 @@ const defaultConfig = `
 	[agent]
 	gpgUser =
 	gpgPassword = 12345678
+	gpgHome =
 	debug = true
 	appPrefix = /apps/subutai/current/
 	dataPrefix = /var/lib/apps/subutai/current/
@@ -133,6 +135,10 @@ func init() {
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
+	}
+
+	if config.Agent.GpgHome == "" {
+		config.Agent.GpgHome = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/.gnupg"
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb
