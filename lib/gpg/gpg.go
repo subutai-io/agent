@@ -157,6 +157,7 @@ func GetFingerprint(email string) string {
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
 		out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))

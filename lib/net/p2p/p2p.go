@@ -96,7 +96,7 @@ func Interfaces() (list []net.Interface, err error) {
 		return nil, err
 	}
 
-	out, err := exec.Command("p2p", "show", "-interfaces", "-all").Output()
+	out, err := exec.Command("p2p", "show", "-interfaces").Output()
 	if err != nil {
 		return nil, err
 	}
