@@ -70,20 +70,23 @@ type ResponseOptions struct {
 // ExecHost executes request inside Resource host
 // and sends output as response.
 func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
+	defer close(outCh)
+
 	cmd := buildCmd(&req)
+
 	if cmd == nil {
-		close(outCh)
 		return
 	}
 	rop, wop, err := os.Pipe()
 	if err != nil {
 		return
 	}
+	defer rop.Close()
+
 	rep, wep, err := os.Pipe()
 	if err != nil {
 		return
 	}
-	defer rop.Close()
 	defer rep.Close()
 
 	cmd.Stdout = wop
@@ -93,7 +96,9 @@ func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
 		cmd.SysProcAttr.Setpgid = true
 		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: 0, Gid: 0}
 	}
+
 	err = cmd.Start()
+
 	log.Check(log.WarnLevel, "Executing command: "+req.CommandID+" "+req.Command+" "+strings.Join(req.Args, " "), err)
 
 	log.Check(log.DebugLevel, "Closing standard output", wop.Close())
@@ -113,6 +118,7 @@ func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
 	}()
 
 	done := make(chan error)
+
 	go func() { done <- cmd.Wait() }()
 	select {
 	case <-done:
@@ -140,7 +146,6 @@ func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
 			outCh <- response
 		}
 	}
-	close(outCh)
 }
 
 func outputReader(read *os.File, ch chan<- string) {
@@ -228,20 +233,24 @@ func genericResponse(req RequestOptions) ResponseOptions {
 // AttachContainer executes request inside Container host
 // and sends output as response.
 func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptions) error {
+	defer close(outCh)
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err != nil {
 		return err
 	}
+	defer lxc.Release(c)
 
 	rop, wop, err := os.Pipe()
 	if err != nil {
 		return err
 	}
+	defer rop.Close()
+
 	rep, wep, err := os.Pipe()
 	if err != nil {
 		return err
 	}
-	defer rop.Close()
 	defer rep.Close()
 
 	opts := lxc.DefaultAttachOptions
@@ -290,8 +299,8 @@ func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 		}
 		response.ExitCode = strconv.Itoa(exitCode / 256)
 	}
+
 	outCh <- response
-	lxc.Release(c)
-	close(outCh)
+
 	return nil
 }

@@ -167,7 +167,7 @@ func CheckKurjun() (*http.Client, error) {
 	// Cdn.Kurjun = "https://" + Management.Host + ":8339/rest/kurjun"
 	// } else {
 	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(2)*time.Second)
-	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(2)*time.Second) {
+	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {
 		log.Info("CDN unreachable, retrying")
 		time.Sleep(3 * time.Second)
 		c++
