@@ -96,9 +96,9 @@ func LxcDestroy(id string, vlan bool) {
 
 func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
+	ProxyDel(id, "", true)
 	p2p.RemoveByIface("p2p" + id)
 	cleanupNetStat(id)
-	ProxyDel(id, "", true)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN

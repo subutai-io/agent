@@ -118,7 +118,6 @@ func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
 	}()
 
 	done := make(chan error)
-	defer close(done)
 
 	go func() { done <- cmd.Wait() }()
 	select {
