@@ -48,6 +48,7 @@ func RemoveByIface(name string) {
 		}
 	}
 	log.Check(log.WarnLevel, "Removing p2p interface from registered list", exec.Command("p2p", "stop", "--dev", name).Run())
+	log.Check(log.WarnLevel, "Removing p2p interface from system", exec.Command("ip", "link", "delete", name).Run())
 	log.Check(log.WarnLevel, "Disabling p2p link", exec.Command("ifconfig", name, "down").Run())
 	iptablesCleanUp(name)
 }
