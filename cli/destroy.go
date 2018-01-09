@@ -96,19 +96,22 @@ func LxcDestroy(id string, vlan bool) {
 
 func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
+	ProxyDel(id, "", true)
 	p2p.RemoveByIface("p2p" + id)
 	cleanupNetStat(id)
-	ProxyDel(id, "", true)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
 func cleanupNetStat(vlan string) {
-	c, _ := client.NewHTTPClient(client.HTTPConfig{
+	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		InsecureSkipVerify: true,
 	})
+	if err == nil {
+		defer c.Close()
+	}
 	queryInfluxDB(c, `drop series from host_net where iface = 'p2p`+vlan+`'`)
 	queryInfluxDB(c, `drop series from host_net where iface = 'gw-`+vlan+`'`)
 }
