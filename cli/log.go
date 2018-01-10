@@ -9,20 +9,14 @@ import (
 
 	"strings"
 
-	"github.com/influxdata/influxdb/client/v2"
-	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var syslogLevels = []string{"emerg", "alert", "crit", "err", "warn", "notice", "info", "debug"}
 
 // Log prints log information from database server.
 func Log(app, level, start, end string) {
-	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
+	c, err := utils.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
 	}

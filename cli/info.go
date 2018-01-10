@@ -22,6 +22,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 
 type hostStat struct {
 	Host string `json:"host"`
-	CPU  struct {
+	CPU struct {
 		Model     string      `json:"model"`
 		CoreCount int         `json:"coreCount"`
 		Idle      interface{} `json:"idle"`
@@ -50,7 +51,7 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk      struct {
+	Disk struct {
 		Home   int `json:"home"`
 		Opt    int `json:"opt"`
 		Rootfs int `json:"rootfs"`
@@ -61,13 +62,7 @@ type quotaUsage struct {
 
 func initdb() {
 	var err error
-	clnt, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		Timeout:            time.Second * 10,
-		InsecureSkipVerify: true,
-	})
+	clnt, err = utils.InfluxDbClient()
 	log.Check(log.FatalLevel, "Initialize db connection", err)
 	return
 }

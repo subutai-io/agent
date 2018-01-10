@@ -17,6 +17,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var (
@@ -62,12 +63,7 @@ func InitInfluxdb() {
 	if dbclient != nil {
 		dbclient.Close()
 	}
-	dbclient, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
+	dbclient, err = utils.InfluxDbClient()
 	log.Check(log.DebugLevel, "Creating InfluxDB client", err)
 }
 
