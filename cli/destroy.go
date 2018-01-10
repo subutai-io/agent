@@ -3,9 +3,6 @@ package cli
 import (
 	"strings"
 
-	"github.com/influxdata/influxdb/client/v2"
-
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
