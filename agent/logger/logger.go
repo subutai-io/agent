@@ -7,21 +7,18 @@ import (
 	"strings"
 	"time"
 
-	client "github.com/influxdata/influxdb/client/v2"
-	syslog "gopkg.in/mcuadros/go-syslog.v2"
+	"github.com/influxdata/influxdb/client/v2"
+	"gopkg.in/mcuadros/go-syslog.v2"
 
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var c client.Client
 
 func initDB() {
-	c, _ = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
+	c, _ = utils.InfluxDbClient()
+
 	c.Query(client.Query{Command: `CREATE DATABASE logs;
 		CREATE RETENTION POLICY "debug"  ON logs DURATION 24h  REPLICATION 1;
 		CREATE RETENTION POLICY "info"   ON logs DURATION 48h  REPLICATION 1;

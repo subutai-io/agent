@@ -13,6 +13,7 @@ import (
 	"github.com/subutai-io/agent/lib/net/p2p"
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -103,12 +104,7 @@ func cleanupNet(id string) {
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
 func cleanupNetStat(vlan string) {
-	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
+	c, err := utils.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
 	}
