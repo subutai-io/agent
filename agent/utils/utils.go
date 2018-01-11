@@ -42,6 +42,12 @@ func InfluxDbClient() (clnt client.Client, err error) {
 	return
 }
 
+func ResetInfluxDbClient(){
+	influxDbClient.Close()
+	influxDbClient = nil
+	InfluxDbClient()
+}
+
 func createInfluxDbClient() (client.Client, error) {
 
 	return client.NewHTTPClient(client.HTTPConfig{

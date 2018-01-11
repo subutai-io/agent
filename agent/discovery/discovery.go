@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/fromkeith/gossdp"
-	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 type handler struct {
@@ -126,7 +126,7 @@ func save(ip string) {
 
 	config.Influxdb.Server = ip
 	if config.Management.Host != ip {
-		monitor.InitInfluxdb()
+		utils.ResetInfluxDbClient()
 	}
 	config.Management.Host = ip
 }
