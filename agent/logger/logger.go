@@ -35,6 +35,8 @@ func initDB() bool {
 		CREATE RETENTION POLICY "emerg"  ON logs DURATION 192h REPLICATION 1;
 		`, Database: "logs"})
 
+		log.Check(log.WarnLevel, "Initializing log db", err)
+
 	}
 
 	return err == nil
