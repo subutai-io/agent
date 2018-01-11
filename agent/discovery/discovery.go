@@ -18,6 +18,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 type handler struct {
@@ -124,9 +125,9 @@ func save(ip string) {
 	base.Close()
 
 	config.Influxdb.Server = ip
-	//if config.Management.Host != ip {
-	//utils.ResetInfluxDbClient()
-	//}
+	if config.Management.Host != ip {
+		utils.ResetInfluxDbClient()
+	}
 	config.Management.Host = ip
 }
 
