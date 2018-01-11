@@ -7,22 +7,24 @@ import (
 	"strings"
 	"time"
 
-	client "github.com/influxdata/influxdb/client/v2"
-	syslog "gopkg.in/mcuadros/go-syslog.v2"
+	"github.com/influxdata/influxdb/client/v2"
+	"gopkg.in/mcuadros/go-syslog.v2"
 
-	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/log"
 )
 
-var c client.Client
+func initDB() bool {
 
-func initDB() {
-	c, _ = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
-	c.Query(client.Query{Command: `CREATE DATABASE logs;
+	influx, err := utils.InfluxDbClient()
+
+	log.Check(log.WarnLevel, "Initializing logger", err)
+
+	if err == nil {
+
+		defer influx.Close()
+
+		_, err = influx.Query(client.Query{Command: `CREATE DATABASE logs;
 		CREATE RETENTION POLICY "debug"  ON logs DURATION 24h  REPLICATION 1;
 		CREATE RETENTION POLICY "info"   ON logs DURATION 48h  REPLICATION 1;
 		CREATE RETENTION POLICY "notice" ON logs DURATION 72h  REPLICATION 1;
@@ -32,17 +34,21 @@ func initDB() {
 		CREATE RETENTION POLICY "alert"  ON logs DURATION 168h REPLICATION 1;
 		CREATE RETENTION POLICY "emerg"  ON logs DURATION 192h REPLICATION 1;
 		`, Database: "logs"})
+
+		log.Check(log.WarnLevel, "Initializing log db", err)
+
+	}
+
+	return err == nil
+
 }
 
 // SyslogServer starts syslog server and parse data for sending it to InfluxDB.
 func SyslogServer() {
 	go func() {
-		var err error
-		initDB()
-		for dbHost := config.Influxdb.Server; ; _, _, err = c.Ping(time.Second * 3) {
-			if dbHost != config.Influxdb.Server || err != nil {
-				initDB()
-				dbHost = config.Influxdb.Server
+		for {
+			if initDB() {
+				return
 			}
 			time.Sleep(time.Second * 10)
 		}
@@ -75,14 +81,23 @@ func SyslogServer() {
 }
 
 func writeLog(hostname, app, severity, pid, message string) {
+
 	if bp, err := client.NewBatchPoints(client.BatchPointsConfig{Database: "logs", RetentionPolicy: resolveSeverity(severity)}); err == nil {
+
 		point, _ := client.NewPoint("syslog",
 			map[string]string{"hostname": hostname, "severity": resolveSeverity(severity), "app": app, "pid": pid},
 			map[string]interface{}{"message": message},
 			time.Now())
+
 		bp.AddPoint(point)
-		if c == nil || c.Write(bp) != nil {
-			initDB()
+
+		client, err := utils.InfluxDbClient()
+
+		if err == nil {
+
+			defer client.Close()
+
+			client.Write(bp)
 		}
 	}
 }
