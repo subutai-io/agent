@@ -22,15 +22,12 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-)
-
-var (
-	clnt client.Client
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 type hostStat struct {
 	Host string `json:"host"`
-	CPU  struct {
+	CPU struct {
 		Model     string      `json:"model"`
 		CoreCount int         `json:"coreCount"`
 		Idle      interface{} `json:"idle"`
@@ -50,7 +47,7 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk      struct {
+	Disk struct {
 		Home   int `json:"home"`
 		Opt    int `json:"opt"`
 		Rootfs int `json:"rootfs"`
@@ -59,20 +56,16 @@ type quotaUsage struct {
 	RAM int `json:"ram"`
 }
 
-func initdb() {
-	var err error
-	clnt, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		Timeout:            time.Second * 10,
-		InsecureSkipVerify: true,
-	})
-	log.Check(log.FatalLevel, "Initialize db connection", err)
-	return
-}
-
 func queryDB(cmd string) (res []client.Result, err error) {
+
+	clnt, err := utils.InfluxDbClient()
+
+	if err == nil {
+		defer clnt.Close()
+	} else {
+		return nil, err
+	}
+
 	q := client.Query{
 		Command:  cmd,
 		Database: config.Influxdb.Db,
@@ -311,8 +304,6 @@ func Info(command, host, interval string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	}
-
-	initdb()
 
 	switch command {
 	case "quota":
