@@ -20,6 +20,10 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 )
 
+var (
+	influxDbClient client.Client
+)
+
 // Iface describes network interfaces of the Resource Host.
 type Iface struct {
 	InterfaceName string `json:"interfaceName"`
@@ -27,8 +31,24 @@ type Iface struct {
 }
 
 // ---> InfluxDB
+func InfluxDbClient() (clnt client.Client, err error) {
 
-func InfluxDbClient() (client.Client, error) {
+	if influxDbClient == nil {
+		influxDbClient, err = createInfluxDbClient()
+	}
+
+	clnt = influxDbClient
+
+	return
+}
+
+func ResetInfluxDbClient(){
+	influxDbClient.Close()
+	influxDbClient = nil
+	InfluxDbClient()
+}
+
+func createInfluxDbClient() (client.Client, error) {
 
 	return client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + config.Influxdb.Server + ":8086",
@@ -39,7 +59,6 @@ func InfluxDbClient() (client.Client, error) {
 	})
 
 }
-
 // <--- InfluxDb
 
 // PublicCert returns Public SSL certificate for Resource Host

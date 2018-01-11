@@ -60,6 +60,10 @@ func Collect() {
 					diskFree(bp)
 					cpuStat(bp)
 					memStat(bp)
+
+					err = influx.Write(bp)
+
+					log.Check(log.WarnLevel, "Writing metrics batch", err)
 				}
 			}
 		}
