@@ -25,10 +25,6 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 )
 
-var (
-	clnt client.Client
-)
-
 type hostStat struct {
 	Host string `json:"host"`
 	CPU struct {
@@ -60,14 +56,16 @@ type quotaUsage struct {
 	RAM int `json:"ram"`
 }
 
-func initdb() {
-	var err error
-	clnt, err = utils.InfluxDbClient()
-	log.Check(log.FatalLevel, "Initialize db connection", err)
-	return
-}
-
 func queryDB(cmd string) (res []client.Result, err error) {
+
+	clnt, err := utils.InfluxDbClient()
+
+	if err == nil {
+		defer clnt.Close()
+	} else {
+		return nil, err
+	}
+
 	q := client.Query{
 		Command:  cmd,
 		Database: config.Influxdb.Db,
@@ -306,8 +304,6 @@ func Info(command, host, interval string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	}
-
-	initdb()
 
 	switch command {
 	case "quota":
