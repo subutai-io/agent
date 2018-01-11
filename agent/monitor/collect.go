@@ -36,17 +36,24 @@ func Collect() {
 	for {
 		influx, err := utils.InfluxDbClient()
 
+		log.Check(log.WarnLevel, "Entering metrics collection routine", err)
+
 		if err == nil {
 
 			defer influx.Close()
 
 			_, _, err := influx.Ping(time.Second)
 
+			log.Check(log.WarnLevel, "Pinging InfluxDB server", err)
+
 			if err == nil {
 
 				bp, err := client.NewBatchPoints(client.BatchPointsConfig{Database: config.Influxdb.Db, RetentionPolicy: "hour"})
 
+				log.Check(log.WarnLevel, "Preparing metrics batch", err)
+
 				if err == nil {
+
 					netStat(bp)
 					cgroupStat(bp)
 					btrfsStat(bp)
