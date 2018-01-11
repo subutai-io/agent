@@ -29,45 +29,39 @@ var (
 	memory    = map[string]bool{"Active": true, "Buffers": true, "Cached": true, "MemFree": true}
 )
 
-var (
-	dbclient client.Client
-	bp       client.BatchPoints
-)
-
 // Collect collecting performance statistic from Resource Host and Subutai Containers.
 // It sends this information to InfluxDB server using credentials from configuration file.
 func Collect() {
-	InitInfluxdb()
+
 	for {
-		_, _, err := dbclient.Ping(time.Second)
+		influx, err := utils.InfluxDbClient()
+
 		if err == nil {
-			bp, err = client.NewBatchPoints(client.BatchPointsConfig{Database: config.Influxdb.Db, RetentionPolicy: "hour"})
+
+			defer influx.Close()
+
+			_, _, err := influx.Ping(time.Second)
+
 			if err == nil {
-				netStat()
-				cgroupStat()
-				btrfsStat()
-				diskFree()
-				cpuStat()
-				memStat()
+
+				bp, err := client.NewBatchPoints(client.BatchPointsConfig{Database: config.Influxdb.Db, RetentionPolicy: "hour"})
+
+				if err == nil {
+					netStat(bp)
+					cgroupStat(bp)
+					btrfsStat(bp)
+					diskFree(bp)
+					cpuStat(bp)
+					memStat(bp)
+				}
 			}
 		}
-		if err != nil || dbclient.Write(bp) != nil {
-			InitInfluxdb()
-		}
+
 		time.Sleep(time.Second * 30)
 	}
 }
 
-func InitInfluxdb() {
-	var err error
-	if dbclient != nil {
-		dbclient.Close()
-	}
-	dbclient, err = utils.InfluxDbClient()
-	log.Check(log.DebugLevel, "Creating InfluxDB client", err)
-}
-
-func parsefile(hostname, lxc, cgtype, filename string) {
+func parsefile(bp client.BatchPoints, hostname, lxc, cgtype, filename string) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return
@@ -100,7 +94,7 @@ func parsefile(hostname, lxc, cgtype, filename string) {
 
 }
 
-func cgroupStat() {
+func cgroupStat(bp client.BatchPoints) {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	for _, item := range cgtype {
@@ -109,14 +103,14 @@ func cgroupStat() {
 		if err == nil {
 			for _, f := range files {
 				if f.IsDir() {
-					parsefile(hostname, f.Name(), item, path+f.Name()+"/"+item+".stat")
+					parsefile(bp, hostname, f.Name(), item, path+f.Name()+"/"+item+".stat")
 				}
 			}
 		}
 	}
 }
 
-func netStat() {
+func netStat(bp client.BatchPoints) {
 	lxcnic := make(map[string]string)
 	files, err := ioutil.ReadDir(config.Agent.LxcPrefix)
 	if err == nil {
@@ -161,7 +155,7 @@ func netStat() {
 	}
 }
 
-func btrfsStat() {
+func btrfsStat(bp client.BatchPoints) {
 	list := make(map[string]string)
 	out, err := exec.Command("btrfs", "subvolume", "list", config.Agent.LxcPrefix).Output()
 	if log.Check(log.DebugLevel, "Getting BTRFS stats", err) {
@@ -200,7 +194,7 @@ func btrfsStat() {
 	}
 }
 
-func diskFree() {
+func diskFree(bp client.BatchPoints) {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	out, err := exec.Command("df", "-B1").Output()
@@ -226,7 +220,7 @@ func diskFree() {
 	}
 }
 
-func memStat() {
+func memStat(bp client.BatchPoints) {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	if file, err := os.Open("/proc/meminfo"); err == nil {
@@ -247,7 +241,7 @@ func memStat() {
 	}
 }
 
-func cpuStat() {
+func cpuStat(bp client.BatchPoints) {
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	file, err := os.Open("/proc/stat")
