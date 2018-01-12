@@ -411,6 +411,7 @@ func SetContainerConf(container string, conf [][]string) error {
 	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
 		return err
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		newline := scanner.Text() + "\n"
@@ -426,7 +427,6 @@ func SetContainerConf(container string, conf [][]string) error {
 		}
 		newconf = newconf + newline
 	}
-	log.Check(log.DebugLevel, "Closing container configuration file", file.Close())
 
 	for i := range conf {
 		if conf[i][1] != "" {

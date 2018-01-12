@@ -98,7 +98,7 @@ func fingerprint() string {
 	}
 	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
-		defer resp.Body.Close()
+		defer utils.Close(resp)
 	}
 
 	if log.Check(log.WarnLevel, "Getting Management host GPG fingerprint", err) {
@@ -139,7 +139,7 @@ func getKey() []byte {
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {
-		defer resp.Body.Close()
+		defer utils.Close(resp)
 	}
 
 	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
