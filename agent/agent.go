@@ -109,7 +109,7 @@ func Start() {
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
 	if err == nil {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -131,7 +131,7 @@ func connectionMonitor() {
 		} else {
 			resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
 			if err == nil {
-				defer resp.Body.Close()
+				defer utils.Close(resp)
 			}
 			if err == nil && resp.StatusCode == http.StatusOK {
 				log.Debug("Connection monitor check - success")
@@ -184,7 +184,7 @@ func sendHeartbeat() bool {
 
 		resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
-			log.Check(log.DebugLevel, "Closing Management server response: "+resp.Status, resp.Body.Close())
+			defer utils.Close(resp)
 
 			if resp.StatusCode == http.StatusAccepted {
 				return true
@@ -264,7 +264,7 @@ func execute(rsp executer.EncRequest) {
 func sendResponse(msg []byte) {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
 			return
 		}
@@ -280,7 +280,7 @@ func command() {
 	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/requests/" + fingerprint)
 
 	if err == nil {
-		defer resp.Body.Close()
+		defer utils.Close(resp)
 	}
 
 	if log.Check(log.WarnLevel, "Getting requests", err) {

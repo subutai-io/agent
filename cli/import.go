@@ -21,6 +21,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var (
@@ -64,13 +65,13 @@ func templateID(t *templ, kurjun *http.Client, token string) {
 
 	response, err := kurjun.Get(url)
 	log.Check(log.ErrorLevel, "Retrieving id, get: "+url, err)
-	defer response.Body.Close()
+	defer utils.Close(response)
 
 	if err == nil && response.StatusCode == 404 && t.name == "management" {
 		log.Warn("Requested management version not found, getting latest available")
 		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + config.Template.Branch + "&token=" + token)
 		if err == nil {
-			defer response.Body.Close()
+			defer utils.Close(response)
 		}
 	}
 	if log.Check(log.WarnLevel, "Getting kurjun response", err) || response.StatusCode != 200 {
@@ -152,7 +153,8 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 	response, err := kurjun.Get(url)
 	log.Check(log.FatalLevel, "Getting "+url, err)
 
-	defer response.Body.Close()
+	defer utils.Close(response)
+
 	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
 	if response.ContentLength <= 0 {
 		bar.NotPrint = true
@@ -171,7 +173,7 @@ func download(t templ, kurjun *http.Client, token string, torrent bool) bool {
 		defer out.Close()
 		response, err = kurjun.Get(url)
 		log.Check(log.FatalLevel, "Getting "+url, err)
-		defer response.Body.Close()
+		defer utils.Close(response)
 		bar = pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
 		bar.Start()
 		rd = bar.NewProxyReader(response.Body)
@@ -202,7 +204,7 @@ func idToName(id string, kurjun *http.Client, token string) string {
 	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
 	response, err := kurjun.Get(config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token)
 	log.Check(log.ErrorLevel, "Getting kurjun response", err)
-	defer response.Body.Close()
+	defer utils.Close(response)
 
 	body, err := ioutil.ReadAll(response.Body)
 

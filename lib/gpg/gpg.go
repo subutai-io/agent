@@ -181,7 +181,8 @@ func getMngKey(c string) {
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
-	defer resp.Body.Close()
+	defer utils.Close(resp)
+
 	if body, err := ioutil.ReadAll(resp.Body); err == nil {
 		err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
 		log.Check(log.FatalLevel, "Writing Management public key", err)
@@ -226,7 +227,7 @@ func sendData(c string) {
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
 	log.Check(log.FatalLevel, "Sending registration request to management", err)
-
+	defer utils.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)
 	}
@@ -289,7 +290,7 @@ func KurjunUserPK(owner string) []string {
 
 	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
-	defer response.Body.Close()
+	defer utils.Close(response)
 
 	key, err := ioutil.ReadAll(response.Body)
 	log.Check(log.FatalLevel, "Reading key body", err)

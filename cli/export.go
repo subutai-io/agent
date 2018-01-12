@@ -16,6 +16,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 var (
@@ -172,7 +173,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer utils.Close(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		out, err := ioutil.ReadAll(resp.Body)
