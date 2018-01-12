@@ -18,6 +18,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 	"github.com/influxdata/influxdb/client/v2"
+	"io"
 )
 
 var (
@@ -42,10 +43,11 @@ func InfluxDbClient() (clnt client.Client, err error) {
 	return
 }
 
-func ResetInfluxDbClient(){
-	influxDbClient.Close()
-	influxDbClient = nil
-	InfluxDbClient()
+func ResetInfluxDbClient() {
+	if influxDbClient != nil {
+		influxDbClient.Close()
+		influxDbClient = nil
+	}
 }
 
 func createInfluxDbClient() (client.Client, error) {
@@ -59,7 +61,15 @@ func createInfluxDbClient() (client.Client, error) {
 	})
 
 }
+
 // <--- InfluxDb
+
+func Close(resp *http.Response) {
+	if resp.Body != nil {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}
+}
 
 // PublicCert returns Public SSL certificate for Resource Host
 func PublicCert() string {

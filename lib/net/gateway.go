@@ -31,15 +31,15 @@ func RestoreDefaultConf(contName string) {
 
 		openFile, err := os.Open(filePath + file)
 		log.Check(log.PanicLevel, "Opening "+file+" file", err)
+		defer openFile.Close()
 
 		fileBck, err := os.Create(filePath + file + ".BACKUP")
 		log.Check(log.PanicLevel, "Creating "+file+" backup file", err)
+		defer fileBck.Close()
 
 		_, err = io.Copy(fileBck, openFile)
 		log.Check(log.FatalLevel, "Copying "+file+" backup", err)
 
-		defer openFile.Close()
-		defer fileBck.Close()
 
 		val := "domain\tintra.lan\nsearch\tintra.lan\nnameserver\t10.10.10.1"
 		if file == "hosts" {

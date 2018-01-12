@@ -178,7 +178,7 @@ func cpuQuotaUsage(h string) int {
 func read(path string) (i int) {
 	f, err := os.Open(path)
 	log.Check(log.FatalLevel, "Reading "+path, err)
-
+	defer f.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(f))
 	for scanner.Scan() {
 		i, err = strconv.Atoi(scanner.Text())
