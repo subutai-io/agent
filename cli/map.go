@@ -17,6 +17,11 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"sync"
+)
+
+var (
+	mux sync.Mutex
 )
 
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
@@ -51,24 +56,30 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]:
 		log.Error("Reserved system ports")
 	case len(sockInt) != 0:
-		// check sockExt port and create nginx config
-		if portIsNew(protocol, sockInt, domain, &sockExt) {
-			newConfig(protocol, sockExt, domain, cert, sslbcknd)
-		}
 
-		// add containers to backend
-		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
-			"#Add new host here", "	server "+sockInt+";", false)
+		mux.Lock()
+		defer mux.Unlock()
+		//synced block
+		{
+			// check sockExt port and create nginx config
+			if portIsNew(protocol, sockInt, domain, &sockExt) {
+				newConfig(protocol, sockExt, domain, cert, sslbcknd)
+			}
 
-		// save information to database
-		saveMapToDB(protocol, sockExt, domain, sockInt)
-		containerMapToDB(protocol, sockExt, domain, sockInt)
-		balanceMethod(protocol, sockExt, domain, policy)
+			// add containers to backend
+			addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+				"#Add new host here", "	server "+sockInt+";", false)
 
-		if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
-			log.Info(ovs.GetIp() + ":" + socket[1])
-		} else {
-			log.Info(sockExt)
+			// save information to database
+			saveMapToDB(protocol, sockExt, domain, sockInt)
+			containerMapToDB(protocol, sockExt, domain, sockInt)
+			balanceMethod(protocol, sockExt, domain, policy)
+
+			if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
+				log.Info(ovs.GetIp() + ":" + socket[1])
+			} else {
+				log.Info(sockExt)
+			}
 		}
 	case len(policy) != 0:
 		balanceMethod(protocol, sockExt, domain, policy)
@@ -162,7 +173,7 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 		if !bolt.PortInMap(protocol, (*sockExt), "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
 		} else if bolt.PortInMap(protocol, (*sockExt), domain, sockInt) {
-			log.Error("Map is already exists")
+			log.Error("Mapping already exists")
 		}
 		return !bolt.PortInMap(protocol, (*sockExt), domain, "")
 	}
