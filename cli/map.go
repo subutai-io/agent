@@ -56,30 +56,24 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]:
 		log.Error("Reserved system ports")
 	case len(sockInt) != 0:
+		// check sockExt port and create nginx config
+		if portIsNew(protocol, sockInt, domain, &sockExt) {
+			newConfig(protocol, sockExt, domain, cert, sslbcknd)
+		}
 
-		mux.Lock()
-		defer mux.Unlock()
-		//synced block
-		{
-			// check sockExt port and create nginx config
-			if portIsNew(protocol, sockInt, domain, &sockExt) {
-				newConfig(protocol, sockExt, domain, cert, sslbcknd)
-			}
+		// add containers to backend
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+			"#Add new host here", "	server "+sockInt+";", false)
 
-			// add containers to backend
-			addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
-				"#Add new host here", "	server "+sockInt+";", false)
+		// save information to database
+		saveMapToDB(protocol, sockExt, domain, sockInt)
+		containerMapToDB(protocol, sockExt, domain, sockInt)
+		balanceMethod(protocol, sockExt, domain, policy)
 
-			// save information to database
-			saveMapToDB(protocol, sockExt, domain, sockInt)
-			containerMapToDB(protocol, sockExt, domain, sockInt)
-			balanceMethod(protocol, sockExt, domain, policy)
-
-			if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
-				log.Info(ovs.GetIp() + ":" + socket[1])
-			} else {
-				log.Info(sockExt)
-			}
+		if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
+			log.Info(ovs.GetIp() + ":" + socket[1])
+		} else {
+			log.Info(sockExt)
 		}
 	case len(policy) != 0:
 		balanceMethod(protocol, sockExt, domain, policy)
