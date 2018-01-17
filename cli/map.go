@@ -18,6 +18,7 @@ import (
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"sync"
+	"github.com/nightlyone/lockfile"
 )
 
 var (
@@ -56,6 +57,15 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]:
 		log.Error("Reserved system ports")
 	case len(sockInt) != 0:
+
+		var mapping = protocol + domain + sockInt + sockExt
+		var lock lockfile.Lockfile
+		var err error
+		for lock, err = lockSubutai(mapping + ".map"); err != nil; lock, err = lockSubutai(mapping+ ".map") {
+			time.Sleep(time.Second * 1)
+		}
+		defer lock.Unlock()
+
 		// check sockExt port and create nginx config
 		if portIsNew(protocol, sockInt, domain, &sockExt) {
 			newConfig(protocol, sockExt, domain, cert, sslbcknd)
