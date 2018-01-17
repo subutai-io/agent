@@ -18,6 +18,7 @@ import (
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"sync"
+	"github.com/nightlyone/lockfile"
 )
 
 var (
@@ -57,29 +58,32 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		log.Error("Reserved system ports")
 	case len(sockInt) != 0:
 
-		mux.Lock()
-		defer mux.Unlock()
-		//synced block
-		{
-			// check sockExt port and create nginx config
-			if portIsNew(protocol, sockInt, domain, &sockExt) {
-				newConfig(protocol, sockExt, domain, cert, sslbcknd)
-			}
+		var mapping = protocol + domain + sockInt + sockExt
+		var lock lockfile.Lockfile
+		var err error
+		for lock, err = lockSubutai(mapping + ".map"); err != nil; lock, err = lockSubutai(mapping+ ".map") {
+			time.Sleep(time.Second * 1)
+		}
+		defer lock.Unlock()
 
-			// add containers to backend
-			addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
-				"#Add new host here", "	server "+sockInt+";", false)
+		// check sockExt port and create nginx config
+		if portIsNew(protocol, sockInt, domain, &sockExt) {
+			newConfig(protocol, sockExt, domain, cert, sslbcknd)
+		}
 
-			// save information to database
-			saveMapToDB(protocol, sockExt, domain, sockInt)
-			containerMapToDB(protocol, sockExt, domain, sockInt)
-			balanceMethod(protocol, sockExt, domain, policy)
+		// add containers to backend
+		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+			"#Add new host here", "	server "+sockInt+";", false)
 
-			if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
-				log.Info(ovs.GetIp() + ":" + socket[1])
-			} else {
-				log.Info(sockExt)
-			}
+		// save information to database
+		saveMapToDB(protocol, sockExt, domain, sockInt)
+		containerMapToDB(protocol, sockExt, domain, sockInt)
+		balanceMethod(protocol, sockExt, domain, policy)
+
+		if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
+			log.Info(ovs.GetIp() + ":" + socket[1])
+		} else {
+			log.Info(sockExt)
 		}
 	case len(policy) != 0:
 		balanceMethod(protocol, sockExt, domain, policy)
