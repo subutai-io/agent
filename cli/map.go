@@ -17,12 +17,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-	"sync"
 	"github.com/nightlyone/lockfile"
-)
-
-var (
-	mux sync.Mutex
 )
 
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
@@ -61,7 +56,7 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		var mapping = protocol + domain + sockInt + sockExt
 		var lock lockfile.Lockfile
 		var err error
-		for lock, err = lockSubutai(mapping + ".map"); err != nil; lock, err = lockSubutai(mapping+ ".map") {
+		for lock, err = lockSubutai(mapping + ".map"); err != nil; lock, err = lockSubutai(mapping + ".map") {
 			time.Sleep(time.Second * 1)
 		}
 		defer lock.Unlock()
