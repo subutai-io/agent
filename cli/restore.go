@@ -88,7 +88,7 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 	volumes, _ := filepath.Glob(newContainerTmpDir + "/*@parent")
 
 	for _, volume := range volumes {
-		fs.SetVolReadOnly(volume, false, true)
+		fs.SetVolReadOnly(volume, false)
 		volumeName := strings.Replace(path.Base(volume), "@parent", "", -1)
 
 		if _, err := os.Stat(config.Agent.LxcPrefix + newContainer + "/" + volumeName); err == nil {
