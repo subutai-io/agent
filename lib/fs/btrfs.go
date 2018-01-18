@@ -105,7 +105,7 @@ func Send(src, dst, delta string) error {
 
 		SubvolumeClone(dst, tmpVolume)
 		defer SubvolumeDestroy(tmpVolume)
-		SetVolReadOnly(tmpVolume, true)
+		SetVolReadOnly(tmpVolume, true, true)
 
 		if src != dst {
 			return exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
@@ -117,16 +117,20 @@ func Send(src, dst, delta string) error {
 
 // ReadOnly sets readonly flag for Subutai container.
 // Subvolumes with active readonly flag is Subutai templates.
-func ReadOnly(container string, flag bool) {
+func ReadOnly(container string, flag bool, exitOnFaillure bool) {
 	for _, path := range []string{container + "/rootfs/", container + "/opt", container + "/var", container + "/home"} {
-		SetVolReadOnly(config.Agent.LxcPrefix+path, flag)
+		SetVolReadOnly(config.Agent.LxcPrefix+path, flag, exitOnFaillure)
 	}
 }
 
 // SetVolReadOnly sets readonly flag for BTRFS subvolume.
-func SetVolReadOnly(subvol string, flag bool) {
+func SetVolReadOnly(subvol string, flag bool, exitOnFailure bool) {
 	out, err := exec.Command("btrfs", "property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)).CombinedOutput()
-	log.Check(log.FatalLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
+	if exitOnFailure {
+		log.Check(log.FatalLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
+	} else {
+		log.Check(log.WarnLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
+	}
 }
 
 // Stat returns quota and usage for BTRFS subvolume.
