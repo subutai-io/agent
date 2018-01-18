@@ -20,10 +20,11 @@ import (
 // if a newer version is found, installs it. Please note, system security policies requires that such commands should be performed by the superuser manually,
 // otherwise an application's attempt to update itself will be blocked.
 func Update(name string, check bool) {
-	if !lockSubutai(name + ".update") {
+	lock, err := lockSubutai(name + ".update")
+	if err != nil {
 		log.Error("Another update process is already running")
 	}
-	defer unlockSubutai()
+	defer lock.Unlock()
 
 	if name == "rh" {
 		updateRH(name, check)

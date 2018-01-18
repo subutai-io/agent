@@ -25,7 +25,6 @@ import (
 )
 
 var (
-	lock   lockfile.Lockfile
 	owners = []string{"subutai", "jenkins", "docker", ""}
 )
 
@@ -47,7 +46,7 @@ type metainfo struct {
 	Version string            `json:"version"`
 	File    string            `json:"filename"`
 	Signs   map[string]string `json:"signature"`
-	Hash    struct {
+	Hash struct {
 		Md5    string
 		Sha256 string
 	} `json:"hash"`
@@ -224,29 +223,24 @@ func idToName(id string, kurjun *http.Client, token string) string {
 }
 
 // lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation
-func lockSubutai(file string) bool {
+func lockSubutai(file string) (lockfile.Lockfile, error) {
 	lock, err := lockfile.New("/var/run/lock/subutai." + file)
 	if log.Check(log.DebugLevel, "Init lock "+file, err) {
-		return false
+		return lock, err
 	}
 
 	err = lock.TryLock()
 	if log.Check(log.DebugLevel, "Locking file "+file, err) {
-		if p, err := lock.GetOwner(); err == nil {
-			cmd, err := ioutil.ReadFile(fmt.Sprintf("/proc/%v/cmdline", p.Pid))
-			if err != nil || !(strings.Contains(string(cmd), "subutai") && strings.Contains(string(cmd), "import")) {
+		if p, err2 := lock.GetOwner(); err2 == nil {
+			cmd, err2 := ioutil.ReadFile(fmt.Sprintf("/proc/%v/cmdline", p.Pid))
+			if err2 != nil || !(strings.Contains(string(cmd), "subutai") && strings.Contains(string(cmd), "import")) {
 				log.Check(log.DebugLevel, "Removing broken lockfile /var/run/lock/subutai."+file, os.Remove("/var/run/lock/subutai."+file))
 			}
 		}
-		return false
+		return lock, err
 	}
 
-	return true
-}
-
-// unlockSubutai removes lock file
-func unlockSubutai() {
-	lock.Unlock()
+	return lock, nil
 }
 
 // LxcImport function deploys a Subutai template on a Resource Host. The import algorithm works with both the global template repository and a local directory
@@ -289,10 +283,13 @@ func LxcImport(name, version, token string, torrent bool, auxDepList ...string) 
 	}
 
 	log.Info("Importing " + name)
-	for !lockSubutai(t.name + ".import") {
+
+	var lock lockfile.Lockfile
+	var err error
+	for lock, err = lockSubutai(t.name + ".import"); err != nil; lock, err = lockSubutai(t.name + ".import") {
 		time.Sleep(time.Second * 1)
 	}
-	defer unlockSubutai()
+	defer lock.Unlock()
 
 	if container.IsContainer(t.name) {
 		log.Info(t.name + " instance exist")
