@@ -24,7 +24,7 @@ func LxcPromote(name, source string) {
 			container.Stop(source)
 			defer container.Start(source)
 		}
-		log.Check(log.ErrorLevel, "Clonning source container", container.Clone(source, name))
+		log.Check(log.ErrorLevel, "Cloning source container", container.Clone(source, name))
 		container.SetContainerConf(name, [][]string{{"subutai.parent", container.GetParent(source)}})
 	}
 	checkSanity(name)
