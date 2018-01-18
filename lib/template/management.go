@@ -14,7 +14,7 @@ import (
 
 // MngInit performs initial operations for SS Management deployment
 func MngInit() {
-	fs.ReadOnly("management", false, true)
+	fs.ReadOnly("management", false)
 	container.SetContainerUID("management")
 	container.SetContainerConf("management", [][]string{
 		{"lxc.network.hwaddr", Mac()},

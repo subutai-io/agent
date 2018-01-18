@@ -94,7 +94,7 @@ func BackupContainer(container string, full, stop bool) string {
 		containerSnapshotName := containerSnapshotDir + "/" + subvolBase
 
 		fs.SubvolumeClone(subvol, containerSnapshotName)
-		fs.SetVolReadOnly(containerSnapshotName, true, true)
+		fs.SetVolReadOnly(containerSnapshotName, true)
 
 		if full {
 			fs.Send(containerSnapshotDir+"/"+subvolBase, containerSnapshotDir+"/"+subvolBase,

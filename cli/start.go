@@ -13,7 +13,7 @@ import (
 func LxcStart(name string) {
 	if container.IsContainer(name) && container.State(name) == "STOPPED" {
 
-		fs.ReadOnly(name, false, false)
+		fs.ReadOnly(name, false)
 
 		startErr := container.Start(name)
 		for i := 0; i < 60 && startErr != nil; i++ {
