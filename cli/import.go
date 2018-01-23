@@ -334,7 +334,8 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 			container.DestroyTemplate(name)
 
-			log.Check(log.DebugLevel, "Removing template archive "+archiveName, os.Remove(archiveName))
+			log.Check(log.DebugLevel, "Removing template archive "+archiveName,
+				os.Remove(config.Agent.LxcPrefix+"tmpdir/"+archiveName))
 
 		} else {
 
