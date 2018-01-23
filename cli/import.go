@@ -326,7 +326,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		archiveVersion := strings.TrimRight(strings.TrimLeft(strings.ToLower(archiveName),
 			strings.ToLower(name)+"-subutai-template_"), "_"+strings.ToLower(runtime.GOARCH)+".tar.gz")
 
-		updateRequired = version.Compare(version.Normalize(t.version), version.Normalize(archiveVersion), ">")
+		updateRequired = version.Compare(t.version, archiveVersion, ">")
 
 		if updateRequired {
 
