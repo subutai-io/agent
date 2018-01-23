@@ -294,7 +294,9 @@ func DestroyTemplate(name string, removeArchive bool) {
 				"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"
 
 			log.Check(log.WarnLevel, "Removing template archive", os.Remove(archiveName))
-		}else{
+
+		} else {
+
 			log.Debug("Template archive not found")
 		}
 	}
