@@ -272,7 +272,7 @@ func DestroyContainer(name string) error {
 	return nil
 }
 
-func DestroyTemplate(name string) {
+func DestroyTemplate(name string, removeArchive bool) {
 
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
@@ -283,6 +283,19 @@ func DestroyTemplate(name string) {
 	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
+
+	if removeArchive {
+
+		version := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
+
+		if len(version) == 0 {
+
+			archiveName := config.Agent.LxcPrefix + "tmpdir/" + name +
+				"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"
+
+			log.Check(log.WarnLevel, "Removing template archive", os.Remove(archiveName))
+		}
+	}
 
 }
 
