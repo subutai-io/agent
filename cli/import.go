@@ -22,6 +22,7 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"github.com/mcuadros/go-version"
 	"runtime"
 )
 
@@ -325,13 +326,16 @@ func LxcImport(name, token string, auxDepList ...string) {
 		archiveVersion := strings.TrimRight(strings.TrimLeft(strings.ToLower(archiveName),
 			strings.ToLower(name)+"-subutai-template_"), "_"+strings.ToLower(runtime.GOARCH)+".tar.gz")
 
-		updateRequired = !strings.EqualFold(t.version, archiveVersion)
+		updateRequired = version.Compare(version.Normalize(t.version), version.Normalize(archiveVersion), ">")
 
 		if updateRequired {
 
 			log.Debug("Removing outdated template " + name + " of version " + archiveVersion)
 
 			container.DestroyTemplate(name)
+
+			log.Check(log.DebugLevel, "Removing template archive "+archiveName, os.Remove(archiveName))
+
 		} else {
 
 			log.Debug("Template is of latest version")
