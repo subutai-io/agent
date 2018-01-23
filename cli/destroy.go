@@ -69,7 +69,7 @@ func LxcDestroy(id string, vlan bool) {
 
 			msg = id + " is destroyed"
 
-			container.DestroyTemplate(id, false)
+			container.DestroyTemplate(id)
 		}
 	}
 
