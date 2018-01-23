@@ -332,7 +332,11 @@ func LxcImport(name, token string, auxDepList ...string) {
 			log.Debug("Removing outdated template " + name)
 
 			container.DestroyTemplate(name)
+		} else {
+			log.Debug("Template is of latest version")
 		}
+	} else{
+		log.Debug("Archive is missing in local cache")
 	}
 
 	if !archiveExists || updateRequired {
@@ -364,7 +368,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	}
 
 	log.Info("Unpacking template " + t.name)
-	log.Debug(config.Agent.LxcPrefix + "tmpdir/ " + t.file + " to " + t.name)
+	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.file + " to " + t.name)
 	tgz := extractor.NewTgz()
 	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.name
 	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.file, templdir))
