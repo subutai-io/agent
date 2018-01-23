@@ -247,25 +247,43 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 }
 
 // Destroy deletes the Subutai container.
-func Destroy(name string) error {
+func DestroyContainer(name string) error {
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+
 	if c.State() == lxc.RUNNING {
 		if err = c.Stop(); log.Check(log.DebugLevel, "Stopping container", err) {
 			return err
 		}
 	}
+
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
 	db, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
+
 	return nil
+}
+
+func DestroyTemplate(name string) {
+
+	//remove files
+	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+
+	//remove metadata from db
+	db, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
+	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
+	log.Check(log.WarnLevel, "Closing database", db.Close())
+
 }
 
 // GetParent return a parent of the Subutai container.
