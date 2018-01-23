@@ -288,12 +288,14 @@ func DestroyTemplate(name string, removeArchive bool) {
 
 		version := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
 
-		if len(version) == 0 {
+		if len(version) > 0 {
 
 			archiveName := config.Agent.LxcPrefix + "tmpdir/" + name +
 				"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"
 
 			log.Check(log.WarnLevel, "Removing template archive", os.Remove(archiveName))
+		}else{
+			log.Debug("Template archive not found")
 		}
 	}
 
