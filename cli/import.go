@@ -108,7 +108,7 @@ func md5sum(filePath string) string {
 }
 
 // checkLocal reads content of local templates folder to check if required archive is present there
-func checkLocal(t *templ) bool {
+func checkLocal(t *templ) (bool, string) {
 	var response string
 	files, _ := ioutil.ReadDir(config.Agent.LxcPrefix + "tmpdir")
 	for _, f := range files {
@@ -119,17 +119,17 @@ func checkLocal(t *templ) bool {
 				log.Check(log.FatalLevel, "Reading input", err)
 				if response == "y" {
 					t.file = f.Name()
-					return true
+					return true, f.Name()
 				}
-				return false
+				return false, ""
 			}
 			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + f.Name())
 			if t.id == hash || t.md5 == hash {
-				return true
+				return true, f.Name()
 			}
 		}
 	}
-	return false
+	return false, ""
 }
 
 func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bool {
@@ -315,27 +315,29 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
-	archiveExists := checkLocal(&t)
+	archiveExists, archiveName := checkLocal(&t)
 
 	//check if template update is needed
 	updateRequired := false
 
 	if archiveExists {
 
-		archiveVersion := strings.TrimRight(strings.TrimLeft(strings.ToLower(t.file),
+		archiveVersion := strings.TrimRight(strings.TrimLeft(strings.ToLower(archiveName),
 			strings.ToLower(name)+"-subutai-template_"), "_"+strings.ToLower(runtime.GOARCH)+".tar.gz")
 
 		updateRequired = !strings.EqualFold(t.version, archiveVersion)
 
 		if updateRequired {
 
-			log.Debug("Removing outdated template " + name)
+			log.Debug("Removing outdated template " + name + " of version " + archiveVersion)
 
 			container.DestroyTemplate(name)
 		} else {
+
 			log.Debug("Template is of latest version")
 		}
-	} else{
+
+	} else {
 		log.Debug("Archive is missing in local cache")
 	}
 
@@ -361,8 +363,10 @@ func LxcImport(name, token string, auxDepList ...string) {
 		}
 
 		if !downloaded && !downloadWithRetry(t, kurjun, token, 5) {
+
 			log.Error("Failed to download or verify template " + t.name)
 		} else {
+
 			log.Info("File integrity verified")
 		}
 	}
