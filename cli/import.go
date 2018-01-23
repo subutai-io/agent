@@ -295,18 +295,33 @@ func LxcImport(name, token string, auxDepList ...string) {
 	}
 	defer lock.Unlock()
 
-	if container.ContainerOrTemplateExists(t.name) {
-		log.Info(t.name + " instance exists")
-		return
-	}
-
 	if kurjun == nil {
 		kurjun, _ = config.CheckKurjun()
 	}
+
 	if kurjun != nil {
 		templateID(&t, kurjun, token)
+
+		if container.IsTemplate(t.name) {
+			existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
+
+			if version.Compare(t.version, existingVersion, "<=") {
+				log.Info(t.name + " instance exists")
+				return
+			}
+		} else if container.IsContainer(t.name) {
+			log.Info(t.name + " instance exists")
+			return
+		}
+
 		log.Info("Version: " + t.version)
 	} else {
+
+		if container.ContainerOrTemplateExists(t.name) {
+			log.Info(t.name + " instance exists")
+			return
+		}
+
 		log.Info("Trying to import from local storage")
 	}
 
