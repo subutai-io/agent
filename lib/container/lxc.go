@@ -32,6 +32,10 @@ func IsTemplate(name string) bool {
 	return fs.IsSubvolumeReadonly(config.Agent.LxcPrefix + name + "/rootfs/")
 }
 
+func IsContainer(name string) bool {
+	return fs.IsSubvolumeReadWrite(config.Agent.LxcPrefix + name + "/rootfs/")
+}
+
 // Templates returns list of all templates
 func Templates() (containers []string) {
 	for _, name := range All() {
@@ -52,8 +56,8 @@ func Containers() (containers []string) {
 	return
 }
 
-// IsContainer checks is container exist.
-func IsContainer(name string) bool {
+// ContainerOrTemplateExists checks if container or template exists
+func ContainerOrTemplateExists(name string) bool {
 	for _, item := range All() {
 		if name == item {
 			return true
@@ -98,7 +102,7 @@ func SetApt(name string) {
 
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
-	if !IsContainer(name) {
+	if !ContainerOrTemplateExists(name) {
 		return errors.New("Container does not exists")
 	}
 	bolt, err := db.New()
@@ -202,8 +206,8 @@ func DumpRestore(name string) error {
 
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
-	if !IsContainer(name) {
-		return output, errors.New("Container does not exists")
+	if !ContainerOrTemplateExists(name) {
+		return output, errors.New("Container does not exist")
 	}
 
 	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -283,6 +287,23 @@ func DestroyTemplate(name string) {
 	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
+
+	//if removeArchive {
+	//
+	//	version := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
+	//
+	//	if len(version) > 0 {
+	//
+	//		archiveName := config.Agent.LxcPrefix + "tmpdir/" + name +
+	//			"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"
+	//
+	//		log.Check(log.WarnLevel, "Removing template archive", os.Remove(archiveName))
+	//
+	//	} else {
+	//
+	//		log.Debug("Template archive not found")
+	//	}
+	//}
 
 }
 

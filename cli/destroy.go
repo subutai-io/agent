@@ -46,6 +46,7 @@ func LxcDestroy(id string, vlan bool) {
 	} else {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
+		log.Debug("Obtaining container by name")
 		c := bolt.ContainerByName(id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
@@ -97,7 +98,7 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	if len(msg) == 0 {
-		msg = id + " not found. Please check if a container name is correct."
+		msg = id + " not found. Please check if the name is correct"
 	}
 
 	log.Info(msg)
@@ -123,6 +124,7 @@ func cleanupNetStat(vlan string) {
 func removePortMap(name string) {
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
+	log.Debug("Obtaining container port mappings")
 	list := bolt.GetContainerMapping(name)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 

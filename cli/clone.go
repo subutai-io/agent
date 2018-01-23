@@ -31,12 +31,12 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta["parent"] = parent
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, "", kurjToken, false)
+		LxcImport(parent, kurjToken)
 	}
-	if container.IsContainer(child) {
-		log.Error("Container " + child + " already exist")
+	if container.ContainerOrTemplateExists(child) {
+		log.Error("Container " + child + " already exists")
 	}
-	log.Check(log.ErrorLevel, "Clonning the container", container.Clone(parent, child))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(parent, child))
 	gpg.GenerateKey(child)
 
 	if len(token) != 0 {

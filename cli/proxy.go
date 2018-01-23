@@ -33,9 +33,9 @@ func ProxyAdd(vlan, domain, node, policy, cert string) {
 		log.Error("Please specify VLAN")
 	} else if domain != "" {
 		if isVlanExist(vlan) {
-			log.Error("Domain already exist")
+			log.Error("Domain already exists")
 		}
-		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.IsContainer(crt[0]) {
+		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.ContainerOrTemplateExists(crt[0]) {
 			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
 				crt[0] += "/rootfs"
 			}
