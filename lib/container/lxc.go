@@ -288,23 +288,6 @@ func DestroyTemplate(name string) {
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
 
-	//if removeArchive {
-	//
-	//	version := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
-	//
-	//	if len(version) > 0 {
-	//
-	//		archiveName := config.Agent.LxcPrefix + "tmpdir/" + name +
-	//			"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"
-	//
-	//		log.Check(log.WarnLevel, "Removing template archive", os.Remove(archiveName))
-	//
-	//	} else {
-	//
-	//		log.Debug("Template archive not found")
-	//	}
-	//}
-
 }
 
 // GetParent return a parent of the Subutai container.

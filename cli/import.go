@@ -332,6 +332,9 @@ func LxcImport(name, token string, auxDepList ...string) {
 			log.Debug("Removing outdated template " + name + " of version " + archiveVersion)
 
 			container.DestroyTemplate(name)
+
+			log.Check(log.DebugLevel, "Removing template archive "+archiveName, os.Remove(archiveName))
+
 		} else {
 
 			log.Debug("Template is of latest version")
