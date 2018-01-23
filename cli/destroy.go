@@ -51,16 +51,25 @@ func LxcDestroy(id string, vlan bool) {
 
 		if len(c) != 0 {
 			msg = id + " is destroyed"
-		}
 
-		if ip, ok := c["ip"]; ok {
-			if vlan, ok := c["vlan"]; ok {
-				ProxyDel(vlan, ip, false)
+			if ip, ok := c["ip"]; ok {
+				if vlan, ok := c["vlan"]; ok {
+					ProxyDel(vlan, ip, false)
+				}
 			}
+
+			removePortMap(id)
+
+			net.DelIface(c["interface"])
+
+			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
+
+		} else if container.IsTemplate(id) {
+
+			msg = id + " is destroyed"
+
+			container.DestroyTemplate(id)
 		}
-		removePortMap(id)
-		net.DelIface(c["interface"])
-		log.Check(log.ErrorLevel, "Destroying container", container.Destroy(id))
 	}
 
 	if id == "everything" {
@@ -86,9 +95,11 @@ func LxcDestroy(id string, vlan bool) {
 	if id == "management" || id == "everything" {
 		template.MngDel()
 	}
+
 	if len(msg) == 0 {
 		msg = id + " not found. Please check if a container name is correct."
 	}
+
 	log.Info(msg)
 }
 
