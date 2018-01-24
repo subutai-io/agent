@@ -30,6 +30,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	lxc "github.com/subutai-io/agent/lib/container"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -87,9 +88,19 @@ func Start() {
 	go logger.SyslogServer()
 
 	go func() {
-		s := make(chan os.Signal, 1)
+		s := make(chan os.Signal)
 		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
-		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", <-s))
+		sig := <-s
+
+		if sig == syscall.SIGTERM {
+			for _, containerName := range lxc.Containers() {
+				if lxc.State(containerName) == "RUNNING" {
+					lxc.Stop(containerName, false)
+				}
+			}
+		}
+
+		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
 		forceHeartbeat()
 	}()
 
