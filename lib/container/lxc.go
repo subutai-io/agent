@@ -142,7 +142,7 @@ func Stop(name string, addMetadata bool) error {
 	}
 
 	if addMetadata {
-		AddMetadata(name, map[string]string{"state": State(name)})
+		AddMetadata(name, map[string]string{"state": "STOPPED"})
 	}
 
 	return nil
