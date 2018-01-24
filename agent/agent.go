@@ -98,11 +98,9 @@ func Start() {
 
 		canRestoreContainers = false
 
-		if sig == syscall.SIGTERM {
-			for _, containerName := range lxc.Containers() {
-				if lxc.State(containerName) == "RUNNING" {
-					lxc.Stop(containerName, false)
-				}
+		for _, containerName := range lxc.Containers() {
+			if lxc.State(containerName) == "RUNNING" {
+				lxc.Stop(containerName, false)
 			}
 		}
 
