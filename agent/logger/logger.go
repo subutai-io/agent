@@ -44,6 +44,7 @@ func initDB() bool {
 }
 
 // SyslogServer starts syslog server and parse data for sending it to InfluxDB.
+//todo refactor this method
 func SyslogServer() {
 	go func() {
 		for {
@@ -54,6 +55,8 @@ func SyslogServer() {
 		}
 	}()
 
+	//why do we store logs in influx db?
+	//subutai log is never used so think of removing this
 	channel := make(syslog.LogPartsChannel)
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
@@ -68,6 +71,7 @@ func SyslogServer() {
 		}
 	}(channel)
 
+	//what is this?
 	for {
 		if server := syslog.NewServer(); server != nil {
 			server.SetFormat(syslog.Automatic)
