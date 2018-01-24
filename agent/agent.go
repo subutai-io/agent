@@ -51,15 +51,16 @@ type heartbeat struct {
 }
 
 var (
-	lastHeartbeat     []byte
-	mutex             sync.Mutex
-	fingerprint       string
-	hostname, _       = os.Hostname()
-	client            *http.Client
-	instanceType      string
-	instanceArch      string
-	lastHeartbeatTime time.Time
-	pool              []container.Container
+	lastHeartbeat        []byte
+	mutex                sync.Mutex
+	fingerprint          string
+	hostname, _          = os.Hostname()
+	client               *http.Client
+	instanceType         string
+	instanceArch         string
+	lastHeartbeatTime    time.Time
+	pool                 []container.Container
+	canRestoreContainers = true
 )
 
 func initAgent() {
@@ -84,13 +85,18 @@ func Start() {
 	go discovery.Monitor()
 	go monitor.Collect()
 	go connectionMonitor()
+	//todo disable this
 	go alert.Processing()
+	//todo remove this
 	go logger.SyslogServer()
+	go restoreContainers()
 
 	go func() {
 		s := make(chan os.Signal)
 		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
 		sig := <-s
+
+		canRestoreContainers = false
 
 		if sig == syscall.SIGTERM {
 			for _, containerName := range lxc.Containers() {
@@ -101,6 +107,7 @@ func Start() {
 		}
 
 		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
+
 		forceHeartbeat()
 	}()
 
@@ -117,6 +124,16 @@ func Start() {
 	}
 }
 
+func restoreContainers() {
+	for {
+		if !canRestoreContainers {
+			return
+		}
+		container.StateRestore(&canRestoreContainers)
+		time.Sleep(time.Second * 30)
+	}
+}
+
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
 	if err == nil {
@@ -130,7 +147,7 @@ func checkSS() (status bool) {
 
 func connectionMonitor() {
 	for {
-		container.StateRestore()
+
 		if !checkSS() {
 			time.Sleep(time.Second * 10)
 			continue
