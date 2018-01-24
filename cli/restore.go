@@ -20,8 +20,8 @@ import (
 
 // RestoreContainer restores a Subutai container to a snapshot at a specified timestamp if such a backup archive is available.
 func RestoreContainer(container, date, newContainer string, force bool) {
-	if lxcContainer.IsContainer(newContainer) && !force {
-		log.Fatal("Container " + newContainer + " is already exist!")
+	if lxcContainer.ContainerOrTemplateExists(newContainer) && !force {
+		log.Fatal("Container " + newContainer + " already exists")
 	}
 
 	backupDir := config.Agent.LxcPrefix + "/backups/"
@@ -69,7 +69,7 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 		// install deltas
 		for _, deltaFile := range deltas {
 			deltaName := strings.Replace(path.Base(deltaFile), ".delta", "", -1)
-			parent := (newContainerTmpDir + deltaName + "@parent")
+			parent := newContainerTmpDir + deltaName + "@parent"
 
 			fs.Receive(parent, newContainerTmpDir, "unpacking_"+currentDT+"/"+container+"/"+path.Base(deltaFile),
 				!strings.Contains(file, "Full"))

@@ -154,11 +154,9 @@ func main() {
 
 		Name: "import", Usage: "import Subutai template",
 		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "torrent", Usage: "use BitTorrent for downloading (experimental)"},
-			gcli.StringFlag{Name: "v", Usage: "template version"},
 			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcImport(c.Args().Get(0), c.String("v"), c.String("t"), c.Bool("torrent"))
+			cli.LxcImport(c.Args().Get(0), c.String("t"))
 			return nil
 		}}, {
 
@@ -255,7 +253,7 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "promote", Usage: "promote Subutai container",
+		Name:  "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
 			cli.LxcPromote(c.Args().Get(0), c.String("s"))

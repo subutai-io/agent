@@ -98,7 +98,7 @@ func execDiff(dir1, dir2, output string) {
 // checkSanity performs different checks before promote command
 func checkSanity(name string) {
 	// check: if name exists
-	if !container.IsContainer(name) {
+	if !container.ContainerOrTemplateExists(name) {
 		log.Error("Container " + name + " does not exist")
 	}
 
