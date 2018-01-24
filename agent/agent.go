@@ -95,7 +95,7 @@ func Start() {
 		if sig == syscall.SIGTERM {
 			for _, containerName := range lxc.Containers() {
 				if lxc.State(containerName) == "RUNNING" {
-					lxc.Stop(containerName)
+					lxc.Stop(containerName, false)
 				}
 			}
 		}
