@@ -49,7 +49,7 @@ func Templates() (containers []string) {
 // Containers returns list of all containers
 func Containers() (containers []string) {
 	for _, name := range All() {
-		if !IsTemplate(name) {
+		if IsContainer(name) {
 			containers = append(containers, name)
 		}
 	}
