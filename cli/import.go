@@ -362,11 +362,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	}
 
 	if !archiveExists || updateRequired {
-		if updateRequired {
-			log.Info("Updating " + t.name)
-		} else {
-			log.Info("Downloading " + t.name)
-		}
+		log.Info("Downloading " + t.name)
 
 		downloaded := false
 
