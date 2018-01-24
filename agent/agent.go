@@ -93,7 +93,7 @@ func Start() {
 
 	go func() {
 		s := make(chan os.Signal)
-		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
+		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGPIPE, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGKILL)
 		sig := <-s
 
 		canRestoreContainers = false
