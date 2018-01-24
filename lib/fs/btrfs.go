@@ -21,6 +21,11 @@ func IsSubvolumeReadonly(path string) bool {
 	log.Check(log.DebugLevel, "Getting BTRFS subvolume readonly property", err)
 	return strings.Contains(string(out), "true")
 }
+func IsSubvolumeReadWrite(path string) bool {
+	out, err := exec.Command("btrfs", "property", "get", "-ts", path).Output()
+	log.Check(log.DebugLevel, "Getting BTRFS subvolume readonly property", err)
+	return strings.Contains(string(out), "false")
+}
 
 // IsSubvolume checks if path BTRFS subvolume.
 func IsSubvolume(path string) bool {
