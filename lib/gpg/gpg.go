@@ -20,6 +20,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"time"
 )
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
@@ -223,6 +224,7 @@ func sendData(c string) {
 	defer asc.Close()
 
 	client := utils.TLSConfig()
+	client.Timeout = time.Second * 15
 	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
