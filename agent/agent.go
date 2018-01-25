@@ -87,7 +87,6 @@ func Start() {
 	go connectionMonitor()
 	//todo disable this
 	go alert.Processing()
-	//todo remove this
 	go logger.SyslogServer()
 	go restoreContainers()
 
