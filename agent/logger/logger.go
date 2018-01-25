@@ -55,8 +55,6 @@ func SyslogServer() {
 		}
 	}()
 
-	//why do we store logs in influx db?
-	//subutai log is never used so think of removing this
 	channel := make(syslog.LogPartsChannel)
 	go func(channel syslog.LogPartsChannel) {
 		for logParts := range channel {
@@ -71,7 +69,7 @@ func SyslogServer() {
 		}
 	}(channel)
 
-	//what is this?
+	//why server is created in a loop?
 	for {
 		if server := syslog.NewServer(); server != nil {
 			server.SetFormat(syslog.Automatic)
