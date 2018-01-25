@@ -105,8 +105,6 @@ func Start() {
 			}
 		}
 
-		fs.Touch(os.TempDir()+"/test")
-
 		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
 
 		forceHeartbeat()
