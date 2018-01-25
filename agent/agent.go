@@ -31,6 +31,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	lxc "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -92,8 +93,8 @@ func Start() {
 	go restoreContainers()
 
 	go func() {
-		s := make(chan os.Signal)
-		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGPIPE, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGKILL)
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, syscall.SIGTERM)
 		sig := <-s
 
 		canRestoreContainers = false
@@ -103,6 +104,8 @@ func Start() {
 				lxc.Stop(containerName, false)
 			}
 		}
+
+		fs.Touch(os.TempDir()+"/test")
 
 		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
 
