@@ -31,7 +31,6 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	lxc "github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
 )
 
 //Response covers heartbeat date because of format required by Management server.

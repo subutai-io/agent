@@ -40,10 +40,3 @@ func ChownR(path string, uid, gid int) error {
 		return err
 	})
 }
-
-func Touch(name string) {
-	file, err := os.OpenFile(name, os.O_TRUNC|os.O_CREATE, 0644)
-	if err == nil {
-		file.Close()
-	}
-}
