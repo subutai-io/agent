@@ -45,6 +45,7 @@ func ImportManagementKey() {
 
 // Monitor provides service for auto discovery based on SSDP protocol.
 // It starts SSDP server if management container active, otherwise it starts client for waiting another SSDP server.
+//todo refactor this
 func Monitor() {
 	for {
 		if container.State("management") == "RUNNING" {
