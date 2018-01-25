@@ -92,8 +92,8 @@ func Start() {
 	go restoreContainers()
 
 	go func() {
-		s := make(chan os.Signal)
-		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGPIPE, syscall.SIGQUIT, syscall.SIGABRT, syscall.SIGKILL)
+		s := make(chan os.Signal, 1)
+		signal.Notify(s, syscall.SIGTERM)
 		sig := <-s
 
 		canRestoreContainers = false
