@@ -44,6 +44,7 @@ func initDB() bool {
 }
 
 // SyslogServer starts syslog server and parse data for sending it to InfluxDB.
+//todo refactor this method
 func SyslogServer() {
 	go func() {
 		for {
@@ -68,6 +69,7 @@ func SyslogServer() {
 		}
 	}(channel)
 
+	//why server is created in a loop?
 	for {
 		if server := syslog.NewServer(); server != nil {
 			server.SetFormat(syslog.Automatic)
