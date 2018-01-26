@@ -22,7 +22,7 @@ func compat() {
 }
 
 // StateRestore checks container state and starting or stopping containers if required.
-func StateRestore() {
+func StateRestore(canRestore *bool) {
 	compat()
 
 	bolt, err := db.New()
@@ -31,10 +31,16 @@ func StateRestore() {
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	for _, v := range active {
+		if !*canRestore {
+			return
+		}
 		if container.State(v) != "RUNNING" {
 			log.Debug("Starting container " + v)
 			startErr := container.Start(v)
 			for i := 0; i < 5 && startErr != nil; i++ {
+				if !*canRestore {
+					return
+				}
 				log.Debug("Retrying container " + v + " start")
 				time.Sleep(time.Second)
 				startErr = container.Start(v)

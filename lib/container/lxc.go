@@ -49,7 +49,7 @@ func Templates() (containers []string) {
 // Containers returns list of all containers
 func Containers() (containers []string) {
 	for _, name := range All() {
-		if !IsTemplate(name) {
+		if IsContainer(name) {
 			containers = append(containers, name)
 		}
 	}
@@ -127,16 +127,24 @@ func Start(name string) error {
 }
 
 // Stop stops the Subutai container.
-func Stop(name string) error {
+func Stop(name string, addMetadata bool) error {
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+
 	log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
+
 	if c.State().String() != "STOPPED" {
 		return errors.New("Unable to stop container " + name)
 	}
-	AddMetadata(name, map[string]string{"state": State(name)})
+
+	if addMetadata {
+		AddMetadata(name, map[string]string{"state": "STOPPED"})
+	}
+
 	return nil
 }
 

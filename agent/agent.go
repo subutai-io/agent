@@ -30,6 +30,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	lxc "github.com/subutai-io/agent/lib/container"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -50,15 +51,16 @@ type heartbeat struct {
 }
 
 var (
-	lastHeartbeat     []byte
-	mutex             sync.Mutex
-	fingerprint       string
-	hostname, _       = os.Hostname()
-	client            *http.Client
-	instanceType      string
-	instanceArch      string
-	lastHeartbeatTime time.Time
-	pool              []container.Container
+	lastHeartbeat        []byte
+	mutex                sync.Mutex
+	fingerprint          string
+	hostname, _          = os.Hostname()
+	client               *http.Client
+	instanceType         string
+	instanceArch         string
+	lastHeartbeatTime    time.Time
+	pool                 []container.Container
+	canRestoreContainers = true
 )
 
 func initAgent() {
@@ -83,13 +85,26 @@ func Start() {
 	go discovery.Monitor()
 	go monitor.Collect()
 	go connectionMonitor()
+	//todo disable this
 	go alert.Processing()
 	go logger.SyslogServer()
+	go restoreContainers()
 
 	go func() {
 		s := make(chan os.Signal, 1)
-		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
-		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", <-s))
+		signal.Notify(s, syscall.SIGTERM)
+		sig := <-s
+
+		canRestoreContainers = false
+
+		for _, containerName := range lxc.Containers() {
+			if lxc.State(containerName) == "RUNNING" {
+				lxc.Stop(containerName, false)
+			}
+		}
+
+		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
+
 		forceHeartbeat()
 	}()
 
@@ -106,6 +121,16 @@ func Start() {
 	}
 }
 
+func restoreContainers() {
+	for {
+		if !canRestoreContainers {
+			return
+		}
+		container.StateRestore(&canRestoreContainers)
+		time.Sleep(time.Second * 30)
+	}
+}
+
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
 	if err == nil {
@@ -119,7 +144,7 @@ func checkSS() (status bool) {
 
 func connectionMonitor() {
 	for {
-		container.StateRestore()
+
 		if !checkSS() {
 			time.Sleep(time.Second * 10)
 			continue

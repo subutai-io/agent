@@ -20,6 +20,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"time"
 )
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
@@ -223,6 +224,7 @@ func sendData(c string) {
 	defer asc.Close()
 
 	client := utils.TLSConfig()
+	client.Timeout = time.Second * 15
 	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
@@ -286,7 +288,7 @@ func ParsePem(cert string) (crt, key []byte) {
 func KurjunUserPK(owner string) []string {
 	var keys []string
 	kurjun, err := config.CheckKurjun()
-	log.Check(log.DebugLevel, "Checking Kurjun", err)
+	log.Check(log.ErrorLevel, "Checking Kurjun", err)
 
 	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
