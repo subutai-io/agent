@@ -96,13 +96,18 @@ func Active(details bool) []Container {
 		vlan := meta["vlan"]
 		envId := meta["environment"]
 
+		//TODO optimize by caching some of properties below
 		container := Container{
+			//this property can be cached
 			ID:         gpg.GetFingerprint(c),
 			Name:       c,
 			Hostname:   strings.TrimSpace(string(hostname)),
 			Status:     cont.State(c),
+			//this property can be cached
 			Arch:       strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
+			//this property can be cached since now container has only eth0 (not for custom containers)
 			Interfaces: interfaces(c),
+			//this property can be cached
 			Parent:     cont.GetConfigItem(configpath, "subutai.parent"),
 			Vlan:       vlan,
 			EnvId:      envId,

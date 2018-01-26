@@ -200,7 +200,7 @@ func Processing() {
 				delete(cpu, k)
 			}
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 15)
 	}
 }
 

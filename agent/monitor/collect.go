@@ -31,7 +31,6 @@ var (
 
 // Collect collecting performance statistic from Resource Host and Subutai Containers.
 // It sends this information to InfluxDB server using credentials from configuration file.
-//todo optimize this method
 func Collect() {
 
 	for {
