@@ -23,6 +23,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/mcuadros/go-version"
+	"github.com/subutai-io/agent/lib/fs"
 	"runtime"
 )
 
@@ -54,43 +55,71 @@ type metainfo struct {
 	} `json:"hash"`
 }
 
-// templateID retrieves the id of a template on global repository, id of the latest template version will be returned
-func templateID(t *templ, kurjun *http.Client, token string) {
-	var meta []metainfo
+// getTemplateInfo retrieves the id of a template on global repository, id of the latest template version will be returned
+func getTemplateInfo(t *templ, kurjun *http.Client, token string) {
 
+	//get template info by name from Kurjun
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
+	if len(t.owner) > 0 {
+		url += "&owner=" + t.owner[0]
+	}
 
 	response, err := kurjun.Get(url)
-	log.Check(log.ErrorLevel, "Retrieving id, get: "+url, err)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
 	defer utils.Close(response)
 
-	if err == nil && response.StatusCode == 404 && t.name == "management" {
-		log.Warn("Requested management version not found, getting latest available")
-		response, err = kurjun.Get(config.CDN.Kurjun + "/template/info?name=" + t.name + "&version=" + config.Template.Branch + "&token=" + token)
-		if err == nil {
-			defer utils.Close(response)
-		}
+	if response.StatusCode == 404 {
+		log.Error("Template " + t.name + " not found")
 	}
-	if log.Check(log.WarnLevel, "Getting kurjun response", err) || response.StatusCode != 200 {
-		return
+	if response.StatusCode != 200 {
+		log.Error("Failed to get template info:  " + response.Status)
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
+	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
 
-	if err != nil || log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
-		return
-	}
-
-	if len(meta) == 0 {
-		return
+	var meta []metainfo
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+		log.Error("Failed to parse template info:  " + response.Status)
 	}
 
 	t.name = meta[0].Name
+	t.owner = meta[0].Owner
 	t.version = meta[0].Version
 	t.id = meta[0].ID
 	t.file = meta[0].File
 	t.md5 = meta[0].Hash.Md5
 	t.signature = meta[0].Signs
+}
+
+// idToName retrieves template name from global repository by passed id string
+func idToName(t *templ, id string, kurjun *http.Client, token string) {
+	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
+	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
+	url := config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token
+
+	response, err := kurjun.Get(url)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	defer utils.Close(response)
+
+	if response.StatusCode == 404 {
+		log.Error("Template " + t.name + " not found")
+	}
+	if response.StatusCode != 200 {
+		log.Error("Failed to get template info:  " + response.Status)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
+
+	var meta []metainfo
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+		log.Error("Failed to parse template info:  " + response.Status)
+	}
+
+	t.name = meta[0].Name
+	t.owner = meta[0].Owner
+
 }
 
 // md5sum returns MD5 hash sum of specified file
@@ -106,31 +135,6 @@ func md5sum(filePath string) string {
 		return ""
 	}
 	return fmt.Sprintf("%x", hash.Sum(nil))
-}
-
-// checkLocal reads content of local templates folder to check if required archive is present there
-func checkLocal(t *templ) (bool, string) {
-	var response string
-	files, _ := ioutil.ReadDir(config.Agent.LxcPrefix + "tmpdir")
-	for _, f := range files {
-		if strings.HasPrefix(f.Name(), t.name+"-subutai-template") {
-			if len(t.id) == 0 {
-				fmt.Print("Cannot verify local template. Trust anyway? (y/n)")
-				_, err := fmt.Scanln(&response)
-				log.Check(log.FatalLevel, "Reading input", err)
-				if response == "y" {
-					t.file = f.Name()
-					return true, f.Name()
-				}
-				return false, ""
-			}
-			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + f.Name())
-			if t.id == hash || t.md5 == hash {
-				return true, f.Name()
-			}
-		}
-	}
-	return false, ""
 }
 
 func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bool {
@@ -191,41 +195,6 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	return false, err
 }
 
-// idToName retrieves template name from global repository by passed id string
-func idToName(id string, kurjun *http.Client, token string) string {
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	if name := bolt.TemplateName(id); len(name) > 0 {
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-		return name
-	}
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
-	var meta []metainfo
-
-	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
-	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
-	response, err := kurjun.Get(config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token)
-	log.Check(log.ErrorLevel, "Getting kurjun response", err)
-	defer utils.Close(response)
-
-	body, err := ioutil.ReadAll(response.Body)
-
-	if string(body) == "Not found" {
-		log.Error("Template with id \"" + id + "\" not found")
-	}
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) {
-		var oldmeta metainfo
-		log.Check(log.ErrorLevel, "Parsing response body from old Kurjun server", json.Unmarshal(body, &oldmeta))
-		meta = append(meta, oldmeta)
-	}
-
-	if len(meta) > 0 {
-		return meta[0].Name
-	}
-	return ""
-}
-
 // lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation
 func lockSubutai(file string) (lockfile.Lockfile, error) {
 	lock, err := lockfile.New("/var/run/lock/subutai." + file)
@@ -251,14 +220,13 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // to provide more flexibility to enable working with published and custom local templates. Official published templates in the global repository have a overriding scope
 // over custom local artifacts if there's any template naming conflict.
 //
-// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path `/mnt/lib/lxc/tmpdir/` could be used as local repository;
+// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path `/var/snap/subutai/common/lxc/tmpdir/` could be used as local repository;
 // the import sub command checks this directory if a requested published template or the global repository is not available.
 //
 // The import binding handles security checks to confirm the authenticity and integrity of templates. Besides using strict SSL connections for downloads,
 // it verifies the fingerprint and its checksum for each template: an MD5 hash sum signed with author's GPG key. Import executes different integrity and authenticity checks of the template
 // transparent to the user to protect system integrity from all possible risks related to template data transfers over the network.
 //
-// The template's version may be specified with the `-v` option. By default import retrieves the latest available template version from repository.
 // The repository supports public, group private (shared), and private files. Import without specifying a security token can only access public templates.
 //
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
@@ -271,59 +239,48 @@ func LxcImport(name, token string, auxDepList ...string) {
 		return
 	}
 
-	if id := strings.Split(name, "id:"); len(id) > 1 {
-		kurjun, _ = config.CheckKurjun()
-		if kurjun != nil {
-			name = idToName(id[1], kurjun, token)
-		}
-	}
+	var err error
+
+	kurjun, err = config.CheckKurjun()
+
+	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
 
 	var t templ
-
 	t.name = name
-	if line := strings.Split(t.name, "/"); len(line) > 1 {
+
+	if id := strings.Split(name, "id:"); len(id) > 1 {
+		//obtain name and owner from Kurjun
+		idToName(&t, id[1], kurjun, token)
+	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
 		t.name = line[1]
 		t.owner = append(t.owner, line[0])
 	}
 
-	log.Info("Importing " + name)
+	log.Info("Importing " + t.name)
 
 	var lock lockfile.Lockfile
-	var err error
 	for lock, err = lockSubutai(t.name + ".import"); err != nil; lock, err = lockSubutai(t.name + ".import") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
 
-	if kurjun == nil {
-		kurjun, _ = config.CheckKurjun()
-	}
+	//obtain full template info from Kurjun by name to get latest version
+	getTemplateInfo(&t, kurjun, token)
 
-	if kurjun != nil {
-		templateID(&t, kurjun, token)
+	if container.IsTemplate(t.name) {
+		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
 
-		if container.IsTemplate(t.name) {
-			existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
-
-			if version.Compare(t.version, existingVersion, "<=") {
-				log.Info(t.name + " instance exists")
-				return
-			}
-		} else if container.IsContainer(t.name) {
+		//template of latest version already installed
+		if version.Compare(t.version, existingVersion, "<=") {
 			log.Info(t.name + " instance exists")
 			return
 		}
-
-		log.Info("Version: " + t.version)
-	} else {
-
-		if container.ContainerOrTemplateExists(t.name) {
-			log.Info(t.name + " instance exists")
-			return
-		}
-
-		log.Info("Trying to import from local storage")
+	} else if container.IsContainer(t.name) {
+		log.Info(t.name + " instance exists")
+		return
 	}
+
+	log.Info("Version: " + t.version)
 
 	if len(t.id) != 0 && len(t.signature) == 0 {
 		log.Error("Template is not signed")
@@ -331,37 +288,21 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
-	archiveExists, archiveName := checkLocal(&t)
-
-	//check if template update is needed
-	updateRequired := false
+	archiveExists := fs.FileExists(t.file)
 
 	if archiveExists {
 
-		archiveVersion := strings.TrimRight(strings.TrimLeft(strings.ToLower(archiveName),
-			strings.ToLower(name)+"-subutai-template_"), "_"+strings.ToLower(runtime.GOARCH)+".tar.gz")
-
-		updateRequired = version.Compare(t.version, archiveVersion, ">")
-
-		if updateRequired {
-
-			log.Debug("Removing outdated template " + name + " of version " + archiveVersion)
-
-			container.DestroyTemplate(name)
-
-			log.Check(log.DebugLevel, "Removing template archive "+archiveName,
-				os.Remove(config.Agent.LxcPrefix+"tmpdir/"+archiveName))
-
-		} else {
-
-			log.Debug("Template is of latest version")
-		}
-
+		log.Debug("Template archive is present in local cache")
 	} else {
-		log.Debug("Archive is missing in local cache")
+
+		log.Debug("Template archive is missing in local cache")
+
+		//clean all matching archives
+		fs.DeleteFilesWildcard(
+			strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz")
 	}
 
-	if !archiveExists || updateRequired {
+	if !archiveExists {
 		log.Info("Downloading " + t.name)
 
 		downloaded := false
@@ -385,6 +326,11 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 			log.Info("File integrity verified")
 		}
+	}
+	//***************************
+	//remove old template before installing new one
+	if container.IsTemplate(t.name) {
+		container.DestroyTemplate(t.name)
 	}
 
 	log.Info("Unpacking template " + t.name)
