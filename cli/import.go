@@ -271,7 +271,8 @@ func LxcImport(name, token string, auxDepList ...string) {
 	//obtain full template info from Kurjun by name to get latest version
 	getTemplateInfo(&t, kurjun, token)
 
-	if container.IsTemplate(t.name) {
+	isTemplate := container.IsTemplate(t.name)
+	if isTemplate {
 		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
 
 		//template of latest version already installed
@@ -292,17 +293,21 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
-	archiveExists := fs.FileExists(t.file)
+	archiveExists := fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 
 	if archiveExists {
 
 		log.Debug("Template archive is present in local cache")
+
+		//clean all matching OLDER archives
+		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/"+
+			strings.ToLower(t.name)+ "-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz", t.file)
 	} else {
 
 		log.Debug("Template archive is missing in local cache")
 
 		//clean all matching archives
-		fs.DeleteFilesWildcard(
+		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" +
 			strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz")
 	}
 
@@ -331,10 +336,9 @@ func LxcImport(name, token string, auxDepList ...string) {
 			log.Info("File integrity verified")
 		}
 	}
-	//***************************
-	//todo optimize
+
 	//remove old template before installing new one
-	if container.IsTemplate(t.name) {
+	if isTemplate {
 		container.DestroyTemplate(t.name)
 	}
 
