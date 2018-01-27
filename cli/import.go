@@ -191,9 +191,10 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 
 	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 	if t.id == hash || t.md5 == hash {
-		log.Debug("Hash sum mismatch ")
 		return true, nil
 	}
+
+	log.Debug("Hash sum mismatch ")
 
 	return false, err
 }
