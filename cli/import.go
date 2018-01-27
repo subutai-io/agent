@@ -160,6 +160,7 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 
 	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 	if err != nil {
+		log.Debug("Failed to create archive ", err)
 		return false, err
 	}
 	defer out.Close()
@@ -171,6 +172,7 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	}
 	response, err := kurjun.Get(url)
 	if err != nil {
+		log.Debug("Failed to connect to Kurjun ", err)
 		return false, err
 	}
 	defer utils.Close(response)
@@ -184,11 +186,13 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	defer bar.Finish()
 	_, err = io.Copy(out, rd)
 	if err != nil {
+		log.Debug("Failed to download template ", err)
 		return false, err
 	}
 
 	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 	if t.id == hash || t.md5 == hash {
+		log.Debug("Hash sum mismatch ")
 		return true, nil
 	}
 
@@ -328,6 +332,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		}
 	}
 	//***************************
+	//todo optimize
 	//remove old template before installing new one
 	if container.IsTemplate(t.name) {
 		container.DestroyTemplate(t.name)
