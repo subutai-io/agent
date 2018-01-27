@@ -170,6 +170,8 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	if len(t.owner) > 0 {
 		url = config.CDN.Kurjun + "/template/" + t.owner[0] + "/" + t.file + "?token=" + token
 	}
+	log.Debug("Template url " + url)
+
 	response, err := kurjun.Get(url)
 	if err != nil {
 		log.Debug("Failed to connect to Kurjun ", err)
