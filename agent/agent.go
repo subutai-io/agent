@@ -85,7 +85,6 @@ func Start() {
 	go discovery.Monitor()
 	go monitor.Collect()
 	go connectionMonitor()
-	//todo disable this
 	go alert.Processing()
 	go logger.SyslogServer()
 	go restoreContainers()
@@ -114,6 +113,7 @@ func Start() {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
+		//todo review if exec is needed instead of direct call
 		go exec.Command("subutai", "tunnel", "check").Run()
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
