@@ -53,7 +53,7 @@ type Quota struct {
 
 func init() {
 	//initialize cache
-	cache = ttlcache.NewCache(time.Minute * 10)
+	cache = ttlcache.NewCache(time.Minute * 30)
 }
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.
@@ -120,6 +120,8 @@ func Active(details bool) []Container {
 			EnvId:    envId,
 		}
 
+		container.Interfaces = interfaces(c, ip)
+
 		//cacheable properties>>>
 
 		container.ID = getFromCacheOrCalculate(c+"_fingerprint", func() string {
@@ -135,8 +137,6 @@ func Active(details bool) []Container {
 		})
 
 		//<<<cacheable properties
-
-		container.Interfaces = interfaces(c, ip)
 
 		if details {
 			container.Pk = gpg.GetContainerPk(c)
