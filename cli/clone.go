@@ -27,7 +27,9 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		kurjun, err := config.CheckKurjun()
 		log.Check(log.ErrorLevel, "Connecting to CDN", err)
-		parent = idToName(id[1], kurjun, kurjToken)
+		var t templ
+		idToName(&t, id[1], kurjun, kurjToken)
+		parent = t.name
 	}
 	meta["parent"] = parent
 
