@@ -17,6 +17,12 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 	"github.com/subutai-io/agent/db"
+	"github.com/wunderlist/ttlcache"
+	"time"
+)
+
+var (
+	cache *ttlcache.Cache
 )
 
 // Container describes Subutai container with all required options for the Management server.
@@ -43,6 +49,11 @@ type Quota struct {
 	Home int `json:"home,omitempty"`
 	Opt  int `json:"opt,omitempty"`
 	Var  int `json:"var,omitempty"`
+}
+
+func init() {
+	//initialize cache
+	cache = ttlcache.NewCache(time.Minute * 10)
 }
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.
@@ -95,18 +106,38 @@ func Active(details bool) []Container {
 
 		vlan := meta["vlan"]
 		envId := meta["environment"]
+		ip := meta["ip"]
 
 		container := Container{
-			ID:         gpg.GetFingerprint(c),
-			Name:       c,
-			Hostname:   strings.TrimSpace(string(hostname)),
-			Status:     cont.State(c),
-			Arch:       strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
-			Interfaces: interfaces(c),
-			Parent:     cont.GetConfigItem(configpath, "subutai.parent"),
-			Vlan:       vlan,
-			EnvId:      envId,
+			//ID:       gpg.GetFingerprint(c),
+			//Arch: strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
+			//Parent: cont.GetConfigItem(configpath, "subutai.parent"),
+			//Interfaces: interfaces(c, ""),
+			Name:     c,
+			Hostname: strings.TrimSpace(string(hostname)),
+			Status:   cont.State(c),
+			Vlan:     vlan,
+			EnvId:    envId,
 		}
+
+		//cacheable properties>>>
+
+		container.ID = getFromCacheOrCalculate(c+"_fingerprint", func() string {
+			return gpg.GetFingerprint(c)
+		})
+
+		container.Arch = getFromCacheOrCalculate(c+"_arch", func() string {
+			return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
+		})
+
+		container.Parent = getFromCacheOrCalculate(c+"_parent", func() string {
+			return cont.GetConfigItem(configpath, "subutai.parent")
+		})
+
+		//<<<cacheable properties
+
+		container.Interfaces = interfaces(c, ip)
+
 		if details {
 			container.Pk = gpg.GetContainerPk(c)
 		}
@@ -116,18 +147,38 @@ func Active(details bool) []Container {
 	return contArr
 }
 
-func interfaces(name string) []utils.Iface {
+type calculate func() string
+
+func getFromCacheOrCalculate(cacheKey string, calc calculate) string {
+	value, exists := cache.Get(cacheKey)
+
+	if exists {
+		return value
+	} else {
+		value = calc()
+		cache.Set(cacheKey, value)
+		return value
+	}
+}
+
+//todo refactor to remove interfaces and just have ip field sent to Console
+//this should be done together with Console changes
+func interfaces(name string, staticIp string) []utils.Iface {
+
 	iface := new(utils.Iface)
 
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
-		return []utils.Iface{*iface}
-	}
-
 	iface.InterfaceName = "eth0"
-	listip, err := c.IPAddress(iface.InterfaceName)
-	if err == nil {
-		iface.IP = strings.Join(listip, " ")
+
+	if staticIp != "" {
+		iface.IP = staticIp
+	} else {
+		c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+		if err == nil {
+			listip, err := c.IPAddress(iface.InterfaceName)
+			if err == nil {
+				iface.IP = strings.Join(listip, " ")
+			}
+		}
 	}
 
 	return []utils.Iface{*iface}
