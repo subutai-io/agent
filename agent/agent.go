@@ -113,8 +113,9 @@ func Start() {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		//todo review if exec is needed instead of direct call
-		go exec.Command("subutai", "tunnel", "check").Run()
+
+		go exec.Command("timeout", "5m", "subutai", "tunnel", "check").Run()
+
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
 		}
