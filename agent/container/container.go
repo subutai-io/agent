@@ -156,7 +156,9 @@ func getFromCacheOrCalculate(cacheKey string, calc calculate) string {
 		return value
 	} else {
 		value = calc()
-		cache.Set(cacheKey, value)
+		if value != "" {
+			cache.Set(cacheKey, value)
+		}
 		return value
 	}
 }
