@@ -190,11 +190,11 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	}
 
 	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-	if t.id == hash || t.md5 == hash {
+	if t.md5 == hash {
 		return true, nil
 	}
 
-	log.Debug("Hash sum mismatch ")
+	log.Warn("Hash sum mismatch")
 
 	return false, err
 }
@@ -299,6 +299,17 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 		log.Debug("Template archive is present in local cache")
 
+		hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+		if t.md5 == hash {
+
+			log.Debug("File integrity is verified")
+		} else {
+
+			log.Warn("File integrity verification failed")
+
+			archiveExists = false
+		}
+
 		//clean all matching OLDER archives
 		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/"+
 			strings.ToLower(t.name)+ "-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz", t.file)
@@ -333,7 +344,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 			log.Error("Failed to download or verify template " + t.name)
 		} else {
 
-			log.Info("File integrity verified")
+			log.Info("File integrity is verified")
 		}
 	}
 
