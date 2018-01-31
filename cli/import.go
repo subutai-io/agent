@@ -299,6 +299,17 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 		log.Debug("Template archive is present in local cache")
 
+		hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+		if t.md5 == hash {
+
+			log.Debug("File integrity is verified")
+		} else {
+
+			log.Debug("File integrity verification failed")
+
+			archiveExists = false
+		}
+
 		//clean all matching OLDER archives
 		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/"+
 			strings.ToLower(t.name)+ "-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz", t.file)
