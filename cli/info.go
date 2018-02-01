@@ -288,7 +288,7 @@ func grep(str, filename string) string {
 
 // Info command's purposed is to display common system information, such as
 // external IP address to access the container host quotas, its CPU model, RAM size, etc. It's mainly used for internal SS needs.
-func Info(command, host, interval string) {
+func Info(command, host string) {
 	if command == "ipaddr" {
 		fmt.Println(net.GetIp())
 		return
@@ -303,15 +303,14 @@ func Info(command, host, interval string) {
 		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
-	}
-
-	switch command {
-	case "quota":
+	} else if command == "du" {
+		println(fs.DiskUsage(host))
+	} else if command == "quota" {
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}
 		fmt.Println(quota(host))
-	case "system":
+	} else if command == "system" {
 		host, err := os.Hostname()
 		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))
