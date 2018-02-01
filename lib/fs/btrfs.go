@@ -31,7 +31,7 @@ func DiskUsage(container string) string {
 
 	out, err := exec.Command("btrfs", "filesystem", "du", "-s", "--raw", config.Agent.LxcPrefix+container).CombinedOutput()
 
-	log.Check(log.DebugLevel, "Checking disk usage of container "+container+": "+string(out), err)
+	log.Check(log.ErrorLevel, "Checking disk usage of container "+container+": "+string(out), err)
 
 	output := strings.Split(string(out), "\n")
 

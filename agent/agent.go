@@ -114,7 +114,7 @@ func Start() {
 			time.Sleep(5 * time.Second)
 		}
 
-		go exec.Command("timeout", "5m", "subutai", "tunnel", "check").Run()
+		go exec.Command("timeout", "30", "subutai", "tunnel", "check").Run()
 
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
