@@ -27,11 +27,28 @@ func IsSubvolumeReadWrite(path string) bool {
 	return strings.Contains(string(out), "false")
 }
 
-// IsSubvolume checks if path BTRFS subvolume.
-func IsSubvolume(path string) bool {
-	out, err := exec.Command("btrfs", "subvolume", "show", path).CombinedOutput()
-	log.Check(log.DebugLevel, "Checking is path BTRFS subvolume", err)
-	return strings.Contains(string(out), "Subvolume ID")
+func DiskUsage(container string) string {
+
+	out, err := exec.Command("btrfs", "filesystem", "du", "-s", "--raw", config.Agent.LxcPrefix+container).CombinedOutput()
+
+	log.Check(log.DebugLevel, "Checking disk usage of container "+container+": "+string(out), err)
+
+	output := strings.Split(string(out), "\n")
+
+	for idx, line := range output {
+
+		//skip header
+		if idx == 1 {
+
+			return strings.Fields(line)[0]
+		}
+
+	}
+
+	log.Error("Failed to parse output: " + string(out))
+
+	//should not reach here
+	return ""
 }
 
 // SubvolumeCreate creates BTRFS subvolume.
