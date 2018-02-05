@@ -235,7 +235,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 //
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
-func LxcImport(name, token string, auxDepList ...string) {
+func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var kurjun *http.Client
 
 	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
@@ -293,33 +293,70 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
-	archiveExists := fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+	wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/" +
+		strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+
+	var archiveExists = false
+
+	if local {
+		//check if template with the same name but any version exists locally
+		files := fs.GetFilesWildCard(wildcardTemplateName)
+
+		if files != nil && len(files) > 0 {
+
+			latestVersionFile := files[0]
+			latestVersion := getVersion(latestVersionFile)
+
+			for idx, file := range files {
+				if idx > 0 {
+					ver := getVersion(file)
+					if version.Compare(ver, latestVersion, ">") {
+						latestVersionFile = file
+						latestVersion = ver
+					}
+				}
+			}
+
+			t.file = latestVersionFile
+
+			archiveExists = true
+
+		} else {
+			log.Warn("Template " + name + " not found in local cache")
+		}
+
+	} else {
+
+		archiveExists = fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+	}
 
 	if archiveExists {
 
 		log.Debug("Template archive is present in local cache")
 
-		hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-		if t.md5 == hash {
+		if !local {
+			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+			if t.md5 == hash {
 
-			log.Debug("File integrity is verified")
+				log.Debug("File integrity is verified")
+			} else {
+
+				log.Warn("File integrity verification failed")
+
+				archiveExists = false
+			}
 		} else {
-
-			log.Warn("File integrity verification failed")
-
-			archiveExists = false
+			log.Warn("Skipping file integrity verification since -local flag was passed")
 		}
 
 		//clean all matching OLDER archives
-		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/"+
-			strings.ToLower(t.name)+ "-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz", t.file)
+		fs.DeleteFilesWildcard(wildcardTemplateName, t.file)
 	} else {
 
 		log.Debug("Template archive is missing in local cache")
 
 		//clean all matching archives
-		fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" +
-			strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz")
+		fs.DeleteFilesWildcard(wildcardTemplateName)
 	}
 
 	if !archiveExists {
@@ -364,7 +401,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		// Append the template and parent name to dependency list
 		auxDepList = append(auxDepList, parent, t.name)
 		log.Info("Parent template required: " + parent)
-		LxcImport(parent, token, auxDepList...)
+		LxcImport(parent, token, local, auxDepList...)
 	}
 
 	log.Info("Installing template " + t.name)
@@ -402,6 +439,11 @@ func LxcImport(name, token string, auxDepList ...string) {
 	log.Check(log.WarnLevel, "Opening database", err)
 	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+}
+
+func getVersion(fileName string) string {
+
+	return strings.Replace(strings.SplitAfter(fileName, "subutai-template_")[1], "_"+strings.ToLower(runtime.GOARCH)+".tar.gz", "", 1)
 }
 
 func verifySignature(id string, list map[string]string) error {

@@ -54,11 +54,21 @@ func FileExists(name string) bool {
 	return err == nil
 }
 
-func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
-
+func GetFilesWildCard(wildcard string) []string {
 	files, err := filepath.Glob(wildcard)
 
 	if log.Check(log.WarnLevel, "Getting files by wildcard: "+wildcard, err) {
+		return nil
+	}
+
+	return files
+}
+
+func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
+
+	files := GetFilesWildCard(wildcard)
+
+	if files == nil {
 		return
 	}
 
