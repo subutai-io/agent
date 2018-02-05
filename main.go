@@ -162,7 +162,7 @@ func main() {
 
 		Name: "info", Usage: "information about host system",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 
@@ -328,7 +328,7 @@ func main() {
 
 		Name: "stats", Usage: "statistics from host",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 
