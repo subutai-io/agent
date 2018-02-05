@@ -317,7 +317,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				}
 			}
 
-			t.file = latestVersionFile
+			t.file = strings.Replace(latestVersionFile, config.Agent.LxcPrefix+"tmpdir/", "", 1)
 
 			archiveExists = true
 
