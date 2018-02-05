@@ -154,9 +154,10 @@ func main() {
 
 		Name: "import", Usage: "import Subutai template",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"}},
+			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"},
+			gcli.BoolFlag{Name: "local, l", Usage: "prefer to use local template archive"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcImport(c.Args().Get(0), c.String("t"))
+			cli.LxcImport(c.Args().Get(0), c.String("t"), c.Bool("l"))
 			return nil
 		}}, {
 
