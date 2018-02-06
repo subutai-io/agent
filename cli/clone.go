@@ -34,7 +34,7 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta["parent"] = parent
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, kurjToken)
+		LxcImport(parent, kurjToken, false)
 	}
 	if container.ContainerOrTemplateExists(child) {
 		log.Error("Container " + child + " already exists")

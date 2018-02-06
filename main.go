@@ -154,15 +154,16 @@ func main() {
 
 		Name: "import", Usage: "import Subutai template",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"}},
+			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"},
+			gcli.BoolFlag{Name: "local, l", Usage: "prefer to use local template archive"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcImport(c.Args().Get(0), c.String("t"))
+			cli.LxcImport(c.Args().Get(0), c.String("t"), c.Bool("l"))
 			return nil
 		}}, {
 
 		Name: "info", Usage: "information about host system",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 
@@ -328,7 +329,7 @@ func main() {
 
 		Name: "stats", Usage: "statistics from host",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 
