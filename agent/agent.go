@@ -91,14 +91,17 @@ func Start() {
 
 	go func() {
 		s := make(chan os.Signal, 1)
-		signal.Notify(s, syscall.SIGTERM)
+		signal.Notify(s, syscall.SIGUSR1, syscall.SIGTERM)
 		sig := <-s
 
 		canRestoreContainers = false
 
-		for _, containerName := range lxc.Containers() {
-			if lxc.State(containerName) == "RUNNING" {
-				lxc.Stop(containerName, false)
+		if sig == syscall.SIGUSR1 {
+			//stop containers
+			for _, containerName := range lxc.Containers() {
+				if lxc.State(containerName) == "RUNNING" {
+					lxc.Stop(containerName, false)
+				}
 			}
 		}
 
@@ -155,21 +158,25 @@ func connectionMonitor() {
 			fingerprint = gpg.GetFingerprint("rh@subutai.io")
 			connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		} else {
-			resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
-			if err == nil {
-				defer utils.Close(resp)
-			}
-			if err == nil && resp.StatusCode == http.StatusOK {
-				log.Debug("Connection monitor check - success")
-			} else {
-				log.Debug("Connection monitor check - failed")
-				connect.Request(config.Agent.GpgUser, config.Management.Secret)
-				lastHeartbeat = []byte{}
-				go sendHeartbeat()
-			}
+			doCheckConnection()
 		}
 
 		time.Sleep(time.Second * 10)
+	}
+}
+
+func doCheckConnection() {
+	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
+	if err == nil {
+		defer utils.Close(resp)
+	}
+	if err == nil && resp.StatusCode == http.StatusOK {
+		log.Debug("Connection monitor check - success")
+	} else {
+		log.Debug("Connection monitor check - failed")
+		connect.Request(config.Agent.GpgUser, config.Management.Secret)
+		lastHeartbeat = []byte{}
+		go sendHeartbeat()
 	}
 }
 
