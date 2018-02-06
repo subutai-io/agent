@@ -40,7 +40,8 @@ func updateRH(name string, check bool) {
 		if check {
 			log.Info("Update is available")
 		} else {
-			log.Check(log.FatalLevel, "Updating RH snap", exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).Run())
+			out, err := exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).CombinedOutput()
+			log.Check(log.FatalLevel, "Updating RH snap: "+string(out), err)
 		}
 		os.Exit(0)
 	}
