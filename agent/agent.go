@@ -89,25 +89,44 @@ func Start() {
 	go logger.SyslogServer()
 	go restoreContainers()
 
+	/**
+	This routine does best effort to stop RUNNING containers on a custom signal (SIGUSR1)
+	received from our custom unit file on system reboot/shutdown
+	It handles SIGTERM in addition to SIGUSR1
+	Signals are awaited in a loop to make sure that they both are processed if sent, regardless of order
+	 */
 	go func() {
-		s := make(chan os.Signal, 1)
+		s := make(chan os.Signal, 2)
 		signal.Notify(s, syscall.SIGUSR1, syscall.SIGTERM)
-		sig := <-s
+		var wg sync.WaitGroup
 
-		canRestoreContainers = false
+		for i := 1; i <= 2; i++ {
+			sig := <-s
 
-		if sig == syscall.SIGUSR1 {
-			//stop containers
-			for _, containerName := range lxc.Containers() {
-				if lxc.State(containerName) == "RUNNING" {
-					lxc.Stop(containerName, false)
+			canRestoreContainers = false
+
+			switch sig {
+
+			case syscall.SIGUSR1:
+				//stop containers
+				for _, containerName := range lxc.Containers() {
+					if lxc.State(containerName) == "RUNNING" {
+						lxc.Stop(containerName, false)
+					}
 				}
+			case syscall.SIGTERM:
+				//wrap into routine to avoid blocking for-loop too long
+				//so that if SIGUSR1 comes second, we have more time to stop containers
+				//before system sends SIGKILL
+				wg.Add(1)
+				go func() {
+					log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
+					forceHeartbeat()
+					wg.Done()
+				}()
 			}
 		}
-
-		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
-
-		forceHeartbeat()
+		wg.Wait()
 	}()
 
 	for {
