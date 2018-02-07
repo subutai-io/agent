@@ -34,41 +34,47 @@ var (
 func Collect() {
 
 	for {
-		influx, err := utils.InfluxDbClient()
 
-		log.Check(log.WarnLevel, "Entering metrics collection routine", err)
+		doCollect()
+
+		time.Sleep(time.Second * 30)
+	}
+}
+
+func doCollect() {
+
+	influx, err := utils.InfluxDbClient()
+
+	log.Check(log.WarnLevel, "Entering metrics collection routine", err)
+
+	if err == nil {
+
+		defer influx.Close()
+
+		_, _, err := influx.Ping(time.Second)
+
+		log.Check(log.WarnLevel, "Pinging InfluxDB server", err)
 
 		if err == nil {
 
-			defer influx.Close()
+			bp, err := client.NewBatchPoints(client.BatchPointsConfig{Database: config.Influxdb.Db, RetentionPolicy: "hour"})
 
-			_, _, err := influx.Ping(time.Second)
-
-			log.Check(log.WarnLevel, "Pinging InfluxDB server", err)
+			log.Check(log.WarnLevel, "Preparing metrics batch", err)
 
 			if err == nil {
 
-				bp, err := client.NewBatchPoints(client.BatchPointsConfig{Database: config.Influxdb.Db, RetentionPolicy: "hour"})
+				netStat(bp)
+				cgroupStat(bp)
+				btrfsStat(bp)
+				diskFree(bp)
+				cpuStat(bp)
+				memStat(bp)
 
-				log.Check(log.WarnLevel, "Preparing metrics batch", err)
+				err = influx.Write(bp)
 
-				if err == nil {
-
-					netStat(bp)
-					cgroupStat(bp)
-					btrfsStat(bp)
-					diskFree(bp)
-					cpuStat(bp)
-					memStat(bp)
-
-					err = influx.Write(bp)
-
-					log.Check(log.WarnLevel, "Writing metrics batch", err)
-				}
+				log.Check(log.WarnLevel, "Writing metrics batch", err)
 			}
 		}
-
-		time.Sleep(time.Second * 30)
 	}
 }
 
