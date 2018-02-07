@@ -57,7 +57,11 @@ func main() {
 		Name: "attach", Usage: "attach to Subutai container",
 		SkipFlagParsing: true,
 		Action: func(c *gcli.Context) error {
-			cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
+			if c.Args().Get(0) != "" {
+				cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -66,7 +70,11 @@ func main() {
 			gcli.BoolFlag{Name: "full, f", Usage: "make full backup"},
 			gcli.BoolFlag{Name: "stop, s", Usage: "stop container at the time of backup"}},
 		Action: func(c *gcli.Context) error {
-			cli.BackupContainer(c.Args().Get(0), c.Bool("f"), c.Bool("s"))
+			if c.Args().Get(0) != "" {
+				cli.BackupContainer(c.Args().Get(0), c.Bool("f"), c.Bool("s"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -74,7 +82,11 @@ func main() {
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "json, j", Usage: "JSON string with commands"}},
 		Action: func(c *gcli.Context) error {
-			cli.Batch(c.String("j"))
+			if c.String("j") != "" {
+				cli.Batch(c.String("j"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -83,7 +95,11 @@ func main() {
 			gcli.BoolFlag{Name: "stop, s", Usage: "Stop container during checkpoint"},
 			gcli.BoolFlag{Name: "restore, r", Usage: "Restore checkpoint"}},
 		Action: func(c *gcli.Context) error {
-			cli.Checkpoint(c.Args().Get(0), c.Bool("r"), c.Bool("s"))
+			if c.Args().Get(0) != "" {
+				cli.Checkpoint(c.Args().Get(0), c.Bool("r"), c.Bool("s"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -94,13 +110,21 @@ func main() {
 			gcli.StringFlag{Name: "token, t", Usage: "token to verify with MH"},
 			gcli.StringFlag{Name: "kurjun, k", Usage: "kurjun token to clone private and shared templates"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"), c.String("k"))
+			if c.Args().Get(0) != "" {
+				cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"), c.String("k"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
 		Name: "cleanup", Usage: "clean Subutai environment",
 		Action: func(c *gcli.Context) error {
-			cli.LxcDestroy(c.Args().Get(0), true)
+			if c.Args().Get(0) != "" {
+				cli.LxcDestroy(c.Args().Get(0), true)
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -111,7 +135,11 @@ func main() {
 			gcli.StringFlag{Name: "value, v", Usage: "configuration value"},
 		},
 		Action: func(c *gcli.Context) error {
-			cli.LxcConfig(c.Args().Get(0), c.String("o"), c.String("k"), c.String("v"))
+			if c.Args().Get(0) != "" {
+				cli.LxcConfig(c.Args().Get(0), c.String("o"), c.String("k"), c.String("v"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -128,7 +156,11 @@ func main() {
 			gcli.StringFlag{Name: "vlan, v", Usage: "VLAN tag"},
 		},
 		Action: func(c *gcli.Context) error {
-			cli.LxcDemote(c.Args().Get(0), c.String("i"), c.String("v"))
+			if c.Args().Get(0) != "" {
+				cli.LxcDemote(c.Args().Get(0), c.String("i"), c.String("v"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -137,7 +169,11 @@ func main() {
 			gcli.BoolFlag{Name: "vlan, v", Usage: "destroy environment by passed vlan"},
 		},
 		Action: func(c *gcli.Context) error {
-			cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
+			if c.Args().Get(0) != "" {
+				cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -149,7 +185,11 @@ func main() {
 			gcli.StringFlag{Name: "description, d", Usage: "template description"},
 			gcli.BoolFlag{Name: "private, p", Usage: "use private repo for uploading template"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"), c.String("t"), c.String("d"), c.Bool("p"))
+			if c.Args().Get(0) != "" {
+				cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"), c.String("t"), c.String("d"), c.Bool("p"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -159,7 +199,11 @@ func main() {
 			gcli.StringFlag{Name: "v", Usage: "template version"},
 			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcImport(c.Args().Get(0), c.String("v"), c.String("t"), c.Bool("torrent"))
+			if c.Args().Get(0) != "" {
+				cli.LxcImport(c.Args().Get(0), c.String("v"), c.String("t"), c.Bool("torrent"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -213,7 +257,11 @@ func main() {
 			gcli.BoolFlag{Name: "sslbackend", Usage: "ssl backend in https upstream"},
 		},
 		Action: func(c *gcli.Context) error {
-			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
+			if c.Args().Get(0) != "" {
+				cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -222,7 +270,11 @@ func main() {
 			gcli.StringFlag{Name: "start, s", Usage: "start time"},
 			gcli.StringFlag{Name: "end, e", Usage: "end time"}},
 		Action: func(c *gcli.Context) error {
-			cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
+			if c.Args().Get(0) != "" {
+				cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -231,7 +283,11 @@ func main() {
 			gcli.StringFlag{Name: "stage, s", Usage: "migration stage"},
 			gcli.StringFlag{Name: "destination, d", Usage: "peer destination address"}},
 		Action: func(c *gcli.Context) error {
-			cli.Migrate(c.Args().Get(0), c.String("s"), c.String("d"))
+			if c.Args().Get(0) != "" {
+				cli.Migrate(c.Args().Get(0), c.String("s"), c.String("d"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -259,7 +315,11 @@ func main() {
 		Name: "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcPromote(c.Args().Get(0), c.String("s"))
+			if c.Args().Get(0) != "" {
+				cli.LxcPromote(c.Args().Get(0), c.String("s"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -316,7 +376,11 @@ func main() {
 
 		Name: "rename", Usage: "rename Subutai container",
 		Action: func(c *gcli.Context) error {
-			cli.LxcRename(c.Args().Get(0), c.Args().Get(1))
+			if c.Args().Get(0) != "" || c.Args().Get(1) != "" {
+				cli.LxcRename(c.Args().Get(0), c.Args().Get(1))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -325,7 +389,11 @@ func main() {
 			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
 			gcli.StringFlag{Name: "container, c", Usage: "name of new container"}},
 		Action: func(c *gcli.Context) error {
-			cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
+			if c.Args().Get(0) != "" {
+				cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -337,13 +405,21 @@ func main() {
 
 		Name: "start", Usage: "start Subutai container",
 		Action: func(c *gcli.Context) error {
-			cli.LxcStart(c.Args().Get(0))
+			if c.Args().Get(0) != "" {
+				cli.LxcStart(c.Args().Get(0))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
 		Name: "stop", Usage: "stop Subutai container",
 		Action: func(c *gcli.Context) error {
-			cli.LxcStop(c.Args().Get(0))
+			if c.Args().Get(0) != "" {
+				cli.LxcStop(c.Args().Get(0))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
@@ -382,7 +458,11 @@ func main() {
 		Flags: []gcli.Flag{
 			gcli.BoolFlag{Name: "check, c", Usage: "check for updates without installation"}},
 		Action: func(c *gcli.Context) error {
-			cli.Update(c.Args().Get(0), c.Bool("c"))
+			if c.Args().Get(0) != "" {
+				cli.Update(c.Args().Get(0), c.Bool("c"))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
 			return nil
 		}}, {
 
