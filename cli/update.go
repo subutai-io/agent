@@ -20,10 +20,11 @@ import (
 // if a newer version is found, installs it. Please note, system security policies requires that such commands should be performed by the superuser manually,
 // otherwise an application's attempt to update itself will be blocked.
 func Update(name string, check bool) {
-	if !lockSubutai(name + ".update") {
+	lock, err := lockSubutai(name + ".update")
+	if err != nil {
 		log.Error("Another update process is already running")
 	}
-	defer unlockSubutai()
+	defer lock.Unlock()
 
 	if name == "rh" {
 		updateRH(name, check)
@@ -39,7 +40,8 @@ func updateRH(name string, check bool) {
 		if check {
 			log.Info("Update is available")
 		} else {
-			log.Check(log.FatalLevel, "Updating RH snap", exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).Run())
+			out, err := exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).CombinedOutput()
+			log.Check(log.FatalLevel, "Updating RH snap: "+string(out), err)
 		}
 		os.Exit(0)
 	}
@@ -48,7 +50,7 @@ func updateRH(name string, check bool) {
 }
 
 func updateContainer(name string, check bool) {
-	if !container.IsContainer(name) {
+	if !container.ContainerOrTemplateExists(name) {
 		log.Error("no such instance \"" + name + "\"")
 	}
 	_, err := container.AttachExec(name, []string{"apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})

@@ -14,7 +14,7 @@ import (
 
 // LxcHostname command changes container configs to apply a new name for the container. Used for internal SS purposes.
 func LxcHostname(c, name string) {
-	if !container.IsContainer(c) || container.IsTemplate(c) {
+	if !container.ContainerOrTemplateExists(c) || container.IsTemplate(c) {
 		log.Error(c + " is not an container")
 		return
 	}
@@ -24,6 +24,7 @@ func LxcHostname(c, name string) {
 
 	file, err := os.Open(config.Agent.LxcPrefix + c + "/rootfs/etc/hosts")
 	log.Check(log.FatalLevel, "Reading /etc/hosts for "+c, err)
+	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 
 	var hosts string
@@ -34,7 +35,6 @@ func LxcHostname(c, name string) {
 			hosts = hosts + scanner.Text() + "\n"
 		}
 	}
-	file.Close()
 	err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/rootfs/etc/hosts", []byte(hosts), 0644)
 	log.Check(log.FatalLevel, "Fixing /etc/hosts for "+c, err)
 

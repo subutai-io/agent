@@ -11,12 +11,12 @@ import (
 // LxcRename renames a Subutai container impacting filesystem paths, configuration values, etc.
 func LxcRename(src, dst string) {
 	run := false
-	if len(dst) == 0 || container.IsContainer(dst) || container.IsTemplate(dst) {
-		log.Error("Incorrect new name or instance already exist")
+	if len(dst) == 0 || container.ContainerOrTemplateExists(dst) || container.IsTemplate(dst) {
+		log.Error("Incorrect new name or instance already exists")
 	}
 	if container.State(src) == "RUNNING" {
 		run = true
-		log.Check(log.ErrorLevel, "Stopping container", container.Stop(src))
+		log.Check(log.ErrorLevel, "Stopping container", container.Stop(src, true))
 	}
 
 	err := os.Rename(config.Agent.LxcPrefix+src, config.Agent.LxcPrefix+dst)

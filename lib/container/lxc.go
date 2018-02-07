@@ -32,6 +32,10 @@ func IsTemplate(name string) bool {
 	return fs.IsSubvolumeReadonly(config.Agent.LxcPrefix + name + "/rootfs/")
 }
 
+func IsContainer(name string) bool {
+	return fs.IsSubvolumeReadWrite(config.Agent.LxcPrefix + name + "/rootfs/")
+}
+
 // Templates returns list of all templates
 func Templates() (containers []string) {
 	for _, name := range All() {
@@ -45,15 +49,15 @@ func Templates() (containers []string) {
 // Containers returns list of all containers
 func Containers() (containers []string) {
 	for _, name := range All() {
-		if !IsTemplate(name) {
+		if IsContainer(name) {
 			containers = append(containers, name)
 		}
 	}
 	return
 }
 
-// IsContainer checks is container exist.
-func IsContainer(name string) bool {
+// ContainerOrTemplateExists checks if container or template exists
+func ContainerOrTemplateExists(name string) bool {
 	for _, item := range All() {
 		if name == item {
 			return true
@@ -98,7 +102,7 @@ func SetApt(name string) {
 
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
-	if !IsContainer(name) {
+	if !ContainerOrTemplateExists(name) {
 		return errors.New("Container does not exists")
 	}
 	bolt, err := db.New()
@@ -118,21 +122,29 @@ func Start(name string) error {
 	if c.State().String() != "RUNNING" {
 		return errors.New("Unable to start container " + name)
 	}
-	AddMetadata(name, map[string]string{"state": State(name)})
+	AddMetadata(name, map[string]string{"state": "RUNNING"})
 	return nil
 }
 
 // Stop stops the Subutai container.
-func Stop(name string) error {
+func Stop(name string, addMetadata bool) error {
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+
 	log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
+
 	if c.State().String() != "STOPPED" {
 		return errors.New("Unable to stop container " + name)
 	}
-	AddMetadata(name, map[string]string{"state": State(name)})
+
+	if addMetadata {
+		AddMetadata(name, map[string]string{"state": "STOPPED"})
+	}
+
 	return nil
 }
 
@@ -202,8 +214,8 @@ func DumpRestore(name string) error {
 
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
-	if !IsContainer(name) {
-		return output, errors.New("Container does not exists")
+	if !ContainerOrTemplateExists(name) {
+		return output, errors.New("Container does not exist")
 	}
 
 	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -247,25 +259,43 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 }
 
 // Destroy deletes the Subutai container.
-func Destroy(name string) error {
+func DestroyContainer(name string) error {
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+
 	if c.State() == lxc.RUNNING {
 		if err = c.Stop(); log.Check(log.DebugLevel, "Stopping container", err) {
 			return err
 		}
 	}
+
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
 	db, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", db.Close())
+
 	return nil
+}
+
+func DestroyTemplate(name string) {
+
+	//remove files
+	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+
+	//remove metadata from db
+	db, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
+	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
+	log.Check(log.WarnLevel, "Closing database", db.Close())
+
 }
 
 // GetParent return a parent of the Subutai container.
@@ -411,6 +441,7 @@ func SetContainerConf(container string, conf [][]string) error {
 	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
 		return err
 	}
+	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		newline := scanner.Text() + "\n"
@@ -426,7 +457,6 @@ func SetContainerConf(container string, conf [][]string) error {
 		}
 		newconf = newconf + newline
 	}
-	log.Check(log.DebugLevel, "Closing container configuration file", file.Close())
 
 	for i := range conf {
 		if conf[i][1] != "" {

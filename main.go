@@ -55,7 +55,6 @@ func main() {
 
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
-		SkipFlagParsing: true,
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
 				cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
@@ -195,12 +194,11 @@ func main() {
 
 		Name: "import", Usage: "import Subutai template",
 		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "torrent", Usage: "use BitTorrent for downloading (experimental)"},
-			gcli.StringFlag{Name: "v", Usage: "template version"},
-			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"}},
+			gcli.StringFlag{Name: "token, t", Usage: "token to access private repo"},
+			gcli.BoolFlag{Name: "local, l", Usage: "prefer to use local template archive"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcImport(c.Args().Get(0), c.String("v"), c.String("t"), c.Bool("torrent"))
+				cli.LxcImport(c.Args().Get(0), c.String("t"), c.Bool("l"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -209,7 +207,7 @@ func main() {
 
 		Name: "info", Usage: "information about host system",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 
@@ -312,7 +310,7 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "promote", Usage: "promote Subutai container",
+		Name:  "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
@@ -399,7 +397,7 @@ func main() {
 
 		Name: "stats", Usage: "statistics from host",
 		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1), c.Args().Get(2))
+			cli.Info(c.Args().Get(0), c.Args().Get(1))
 			return nil
 		}}, {
 

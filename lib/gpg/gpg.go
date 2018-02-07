@@ -20,6 +20,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"time"
 )
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
@@ -100,7 +101,7 @@ func GenerateKey(name string) {
 	path := config.Agent.LxcPrefix + name
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
-	if !container.IsContainer(name) {
+	if !container.ContainerOrTemplateExists(name) {
 		err := os.MkdirAll("/root/.gnupg/", 0700)
 		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
 		path = "/root/.gnupg"
@@ -130,7 +131,7 @@ func GenerateKey(name string) {
 	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
 		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
 	}
-	if !container.IsContainer(name) {
+	if !container.ContainerOrTemplateExists(name) {
 		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
 			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
@@ -157,6 +158,7 @@ func GetFingerprint(email string) string {
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
 		out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -180,7 +182,8 @@ func getMngKey(c string) {
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
-	defer resp.Body.Close()
+	defer utils.Close(resp)
+
 	if body, err := ioutil.ReadAll(resp.Body); err == nil {
 		err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
 		log.Check(log.FatalLevel, "Writing Management public key", err)
@@ -221,11 +224,12 @@ func sendData(c string) {
 	defer asc.Close()
 
 	client := utils.TLSConfig()
+	client.Timeout = time.Second * 15
 	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
 	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
 	log.Check(log.FatalLevel, "Sending registration request to management", err)
-
+	defer utils.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)
 	}
@@ -284,11 +288,11 @@ func ParsePem(cert string) (crt, key []byte) {
 func KurjunUserPK(owner string) []string {
 	var keys []string
 	kurjun, err := config.CheckKurjun()
-	log.Check(log.DebugLevel, "Checking Kurjun", err)
+	log.Check(log.ErrorLevel, "Checking Kurjun", err)
 
 	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
-	defer response.Body.Close()
+	defer utils.Close(response)
 
 	key, err := ioutil.ReadAll(response.Body)
 	log.Check(log.FatalLevel, "Reading key body", err)

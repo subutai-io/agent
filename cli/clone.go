@@ -25,18 +25,21 @@ import (
 func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta := make(map[string]string)
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
-		kurjun, _ := config.CheckKurjun()
-		parent = idToName(id[1], kurjun, kurjToken)
+		kurjun, err := config.CheckKurjun()
+		log.Check(log.ErrorLevel, "Connecting to CDN", err)
+		var t templ
+		idToName(&t, id[1], kurjun, kurjToken)
+		parent = t.name
 	}
 	meta["parent"] = parent
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, "", kurjToken, false)
+		LxcImport(parent, kurjToken, false)
 	}
-	if container.IsContainer(child) {
-		log.Error("Container " + child + " already exist")
+	if container.ContainerOrTemplateExists(child) {
+		log.Error("Container " + child + " already exists")
 	}
-	log.Check(log.ErrorLevel, "Clonning the container", container.Clone(parent, child))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(parent, child))
 	gpg.GenerateKey(child)
 
 	if len(token) != 0 {

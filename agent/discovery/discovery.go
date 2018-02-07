@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/fromkeith/gossdp"
-	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 type handler struct {
@@ -97,10 +97,13 @@ func fingerprint() string {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
 	}
 	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
+	if err == nil {
+		defer utils.Close(resp)
+	}
+
 	if log.Check(log.WarnLevel, "Getting Management host GPG fingerprint", err) {
 		return ""
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
 		key, err := ioutil.ReadAll(resp.Body)
@@ -123,7 +126,7 @@ func save(ip string) {
 
 	config.Influxdb.Server = ip
 	if config.Management.Host != ip {
-		monitor.InitInfluxdb()
+		utils.ResetInfluxDbClient()
 	}
 	config.Management.Host = ip
 }
@@ -134,10 +137,14 @@ func getKey() []byte {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
 	}
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
+
+	if err == nil {
+		defer utils.Close(resp)
+	}
+
 	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
 		return nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
 		if key, err := ioutil.ReadAll(resp.Body); err == nil {

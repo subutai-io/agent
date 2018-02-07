@@ -8,6 +8,7 @@ import (
 	"github.com/jhoonb/archivex"
 
 	"github.com/subutai-io/agent/log"
+	"strings"
 )
 
 // Copy creates a copy of passed "source" file to "dest" file
@@ -39,4 +40,51 @@ func ChownR(path string, uid, gid int) error {
 		}
 		return err
 	})
+}
+
+func FileExists(name string) bool {
+	_, err := os.Stat(name)
+
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	//sometimes there can be permission or other errors
+	//here we use a simple logic that if file exists and we can use it then true otherwise false
+	return err == nil
+}
+
+func GetFilesWildCard(wildcard string) []string {
+	files, err := filepath.Glob(wildcard)
+
+	if log.Check(log.WarnLevel, "Getting files by wildcard: "+wildcard, err) {
+		return nil
+	}
+
+	return files
+}
+
+func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
+
+	files := GetFilesWildCard(wildcard)
+
+	if files == nil {
+		return
+	}
+
+	for _, f := range files {
+
+		exclude := false
+
+		for _, excludedFile := range excludedFiles {
+			if strings.HasSuffix(f, excludedFile) {
+				exclude = true
+				break
+			}
+		}
+
+		if !exclude {
+			log.Check(log.WarnLevel, "Removing file: "+f, os.Remove(f))
+		}
+	}
 }

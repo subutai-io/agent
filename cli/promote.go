@@ -21,7 +21,7 @@ import (
 func LxcPromote(name, source string) {
 	if len(source) > 0 && len(name) > 0 {
 		if container.State(source) == "RUNNING" {
-			container.Stop(source)
+			container.Stop(source, true)
 			defer container.Start(source)
 		}
 		log.Check(log.ErrorLevel, "Clonning source container", container.Clone(source, name))
@@ -41,7 +41,7 @@ func LxcPromote(name, source string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/packages",
 			[]byte(strCmdRes), 0755))
 	if container.State(name) == "RUNNING" {
-		log.Check(log.ErrorLevel, "Stopping container", container.Stop(name))
+		log.Check(log.ErrorLevel, "Stopping container", container.Stop(name, true))
 	}
 	net.RestoreDefaultConf(name)
 
@@ -98,7 +98,7 @@ func execDiff(dir1, dir2, output string) {
 // checkSanity performs different checks before promote command
 func checkSanity(name string) {
 	// check: if name exists
-	if !container.IsContainer(name) {
+	if !container.ContainerOrTemplateExists(name) {
 		log.Error("Container " + name + " does not exist")
 	}
 

@@ -58,6 +58,6 @@ func Request(user, pass string) {
 		bytes.NewBuffer(msg))
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		defer utils.Close(resp)
 	}
 }

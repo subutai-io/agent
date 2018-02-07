@@ -19,12 +19,10 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-)
-
-var (
-	clnt client.Client
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 type hostStat struct {
@@ -58,20 +56,16 @@ type quotaUsage struct {
 	RAM int `json:"ram"`
 }
 
-func initdb() {
-	var err error
-	clnt, err = client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		Timeout:            time.Second * 10,
-		InsecureSkipVerify: true,
-	})
-	log.Check(log.FatalLevel, "Initialize db connection", err)
-	return
-}
-
 func queryDB(cmd string) (res []client.Result, err error) {
+
+	clnt, err := utils.InfluxDbClient()
+
+	if err == nil {
+		defer clnt.Close()
+	} else {
+		return nil, err
+	}
+
 	q := client.Query{
 		Command:  cmd,
 		Database: config.Influxdb.Db,
@@ -90,10 +84,14 @@ func queryDB(cmd string) (res []client.Result, err error) {
 
 func ramLoad(h string) (memfree, memtotal, cached interface{}) {
 	file, err := os.Open("/proc/meminfo")
+
+	if err == nil {
+		defer file.Close()
+	}
+
 	if log.Check(log.WarnLevel, "Reading /proc/meminfo", err) {
 		return
 	}
-	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		line := strings.Fields(strings.Replace(scanner.Text(), ":", "", -1))
@@ -180,7 +178,7 @@ func cpuQuotaUsage(h string) int {
 func read(path string) (i int) {
 	f, err := os.Open(path)
 	log.Check(log.FatalLevel, "Reading "+path, err)
-
+	defer f.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(f))
 	for scanner.Scan() {
 		i, err = strconv.Atoi(scanner.Text())
@@ -272,9 +270,9 @@ func grep(str, filename string) string {
 		log.Warn("Cannot open " + filename)
 		return ""
 	}
-	f := bufio.NewReader(fh)
-
 	defer fh.Close()
+
+	f := bufio.NewReader(fh)
 	for {
 		buf, _, err := f.ReadLine()
 		if err != nil {
@@ -290,7 +288,7 @@ func grep(str, filename string) string {
 
 // Info command's purposed is to display common system information, such as
 // external IP address to access the container host quotas, its CPU model, RAM size, etc. It's mainly used for internal SS needs.
-func Info(command, host, interval string) {
+func Info(command, host string) {
 	if command == "ipaddr" {
 		fmt.Println(net.GetIp())
 		return
@@ -301,17 +299,18 @@ func Info(command, host, interval string) {
 	} else if command == "os" {
 
 		fmt.Printf("%s\n", getOsName())
-	}
-
-	initdb()
-
-	switch command {
-	case "quota":
+	} else if command == "id" {
+		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+		defer os.Unsetenv("GNUPGHOME")
+		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
+	} else if command == "du" {
+		fmt.Println(fs.DiskUsage(host))
+	} else if command == "quota" {
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}
 		fmt.Println(quota(host))
-	case "system":
+	} else if command == "system" {
 		host, err := os.Hostname()
 		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))

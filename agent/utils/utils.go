@@ -17,12 +17,58 @@ import (
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
+	"github.com/influxdata/influxdb/client/v2"
+	"io"
+)
+
+var (
+	influxDbClient client.Client
 )
 
 // Iface describes network interfaces of the Resource Host.
 type Iface struct {
 	InterfaceName string `json:"interfaceName"`
 	IP            string `json:"ip"`
+}
+
+// ---> InfluxDB
+func InfluxDbClient() (clnt client.Client, err error) {
+
+	if influxDbClient == nil {
+		influxDbClient, err = createInfluxDbClient()
+	}
+
+	clnt = influxDbClient
+
+	return
+}
+
+func ResetInfluxDbClient() {
+	if influxDbClient != nil {
+		influxDbClient.Close()
+		influxDbClient = nil
+	}
+}
+
+func createInfluxDbClient() (client.Client, error) {
+
+	return client.NewHTTPClient(client.HTTPConfig{
+		Addr:               "https://" + config.Influxdb.Server + ":8086",
+		Username:           config.Influxdb.User,
+		Password:           config.Influxdb.Pass,
+		Timeout:            time.Second * 60,
+		InsecureSkipVerify: true,
+	})
+
+}
+
+// <--- InfluxDb
+
+func Close(resp *http.Response) {
+	if resp.Body != nil {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}
 }
 
 // PublicCert returns Public SSL certificate for Resource Host

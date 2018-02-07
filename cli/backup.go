@@ -26,7 +26,7 @@ func BackupContainer(container string, full, stop bool) string {
 	backupDir := config.Agent.LxcPrefix + "/backups/"
 	var changelog []string
 
-	if !lxcContainer.IsContainer(container) {
+	if !lxcContainer.ContainerOrTemplateExists(container) {
 		log.Fatal("Container " + container + " not found!")
 	}
 
@@ -34,8 +34,10 @@ func BackupContainer(container string, full, stop bool) string {
 		log.Fatal("Backup of container " + container + " already running")
 	} else {
 		f, err := os.Create(config.Agent.LxcPrefix + container + "/.backup")
+		if err == nil {
+			defer f.Close()
+		}
 		log.Check(log.WarnLevel, "Creating .backup file to "+container+" container", err)
-		defer f.Close()
 	}
 
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
@@ -77,7 +79,7 @@ func BackupContainer(container string, full, stop bool) string {
 		case "STOPPED":
 			stop = false
 		case "RUNNING":
-			log.Check(log.ErrorLevel, "Stopping container", lxcContainer.Stop(container))
+			log.Check(log.ErrorLevel, "Stopping container", lxcContainer.Stop(container, true))
 		}
 	}
 

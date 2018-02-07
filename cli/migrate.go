@@ -88,7 +88,7 @@ func transfer(src, dst, path string) {
 
 	f, err := os.Open(src)
 	log.Check(log.ErrorLevel, "Opening backup archive", err)
-
+	defer f.Close()
 	log.Check(log.ErrorLevel, "Copying archive", scp.CopyPath(f.Name(), path, session))
 }
 

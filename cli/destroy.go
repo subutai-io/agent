@@ -3,9 +3,6 @@ package cli
 import (
 	"strings"
 
-	"github.com/influxdata/influxdb/client/v2"
-
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
@@ -13,6 +10,7 @@ import (
 	"github.com/subutai-io/agent/lib/net/p2p"
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -48,21 +46,31 @@ func LxcDestroy(id string, vlan bool) {
 	} else {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
+		log.Debug("Obtaining container by name")
 		c := bolt.ContainerByName(id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 		if len(c) != 0 {
 			msg = id + " is destroyed"
-		}
 
-		if ip, ok := c["ip"]; ok {
-			if vlan, ok := c["vlan"]; ok {
-				ProxyDel(vlan, ip, false)
+			if ip, ok := c["ip"]; ok {
+				if vlan, ok := c["vlan"]; ok {
+					ProxyDel(vlan, ip, false)
+				}
 			}
+
+			removePortMap(id)
+
+			net.DelIface(c["interface"])
+
+			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
+
+		} else if container.IsTemplate(id) {
+
+			msg = id + " is destroyed"
+
+			container.DestroyTemplate(id)
 		}
-		removePortMap(id)
-		net.DelIface(c["interface"])
-		log.Check(log.ErrorLevel, "Destroying container", container.Destroy(id))
 	}
 
 	if id == "everything" {
@@ -88,9 +96,11 @@ func LxcDestroy(id string, vlan bool) {
 	if id == "management" || id == "everything" {
 		template.MngDel()
 	}
+
 	if len(msg) == 0 {
-		msg = id + " not found. Please check if a container name is correct."
+		msg = id + " not found. Please check if the name is correct"
 	}
+
 	log.Info(msg)
 }
 
@@ -103,12 +113,10 @@ func cleanupNet(id string) {
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
 func cleanupNetStat(vlan string) {
-	c, _ := client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
-		Username:           config.Influxdb.User,
-		Password:           config.Influxdb.Pass,
-		InsecureSkipVerify: true,
-	})
+	c, err := utils.InfluxDbClient()
+	if err == nil {
+		defer c.Close()
+	}
 	queryInfluxDB(c, `drop series from host_net where iface = 'p2p`+vlan+`'`)
 	queryInfluxDB(c, `drop series from host_net where iface = 'gw-`+vlan+`'`)
 }
@@ -116,6 +124,7 @@ func cleanupNetStat(vlan string) {
 func removePortMap(name string) {
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
+	log.Debug("Obtaining container port mappings")
 	list := bolt.GetContainerMapping(name)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 

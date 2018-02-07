@@ -30,6 +30,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	lxc "github.com/subutai-io/agent/lib/container"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -50,15 +51,16 @@ type heartbeat struct {
 }
 
 var (
-	lastHeartbeat     []byte
-	mutex             sync.Mutex
-	fingerprint       string
-	hostname, _       = os.Hostname()
-	client            *http.Client
-	instanceType      string
-	instanceArch      string
-	lastHeartbeatTime time.Time
-	pool              []container.Container
+	lastHeartbeat        []byte
+	mutex                sync.Mutex
+	fingerprint          string
+	hostname, _          = os.Hostname()
+	client               *http.Client
+	instanceType         string
+	instanceArch         string
+	lastHeartbeatTime    time.Time
+	pool                 []container.Container
+	canRestoreContainers = true
 )
 
 func initAgent() {
@@ -85,11 +87,26 @@ func Start() {
 	go connectionMonitor()
 	go alert.Processing()
 	go logger.SyslogServer()
+	go restoreContainers()
 
 	go func() {
 		s := make(chan os.Signal, 1)
-		signal.Notify(s, os.Interrupt, syscall.SIGTERM, os.Kill)
-		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", <-s))
+		signal.Notify(s, syscall.SIGUSR1, syscall.SIGTERM)
+		sig := <-s
+
+		canRestoreContainers = false
+
+		if sig == syscall.SIGUSR1 {
+			//stop containers
+			for _, containerName := range lxc.Containers() {
+				if lxc.State(containerName) == "RUNNING" {
+					lxc.Stop(containerName, false)
+				}
+			}
+		}
+
+		log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
+
 		forceHeartbeat()
 	}()
 
@@ -99,17 +116,29 @@ func Start() {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		go exec.Command("subutai", "tunnel", "check").Run()
+
+		go exec.Command("timeout", "30", "subutai", "tunnel", "check").Run()
+
 		for !checkSS() {
 			time.Sleep(time.Second * 10)
 		}
 	}
 }
 
+func restoreContainers() {
+	for {
+		if !canRestoreContainers {
+			return
+		}
+		container.StateRestore(&canRestoreContainers)
+		time.Sleep(time.Second * 30)
+	}
+}
+
 func checkSS() (status bool) {
 	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
 	if err == nil {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -119,7 +148,7 @@ func checkSS() (status bool) {
 
 func connectionMonitor() {
 	for {
-		container.StateRestore()
+
 		if !checkSS() {
 			time.Sleep(time.Second * 10)
 			continue
@@ -129,19 +158,25 @@ func connectionMonitor() {
 			fingerprint = gpg.GetFingerprint("rh@subutai.io")
 			connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		} else {
-			resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
-			if err == nil && resp.StatusCode == http.StatusOK {
-				log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
-				log.Debug("Connection monitor check - success")
-			} else {
-				log.Debug("Connection monitor check - failed")
-				connect.Request(config.Agent.GpgUser, config.Management.Secret)
-				lastHeartbeat = []byte{}
-				go sendHeartbeat()
-			}
+			doCheckConnection()
 		}
 
 		time.Sleep(time.Second * 10)
+	}
+}
+
+func doCheckConnection() {
+	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
+	if err == nil {
+		defer utils.Close(resp)
+	}
+	if err == nil && resp.StatusCode == http.StatusOK {
+		log.Debug("Connection monitor check - success")
+	} else {
+		log.Debug("Connection monitor check - failed")
+		connect.Request(config.Agent.GpgUser, config.Management.Secret)
+		lastHeartbeat = []byte{}
+		go sendHeartbeat()
 	}
 }
 
@@ -182,7 +217,7 @@ func sendHeartbeat() bool {
 
 		resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
-			log.Check(log.DebugLevel, "Closing Management server response: "+resp.Status, resp.Body.Close())
+			defer utils.Close(resp)
 
 			if resp.StatusCode == http.StatusAccepted {
 				return true
@@ -262,7 +297,7 @@ func execute(rsp executer.EncRequest) {
 func sendResponse(msg []byte) {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
-		log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
+		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
 			return
 		}
@@ -276,6 +311,11 @@ func command() {
 	var rsp []executer.EncRequest
 
 	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/requests/" + fingerprint)
+
+	if err == nil {
+		defer utils.Close(resp)
+	}
+
 	if log.Check(log.WarnLevel, "Getting requests", err) {
 		return
 	}
@@ -291,8 +331,6 @@ func command() {
 			go execute(request)
 		}
 	}
-	log.Check(log.DebugLevel, "Closing Management server response", resp.Body.Close())
-
 }
 
 func ping(rw http.ResponseWriter, request *http.Request) {
