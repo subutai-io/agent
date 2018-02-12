@@ -236,6 +236,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
 func LxcImport(name, token string, local bool, auxDepList ...string) {
+	var err error
 	var kurjun *http.Client
 
 	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
@@ -243,21 +244,11 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	var err error
-
-	kurjun, err = config.CheckKurjun()
-
-	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
-
 	var t templ
 	t.name = name
 
-	if id := strings.Split(name, "id:"); len(id) > 1 {
-		//obtain name and owner from Kurjun
-		idToName(&t, id[1], kurjun, token)
-	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
-		t.name = line[1]
-		t.owner = append(t.owner, line[0])
+	if !local {
+		fetchTemplateMetadata(kurjun, &t, token);
 	}
 
 	log.Info("Importing " + t.name)
@@ -268,14 +259,17 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 	defer lock.Unlock()
 
-	//obtain full template info from Kurjun by name to get latest version
-	getTemplateInfo(&t, kurjun, token)
-
 	isTemplate := container.IsTemplate(t.name)
 	if isTemplate {
+
+		if local {
+			log.Info(t.name + " instance exists")
+			return
+		}
+
 		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
 
-		//template of latest version already installed
+		//latest version is already installed
 		if version.Compare(t.version, existingVersion, "<=") {
 			log.Info(t.name + " instance exists")
 			return
@@ -284,14 +278,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Info(t.name + " instance exists")
 		return
 	}
-
-	log.Info("Version: " + t.version)
-
-	if len(t.id) != 0 && len(t.signature) == 0 {
-		log.Error("Template is not signed")
-	}
-
-	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
 	wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/" +
 		strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
@@ -302,6 +288,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		//check if template with the same name but any version exists locally
 		files := fs.GetFilesWildCard(wildcardTemplateName)
 
+		//figure out latest version among locally present ones
 		if files != nil && len(files) > 0 {
 
 			latestVersionFile := files[0]
@@ -323,6 +310,11 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 		} else {
 			log.Warn("Template " + name + " not found in local cache")
+
+			//since we failed to find a local archive
+			//obtain template metadata from CDN
+			//to allow further download from CDN
+			fetchTemplateMetadata(kurjun, &t, token)
 		}
 
 	} else {
@@ -343,6 +335,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 				log.Warn("File integrity verification failed")
 
+				//make agent re-download verified template from CDN
 				archiveExists = false
 			}
 		} else {
@@ -435,10 +428,37 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
 
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if t.id != "" {
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
+}
+
+func fetchTemplateMetadata(kurjun *http.Client, t *templ, token string) {
+	kurjun, err := config.CheckKurjun()
+
+	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
+
+	//obtain name and owner from Kurjun
+	if id := strings.Split(t.name, "id:"); len(id) > 1 {
+		idToName(t, id[1], kurjun, token)
+	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
+		t.name = line[1]
+		t.owner = append(t.owner, line[0])
+	}
+
+	//obtain full template info from Kurjun by name & owner to get latest version
+	getTemplateInfo(t, kurjun, token)
+
+	log.Info("Version: " + t.version)
+
+	if len(t.id) != 0 && len(t.signature) == 0 {
+		log.Error("Template is not signed")
+	}
+
+	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 }
 
 func getVersion(fileName string) string {
