@@ -248,7 +248,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	t.name = name
 
 	if !local {
-		fetchTemplateMetadata(kurjun, &t, token);
+		kurjun = fetchTemplateMetadata(&t, token);
 	}
 
 	log.Info("Importing " + t.name)
@@ -314,7 +314,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			//since we failed to find a local archive
 			//obtain template metadata from CDN
 			//to allow further download from CDN
-			fetchTemplateMetadata(kurjun, &t, token)
+			kurjun = fetchTemplateMetadata(&t, token)
 		}
 
 	} else {
@@ -436,7 +436,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 }
 
-func fetchTemplateMetadata(kurjun *http.Client, t *templ, token string) {
+func fetchTemplateMetadata(t *templ, token string) *http.Client {
 	kurjun, err := config.CheckKurjun()
 
 	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
@@ -459,6 +459,8 @@ func fetchTemplateMetadata(kurjun *http.Client, t *templ, token string) {
 	}
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
+
+	return kurjun
 }
 
 func getVersion(fileName string) string {
