@@ -43,15 +43,16 @@ func LxcDestroy(id string, vlan bool) {
 			LxcDestroy(c, false)
 		}
 		cleanupNet(id)
-	} else {
+	} else if id != "everything" {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
 		log.Debug("Obtaining container by name")
 		c := bolt.ContainerByName(id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
+		msg = id + " is destroyed"
+
 		if len(c) != 0 {
-			msg = id + " is destroyed"
 
 			if ip, ok := c["ip"]; ok {
 				if vlan, ok := c["vlan"]; ok {
@@ -67,9 +68,12 @@ func LxcDestroy(id string, vlan bool) {
 
 		} else if container.IsTemplate(id) {
 
-			msg = id + " is destroyed"
-
 			container.DestroyTemplate(id)
+		} else {
+
+			err = container.DestroyContainer(id)
+
+			log.Check(log.ErrorLevel, "Destroying container", err)
 		}
 	}
 
@@ -82,18 +86,18 @@ func LxcDestroy(id string, vlan bool) {
 		for _, name := range list {
 			bolt, err := db.New()
 			log.Check(log.WarnLevel, "Opening database", err)
-			container := bolt.ContainerByName(name)
+			c := bolt.ContainerByName(name)
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 			LxcDestroy(name, false)
-			if v, ok := container["vlan"]; ok {
+			if v, ok := c["vlan"]; ok {
 				cleanupNet(v)
 			}
 		}
 		msg = id + " is destroyed"
 	}
 
-	if id == "management" || id == "everything" {
+	if id == "management" {
 		template.MngDel()
 	}
 

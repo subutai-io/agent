@@ -275,11 +275,11 @@ func DestroyContainer(name string) error {
 
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
-	db, err := db.New()
+	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting container metadata entry", db.ContainerDel(name))
-	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
-	log.Check(log.WarnLevel, "Closing database", db.Close())
+	log.Check(log.WarnLevel, "Deleting container metadata entry", bolt.ContainerDel(name))
+	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 	return nil
 }
@@ -290,11 +290,11 @@ func DestroyTemplate(name string) {
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
 	//remove metadata from db
-	db, err := db.New()
+	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting template metadata entry", db.TemplateDel(name))
-	log.Check(log.WarnLevel, "Deleting uuid entry", db.DelUuidEntry(name))
-	log.Check(log.WarnLevel, "Closing database", db.Close())
+	log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(name))
+	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 }
 
@@ -468,9 +468,9 @@ func SetContainerConf(container string, conf [][]string) error {
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.
 func GetConfigItem(path, item string) string {
-	if config, err := os.Open(path); err == nil {
-		defer config.Close()
-		scanner := bufio.NewScanner(config)
+	if cfg, err := os.Open(path); err == nil {
+		defer cfg.Close()
+		scanner := bufio.NewScanner(cfg)
 		for scanner.Scan() {
 			line := strings.Split(scanner.Text(), "=")
 			if strings.Trim(line[0], " ") == item {
