@@ -24,12 +24,21 @@ import (
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta := make(map[string]string)
+
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
-		kurjun, err := config.CheckKurjun()
-		log.Check(log.ErrorLevel, "Connecting to CDN", err)
-		var t templ
-		idToName(&t, id[1], kurjun, kurjToken)
-		parent = t.name
+		//check in db first and only if not found then go to CDN
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		parent = bolt.TemplateName(id[1])
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		if parent == "" {
+			kurjun, err := config.CheckKurjun()
+			log.Check(log.ErrorLevel, "Connecting to CDN", err)
+			var t templ
+			idToName(&t, id[1], kurjun, kurjToken)
+			parent = t.name
+		}
 	}
 	meta["parent"] = parent
 
