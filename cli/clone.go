@@ -39,6 +39,8 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 			idToName(&t, id[1], kurjun, kurjToken)
 			parent = t.name
 		}
+
+		log.Debug("Parent template is " + parent)
 	}
 	meta["parent"] = parent
 
