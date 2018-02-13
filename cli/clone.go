@@ -30,7 +30,6 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
 		parent = bolt.TemplateName(id[1])
-		log.Debug("Parent template is " + parent)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 		if parent == "" {
@@ -40,6 +39,8 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 			idToName(&t, id[1], kurjun, kurjToken)
 			parent = t.name
 		}
+
+		log.Debug("Parent template is " + parent)
 	}
 	meta["parent"] = parent
 
