@@ -179,6 +179,7 @@ func getMngKey(c string) {
 		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 		client = &http.Client{Transport: tr}
 	}
+	client.Timeout = time.Second * 5
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 

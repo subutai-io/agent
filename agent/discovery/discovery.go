@@ -92,10 +92,11 @@ func client() error {
 }
 
 func fingerprint() string {
-	client := &http.Client{Timeout: time.Second * 5}
+	client := &http.Client{}
 	if config.Management.Allowinsecure {
-		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	}
+	client.Timeout = time.Second * 5
 	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
 		defer utils.Close(resp)
@@ -132,10 +133,11 @@ func save(ip string) {
 }
 
 func getKey() []byte {
-	client := &http.Client{Timeout: time.Second * 5}
+	client := &http.Client{}
 	if config.Management.Allowinsecure {
-		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: time.Second * 5}
+		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	}
+	client.Timeout = time.Second * 5
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {

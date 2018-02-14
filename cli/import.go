@@ -165,6 +165,8 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	}
 	defer out.Close()
 
+	//timeout 5 hr for template download
+	kurjun.Timeout = time.Hour * 5
 	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
 	log.Debug("Template url " + url)
