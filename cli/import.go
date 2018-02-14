@@ -248,7 +248,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	t.name = name
 
 	if !local {
-		kurjun = fetchTemplateMetadata(&t, token);
+		kurjun = fetchTemplateMetadata(&t, token)
 	}
 
 	log.Info("Importing " + t.name)
