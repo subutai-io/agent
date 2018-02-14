@@ -161,9 +161,8 @@ func CheckKurjun() (*http.Client, error) {
 	if config.CDN.Allowinsecure {
 		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 		client = &http.Client{Transport: tr}
-	}else{
-		client = &http.Client{}
 	}
+	client.Timeout = time.Second * 15
 
 	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second)
 	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {

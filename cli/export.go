@@ -17,6 +17,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"time"
 )
 
 var (
@@ -168,7 +169,8 @@ func upload(path, token string, private bool) ([]byte, error) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("token", token)
 
-	client := &http.Client{}
+	//timeout 5 hr for template upload
+	client := &http.Client{Timeout: time.Hour * 5}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
