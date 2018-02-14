@@ -82,7 +82,7 @@ func queryDB(cmd string) (res []client.Result, err error) {
 	return res, err
 }
 
-func ramLoad(h string) (memfree, memtotal, cached interface{}) {
+func ramLoad() (memfree, memtotal, cached interface{}) {
 	file, err := os.Open("/proc/meminfo")
 
 	if err == nil {
@@ -145,7 +145,7 @@ func cpuLoad(h string) interface{} {
 	return 100 - cpuUsage
 }
 
-func diskLoad(h string) (disktotal, diskused interface{}) {
+func diskLoad() (disktotal, diskused interface{}) {
 	out, _ := exec.Command("df", "-TB1").Output()
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
@@ -246,8 +246,8 @@ func sysLoad(h string) string {
 	result.CPU.Model = grep("model name", "/proc/cpuinfo")
 	result.CPU.CoreCount = runtime.NumCPU()
 	result.CPU.Frequency = grep("cpu MHz", "/proc/cpuinfo")
-	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad(h)
-	result.Disk.Used, result.Disk.Total = diskLoad(h)
+	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad()
+	result.Disk.Used, result.Disk.Total = diskLoad()
 
 	a, err := json.Marshal(result)
 	if err != nil {

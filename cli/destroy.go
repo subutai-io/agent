@@ -11,6 +11,9 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/lib/fs"
+	"runtime"
+	"github.com/subutai-io/agent/config"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -135,4 +138,54 @@ func removePortMap(name string) {
 	for _, v := range list {
 		MapPort(v["protocol"], v["internal"], v["external"], "", v["domain"], "", false, true, false)
 	}
+}
+
+func Prune(what string) {
+	if what == "archives" {
+
+		//remove all template archives
+		wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/*" +
+			"-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+
+		fs.DeleteFilesWildcard(wildcardTemplateName)
+
+	} else if what == "templates" {
+
+		var templatesInUse []string
+
+		//collect all used templates
+		for _, c := range container.Containers() {
+			parent := strings.TrimSpace(container.GetParent(c))
+			for parent != c && parent != "" {
+				templatesInUse = append(templatesInUse, parent)
+				parent = strings.TrimSpace(container.GetParent(c))
+			}
+		}
+
+		//figure out unused templates
+		unusedTemplates := difference(container.Templates(), templatesInUse)
+
+		//remove unused templates
+		for _, t := range unusedTemplates {
+			container.DestroyTemplate(t)
+		}
+
+	} else {
+
+		log.Error("Only archives/templates can be pruned")
+	}
+}
+
+func difference(a, b []string) []string {
+	mb := map[string]bool{}
+	for _, x := range b {
+		mb[x] = true
+	}
+	var ab []string
+	for _, x := range a {
+		if _, ok := mb[x]; !ok {
+			ab = append(ab, x)
+		}
+	}
+	return ab
 }

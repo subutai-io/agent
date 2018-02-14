@@ -49,6 +49,7 @@ func GetIp() string {
 			if strings.Contains(scanner.Text(), "default") {
 				line := strings.Fields(scanner.Text())
 				iface = line[len(line)-1]
+				break
 			}
 		}
 	}

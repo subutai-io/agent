@@ -127,6 +127,16 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "prune", Usage: "prune unused templates/archives",
+		Action: func(c *gcli.Context) error {
+			if c.Args().Get(0) != "" {
+				cli.Prune(c.Args().Get(0))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
+			return nil
+		}}, {
+
 		Name: "config", Usage: "edit container config",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "operation, o", Usage: "<add|del> operation"},
