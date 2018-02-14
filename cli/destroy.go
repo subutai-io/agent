@@ -158,6 +158,7 @@ func Prune(what string) {
 			parent := strings.TrimSpace(container.GetParent(c))
 			for parent != c && parent != "" {
 				templatesInUse = append(templatesInUse, parent)
+				c = parent
 				parent = strings.TrimSpace(container.GetParent(c))
 			}
 		}
