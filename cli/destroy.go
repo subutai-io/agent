@@ -11,6 +11,9 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/lib/fs"
+	"runtime"
+	"github.com/subutai-io/agent/config"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -43,15 +46,16 @@ func LxcDestroy(id string, vlan bool) {
 			LxcDestroy(c, false)
 		}
 		cleanupNet(id)
-	} else {
+	} else if id != "everything" {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
 		log.Debug("Obtaining container by name")
 		c := bolt.ContainerByName(id)
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
+		msg = id + " is destroyed"
+
 		if len(c) != 0 {
-			msg = id + " is destroyed"
 
 			if ip, ok := c["ip"]; ok {
 				if vlan, ok := c["vlan"]; ok {
@@ -67,9 +71,12 @@ func LxcDestroy(id string, vlan bool) {
 
 		} else if container.IsTemplate(id) {
 
-			msg = id + " is destroyed"
-
 			container.DestroyTemplate(id)
+		} else {
+
+			err = container.DestroyContainer(id)
+
+			log.Check(log.ErrorLevel, "Destroying container", err)
 		}
 	}
 
@@ -82,18 +89,18 @@ func LxcDestroy(id string, vlan bool) {
 		for _, name := range list {
 			bolt, err := db.New()
 			log.Check(log.WarnLevel, "Opening database", err)
-			container := bolt.ContainerByName(name)
+			c := bolt.ContainerByName(name)
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 			LxcDestroy(name, false)
-			if v, ok := container["vlan"]; ok {
+			if v, ok := c["vlan"]; ok {
 				cleanupNet(v)
 			}
 		}
 		msg = id + " is destroyed"
 	}
 
-	if id == "management" || id == "everything" {
+	if id == "management" {
 		template.MngDel()
 	}
 
@@ -131,4 +138,55 @@ func removePortMap(name string) {
 	for _, v := range list {
 		MapPort(v["protocol"], v["internal"], v["external"], "", v["domain"], "", false, true, false)
 	}
+}
+
+func Prune(what string) {
+	if what == "archives" {
+
+		//remove all template archives
+		wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/*" +
+			"-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+
+		fs.DeleteFilesWildcard(wildcardTemplateName)
+
+	} else if what == "templates" {
+
+		var templatesInUse []string
+
+		//collect all used templates
+		for _, c := range container.Containers() {
+			parent := strings.TrimSpace(container.GetParent(c))
+			for parent != c && parent != "" {
+				templatesInUse = append(templatesInUse, parent)
+				c = parent
+				parent = strings.TrimSpace(container.GetParent(c))
+			}
+		}
+
+		//figure out unused templates
+		unusedTemplates := difference(container.Templates(), templatesInUse)
+
+		//remove unused templates
+		for _, t := range unusedTemplates {
+			container.DestroyTemplate(t)
+		}
+
+	} else {
+
+		log.Error("Only archives/templates can be pruned")
+	}
+}
+
+func difference(a, b []string) []string {
+	mb := map[string]bool{}
+	for _, x := range b {
+		mb[x] = true
+	}
+	var ab []string
+	for _, x := range a {
+		if _, ok := mb[x]; !ok {
+			ab = append(ab, x)
+		}
+	}
+	return ab
 }
