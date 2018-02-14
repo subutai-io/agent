@@ -273,6 +273,8 @@ func DestroyContainer(name string) error {
 		}
 	}
 
+	log.Info("Destroying container " + name)
+
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
 	bolt, err := db.New()
@@ -285,6 +287,8 @@ func DestroyContainer(name string) error {
 }
 
 func DestroyTemplate(name string) {
+
+	log.Info("Destroying template " + name)
 
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
