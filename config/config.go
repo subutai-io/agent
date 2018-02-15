@@ -176,6 +176,11 @@ func GetClientForUploadDownload() *http.Client {
 	return client
 }
 
+func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: allowInsecure}}
+	return &http.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
+}
+
 func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
 	return func(netw, addr string) (net.Conn, error) {
 		conn, err := net.DialTimeout(netw, addr, connectTimeout)
@@ -189,12 +194,7 @@ func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(n
 
 // CheckKurjun checks if the Kurjun node available.
 func CheckKurjun() (*http.Client, error) {
-	client := &http.Client{}
-	if config.CDN.Allowinsecure {
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client = &http.Client{Transport: tr}
-	}
-	client.Timeout = time.Second * 15
+	client := GetClient(config.CDN.Allowinsecure, 15)
 
 	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second)
 	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {

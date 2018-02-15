@@ -4,10 +4,8 @@ package gpg
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -174,12 +172,7 @@ func GetFingerprint(email string) string {
 }
 
 func getMngKey(c string) {
-	client := &http.Client{}
-	if config.Management.Allowinsecure {
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client = &http.Client{Transport: tr}
-	}
-	client.Timeout = time.Second * 5
+	client := config.GetClient(config.Management.Allowinsecure, 5)
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
