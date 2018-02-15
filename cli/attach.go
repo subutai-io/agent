@@ -7,7 +7,6 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 	"gopkg.in/lxc/go-lxc.v2"
-	"strings"
 )
 
 // LxcAttach allows user to use container's TTY.
@@ -26,14 +25,7 @@ func LxcAttach(name string, cmd []string) {
 	options.ClearEnv = true
 
 	if len(cmd) > 0 {
-
-		var cmdz []string
-
-		for _, arg := range cmd {
-			cmdz = append(cmdz, strings.Fields(arg)...)
-		}
-
-		_, err = c.RunCommand(cmdz, options)
+		_, err = c.RunCommand([]string{"/bin/bash", "-c", cmd[0]}, options)
 		log.Check(log.ErrorLevel, "Attaching shell", err)
 	} else {
 		log.Check(log.ErrorLevel, "Attaching shell", c.AttachShell(options))
