@@ -17,7 +17,6 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"time"
 )
 
 var (
@@ -114,12 +113,16 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 }
 
 func upload(path, token string, private bool) ([]byte, error) {
+	//check file availability
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-
 	defer file.Close()
+
+	//check CDN availability
+	_, err = config.CheckKurjun()
+	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
 
 	body := &bytes.Buffer{}
 
@@ -144,8 +147,6 @@ func upload(path, token string, private bool) ([]byte, error) {
 		return nil, err
 	}
 
-	config.CheckKurjun()
-
 	// get size of file
 	fi, err := file.Stat()
 	if err != nil {
@@ -169,8 +170,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("token", token)
 
-	//timeout 5 hr for template upload
-	client := &http.Client{Timeout: time.Hour * 5}
+	client := config.GetClientForUploadDownload()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

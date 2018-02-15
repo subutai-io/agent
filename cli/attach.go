@@ -25,6 +25,7 @@ func LxcAttach(name string, cmd []string) {
 	options.ClearEnv = true
 
 	if len(cmd) > 0 {
+		//TODO check if there are spaces in the arguments passed since there can be strings with space separated args
 		_, err = c.RunCommand(cmd, options)
 		log.Check(log.ErrorLevel, "Attaching shell", err)
 	} else {

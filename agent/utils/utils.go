@@ -102,7 +102,12 @@ func TLSConfig() *http.Client {
 		tlsconfig = newTLSConfig()
 	}
 
-	transport := &http.Transport{TLSClientConfig: tlsconfig}
+	transport := &http.Transport{
+		TLSClientConfig: tlsconfig,
+		IdleConnTimeout: time.Minute,
+		MaxIdleConns:    10,
+	}
+
 	return &http.Client{Transport: transport, Timeout: time.Second * 10}
 }
 

@@ -137,14 +137,14 @@ func md5sum(filePath string) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bool {
+func downloadWithRetry(t templ, token string, retry int) bool {
 
 	if len(t.id) == 0 {
 		return false
 	}
 
 	for c := 0; c < retry; c++ {
-		ok, err := download(t, kurjun, token)
+		ok, err := download(t, token)
 		if err == nil {
 			return ok
 		} else {
@@ -156,7 +156,7 @@ func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bo
 }
 
 // download gets template archive from global repository
-func download(t templ, kurjun *http.Client, token string) (bool, error) {
+func download(t templ, token string) (bool, error) {
 
 	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 	if err != nil {
@@ -165,13 +165,13 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	}
 	defer out.Close()
 
-	//timeout 5 hr for template download
-	kurjun.Timeout = time.Hour * 5
+	client := config.GetClientForUploadDownload()
+
 	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
 	log.Debug("Template url " + url)
 
-	response, err := kurjun.Get(url)
+	response, err := client.Get(url)
 	if err != nil {
 		log.Debug("Failed to connect to Kurjun ", err)
 		return false, err
@@ -239,7 +239,6 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
-	var kurjun *http.Client
 
 	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
 		gpg.ExchageAndEncrypt("management", token)
@@ -250,7 +249,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	t.name = name
 
 	if !local {
-		kurjun = fetchTemplateMetadata(&t, token)
+		fetchTemplateMetadata(&t, token)
 	}
 
 	log.Info("Importing " + t.name)
@@ -316,7 +315,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			//since we failed to find a local archive
 			//obtain template metadata from CDN
 			//to allow further download from CDN
-			kurjun = fetchTemplateMetadata(&t, token)
+			fetchTemplateMetadata(&t, token)
 		}
 
 	} else {
@@ -364,14 +363,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				if t.owner = []string{owner}; len(owner) == 0 {
 					t.owner = []string{}
 				}
-				if downloadWithRetry(t, kurjun, token, 5) {
+				if downloadWithRetry(t, token, 5) {
 					downloaded = true
 					break
 				}
 			}
 		}
 
-		if !downloaded && !downloadWithRetry(t, kurjun, token, 5) {
+		if !downloaded && !downloadWithRetry(t, token, 5) {
 
 			log.Error("Failed to download or verify template " + t.name)
 		} else {
@@ -438,7 +437,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 }
 
-func fetchTemplateMetadata(t *templ, token string) *http.Client {
+func fetchTemplateMetadata(t *templ, token string) {
 	kurjun, err := config.CheckKurjun()
 
 	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
@@ -462,7 +461,6 @@ func fetchTemplateMetadata(t *templ, token string) *http.Client {
 
 	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
-	return kurjun
 }
 
 func getVersion(fileName string) string {
