@@ -47,7 +47,7 @@ func Request(user, pass string) {
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 
-	client := config.GetClient(config.Management.Allowinsecure, 15)
+	client := utils.GetClient(config.Management.Allowinsecure, 15)
 	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
 	resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))

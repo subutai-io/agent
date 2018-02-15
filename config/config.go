@@ -3,10 +3,8 @@ package config
 
 import (
 	"bufio"
-	"crypto/tls"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -144,6 +142,9 @@ func init() {
 	Template = config.Template
 	Management = config.Management
 	CDN = config.CDN
+
+	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
+
 }
 
 // InitAgentDebug turns on Debug output for the Subutai Agent.
@@ -154,61 +155,18 @@ func InitAgentDebug() {
 	log.ActivateSyslog("127.0.0.1:1514", "subutai")
 }
 
-//one-shot client for one long lasting request
-//no keep-alive, 1 idle connection per client
-//new client must be used for each new request
-func GetClientForUploadDownload() *http.Client {
-	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Dial:                  timeoutDialer(time.Second*15, time.Hour*5),
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
-			DisableKeepAlives:     true,
-			MaxIdleConns:          1,
-			MaxIdleConnsPerHost:   1,
-			IdleConnTimeout:       time.Second * 5,
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.CDN.Allowinsecure},
-		},
-	}
-
-	return client
-}
-
-func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: allowInsecure}}
-	return &http.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
-}
-
-func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
-	return func(netw, addr string) (net.Conn, error) {
-		conn, err := net.DialTimeout(netw, addr, connectTimeout)
-		if err != nil {
-			return nil, err
-		}
-		conn.SetDeadline(time.Now().Add(rwTimeout))
-		return conn, nil
-	}
-}
-
-// CheckKurjun checks if the Kurjun node available.
-func CheckKurjun() (*http.Client, error) {
-	client := GetClient(config.CDN.Allowinsecure, 15)
+// CheckCDN checks if the Kurjun node available.
+func CheckCDN() {
 
 	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second)
+
 	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {
 		log.Info("CDN unreachable, retrying")
 		time.Sleep(3 * time.Second)
 		c++
 	}
-	if log.Check(log.WarnLevel, "Checking CDN accessibility", err) {
-		return nil, err
-	}
 
-	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
-
-	return client, nil
+	log.Check(log.ErrorLevel, "Checking CDN accessibility", err)
 }
 
 // SaveDefaultConfig saves agent configuration file for future changes by user.

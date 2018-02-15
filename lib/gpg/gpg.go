@@ -172,7 +172,7 @@ func GetFingerprint(email string) string {
 }
 
 func getMngKey(c string) {
-	client := config.GetClient(config.Management.Allowinsecure, 5)
+	client := utils.GetClient(config.Management.Allowinsecure, 5)
 	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
@@ -280,10 +280,10 @@ func ParsePem(cert string) (crt, key []byte) {
 
 // KurjunUserPK gets user's public GPG-key from Kurjun.
 func KurjunUserPK(owner string) []string {
-	var keys []string
-	kurjun, err := config.CheckKurjun()
-	log.Check(log.ErrorLevel, "Checking Kurjun", err)
+	config.CheckCDN()
 
+	var keys []string
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(config.CDN.Kurjun + "/auth/keys?user=" + owner)
 	log.Check(log.FatalLevel, "Getting owner public key", err)
 	defer utils.Close(response)

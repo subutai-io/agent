@@ -33,10 +33,9 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
 		if parent == "" {
-			kurjun, err := config.CheckKurjun()
-			log.Check(log.ErrorLevel, "Connecting to CDN", err)
+			config.CheckCDN()
 			var t templ
-			idToName(&t, id[1], kurjun, kurjToken)
+			idToName(&t, id[1], kurjToken)
 			parent = t.name
 		}
 
