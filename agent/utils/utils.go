@@ -236,3 +236,18 @@ func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(n
 		return conn, nil
 	}
 }
+
+// CheckCDN checks if the Kurjun node available.
+func CheckCDN() {
+
+	address := config.CDN.URL + ":" + config.CDN.SSLport
+	_, err := net.DialTimeout("tcp", address, time.Duration(5)*time.Second)
+
+	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", address, time.Duration(5)*time.Second) {
+		log.Info("CDN unreachable, retrying")
+		time.Sleep(3 * time.Second)
+		c++
+	}
+
+	log.Check(log.ErrorLevel, "Checking CDN accessibility", err)
+}

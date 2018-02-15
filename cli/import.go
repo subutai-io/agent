@@ -439,7 +439,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 }
 
 func fetchTemplateMetadata(t *templ, token string) {
-	config.CheckCDN()
+	utils.CheckCDN()
 
 	//obtain name and owner from Kurjun
 	if id := strings.Split(t.name, "id:"); len(id) > 1 {

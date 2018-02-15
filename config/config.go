@@ -4,12 +4,9 @@ package config
 import (
 	"bufio"
 	"fmt"
-	"net"
 	"os"
 	"reflect"
 	"strings"
-	"time"
-
 	"gopkg.in/gcfg.v1"
 
 	"github.com/subutai-io/agent/log"
@@ -153,20 +150,6 @@ func InitAgentDebug() {
 		log.Level(log.DebugLevel)
 	}
 	log.ActivateSyslog("127.0.0.1:1514", "subutai")
-}
-
-// CheckCDN checks if the Kurjun node available.
-func CheckCDN() {
-
-	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second)
-
-	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {
-		log.Info("CDN unreachable, retrying")
-		time.Sleep(3 * time.Second)
-		c++
-	}
-
-	log.Check(log.ErrorLevel, "Checking CDN accessibility", err)
 }
 
 // SaveDefaultConfig saves agent configuration file for future changes by user.

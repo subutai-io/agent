@@ -280,7 +280,7 @@ func ParsePem(cert string) (crt, key []byte) {
 
 // KurjunUserPK gets user's public GPG-key from Kurjun.
 func KurjunUserPK(owner string) []string {
-	config.CheckCDN()
+	utils.CheckCDN()
 
 	var keys []string
 	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
