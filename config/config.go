@@ -155,7 +155,7 @@ func InitAgentDebug() {
 }
 
 //one-shot client for one long lasting request
-//no keep-alive, 1 active connection per client
+//no keep-alive, 1 idle connection per client
 //new client must be used for each new request
 func GetClientForUploadDownload() *http.Client {
 	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
