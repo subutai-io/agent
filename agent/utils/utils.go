@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/influxdata/influxdb/client/v2"
 	"io"
+	"net"
 )
 
 var (
@@ -198,4 +199,40 @@ func newTLSConfig() *tls.Config {
 
 	}
 	return &tls.Config{ClientAuth: tls.NoClientCert, ClientCAs: nil, Certificates: []tls.Certificate{cert}}
+}
+
+//HTTP CLIENT
+
+func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: allowInsecure}}
+	return &http.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
+}
+
+//one-shot client for one long lasting request
+//no keep-alive, 1 idle connection per client
+//new client must be used for each new request
+func GetClientForUploadDownload() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial:                  timeoutDialer(time.Second*15, time.Hour*5),
+			TLSHandshakeTimeout:   15 * time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+			DisableKeepAlives:     true,
+			MaxIdleConns:          1,
+			MaxIdleConnsPerHost:   1,
+			IdleConnTimeout:       time.Second * 5,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.CDN.Allowinsecure},
+		},
+	}
+}
+
+func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		conn, err := net.DialTimeout(netw, addr, connectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		conn.SetDeadline(time.Now().Add(rwTimeout))
+		return conn, nil
+	}
 }

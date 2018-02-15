@@ -121,8 +121,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	defer file.Close()
 
 	//check CDN availability
-	_, err = config.CheckKurjun()
-	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
+	config.CheckCDN()
 
 	body := &bytes.Buffer{}
 
@@ -170,7 +169,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("token", token)
 
-	client := config.GetClientForUploadDownload()
+	client := utils.GetClientForUploadDownload()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
