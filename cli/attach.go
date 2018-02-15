@@ -25,7 +25,7 @@ func LxcAttach(name string, cmd []string) {
 	options.ClearEnv = true
 
 	if len(cmd) > 0 {
-		_, err = c.RunCommand(cmd, options)
+		_, err = c.RunCommand([]string{"/bin/bash", "-c", cmd[0]}, options)
 		log.Check(log.ErrorLevel, "Attaching shell", err)
 	} else {
 		log.Check(log.ErrorLevel, "Attaching shell", c.AttachShell(options))

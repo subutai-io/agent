@@ -3,21 +3,15 @@ package config
 
 import (
 	"bufio"
-	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"reflect"
 	"strings"
-	"time"
-
 	"gopkg.in/gcfg.v1"
 
 	"github.com/subutai-io/agent/log"
 )
 
-var client *http.Client
 var version = ""
 
 type agentConfig struct {
@@ -145,6 +139,9 @@ func init() {
 	Template = config.Template
 	Management = config.Management
 	CDN = config.CDN
+
+	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
+
 }
 
 // InitAgentDebug turns on Debug output for the Subutai Agent.
@@ -153,31 +150,6 @@ func InitAgentDebug() {
 		log.Level(log.DebugLevel)
 	}
 	log.ActivateSyslog("127.0.0.1:1514", "subutai")
-}
-
-// CheckKurjun checks if the Kurjun node available.
-func CheckKurjun() (*http.Client, error) {
-	client := &http.Client{}
-	if config.CDN.Allowinsecure {
-		tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-		client = &http.Client{Transport: tr}
-	}else{
-		client = &http.Client{}
-	}
-
-	_, err := net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second)
-	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", CDN.URL+":"+CDN.SSLport, time.Duration(5)*time.Second) {
-		log.Info("CDN unreachable, retrying")
-		time.Sleep(3 * time.Second)
-		c++
-	}
-	if log.Check(log.WarnLevel, "Checking CDN accessibility", err) {
-		return nil, err
-	}
-
-	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
-
-	return client, nil
 }
 
 // SaveDefaultConfig saves agent configuration file for future changes by user.

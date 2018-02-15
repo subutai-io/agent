@@ -3,9 +3,7 @@ package connect
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -49,10 +47,7 @@ func Request(user, pass string) {
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 
-	client := &http.Client{}
-	if config.Management.Allowinsecure {
-		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
-	}
+	client := utils.GetClient(config.Management.Allowinsecure, 15)
 	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
 	resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))

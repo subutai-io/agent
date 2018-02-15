@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ type metainfo struct {
 }
 
 // getTemplateInfo retrieves the id of a template on global repository, id of the latest template version will be returned
-func getTemplateInfo(t *templ, kurjun *http.Client, token string) {
+func getTemplateInfo(t *templ, token string) {
 
 	//get template info by name from Kurjun
 	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
@@ -64,6 +63,7 @@ func getTemplateInfo(t *templ, kurjun *http.Client, token string) {
 		url += "&owner=" + t.owner[0]
 	}
 
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(url)
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
 	defer utils.Close(response)
@@ -93,11 +93,12 @@ func getTemplateInfo(t *templ, kurjun *http.Client, token string) {
 }
 
 // idToName retrieves template name from global repository by passed id string
-func idToName(t *templ, id string, kurjun *http.Client, token string) {
+func idToName(t *templ, id string, token string) {
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
 	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
 	url := config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token
 
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(url)
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
 	defer utils.Close(response)
@@ -137,14 +138,14 @@ func md5sum(filePath string) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bool {
+func downloadWithRetry(t templ, token string, retry int) bool {
 
 	if len(t.id) == 0 {
 		return false
 	}
 
 	for c := 0; c < retry; c++ {
-		ok, err := download(t, kurjun, token)
+		ok, err := download(t, token)
 		if err == nil {
 			return ok
 		} else {
@@ -156,7 +157,7 @@ func downloadWithRetry(t templ, kurjun *http.Client, token string, retry int) bo
 }
 
 // download gets template archive from global repository
-func download(t templ, kurjun *http.Client, token string) (bool, error) {
+func download(t templ, token string) (bool, error) {
 
 	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 	if err != nil {
@@ -165,11 +166,13 @@ func download(t templ, kurjun *http.Client, token string) (bool, error) {
 	}
 	defer out.Close()
 
+	client := utils.GetClientForUploadDownload()
+
 	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
 
 	log.Debug("Template url " + url)
 
-	response, err := kurjun.Get(url)
+	response, err := client.Get(url)
 	if err != nil {
 		log.Debug("Failed to connect to Kurjun ", err)
 		return false, err
@@ -236,28 +239,18 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
 func LxcImport(name, token string, local bool, auxDepList ...string) {
-	var kurjun *http.Client
+	var err error
 
 	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
 		gpg.ExchageAndEncrypt("management", token)
 		return
 	}
 
-	var err error
-
-	kurjun, err = config.CheckKurjun()
-
-	log.Check(log.ErrorLevel, "Connecting to Kurjun", err)
-
 	var t templ
 	t.name = name
 
-	if id := strings.Split(name, "id:"); len(id) > 1 {
-		//obtain name and owner from Kurjun
-		idToName(&t, id[1], kurjun, token)
-	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
-		t.name = line[1]
-		t.owner = append(t.owner, line[0])
+	if !local {
+		fetchTemplateMetadata(&t, token)
 	}
 
 	log.Info("Importing " + t.name)
@@ -268,14 +261,17 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 	defer lock.Unlock()
 
-	//obtain full template info from Kurjun by name to get latest version
-	getTemplateInfo(&t, kurjun, token)
-
 	isTemplate := container.IsTemplate(t.name)
 	if isTemplate {
+
+		if local {
+			log.Info(t.name + " instance exists")
+			return
+		}
+
 		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
 
-		//template of latest version already installed
+		//latest version is already installed
 		if version.Compare(t.version, existingVersion, "<=") {
 			log.Info(t.name + " instance exists")
 			return
@@ -284,14 +280,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Info(t.name + " instance exists")
 		return
 	}
-
-	log.Info("Version: " + t.version)
-
-	if len(t.id) != 0 && len(t.signature) == 0 {
-		log.Error("Template is not signed")
-	}
-
-	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
 	wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/" +
 		strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
@@ -302,6 +290,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		//check if template with the same name but any version exists locally
 		files := fs.GetFilesWildCard(wildcardTemplateName)
 
+		//figure out latest version among locally present ones
 		if files != nil && len(files) > 0 {
 
 			latestVersionFile := files[0]
@@ -323,6 +312,11 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 		} else {
 			log.Warn("Template " + name + " not found in local cache")
+
+			//since we failed to find a local archive
+			//obtain template metadata from CDN
+			//to allow further download from CDN
+			fetchTemplateMetadata(&t, token)
 		}
 
 	} else {
@@ -343,6 +337,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 				log.Warn("File integrity verification failed")
 
+				//make agent re-download verified template from CDN
 				archiveExists = false
 			}
 		} else {
@@ -369,14 +364,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				if t.owner = []string{owner}; len(owner) == 0 {
 					t.owner = []string{}
 				}
-				if downloadWithRetry(t, kurjun, token, 5) {
+				if downloadWithRetry(t, token, 5) {
 					downloaded = true
 					break
 				}
 			}
 		}
 
-		if !downloaded && !downloadWithRetry(t, kurjun, token, 5) {
+		if !downloaded && !downloadWithRetry(t, token, 5) {
 
 			log.Error("Failed to download or verify template " + t.name)
 		} else {
@@ -435,10 +430,36 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
 
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if t.id != "" {
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
+}
+
+func fetchTemplateMetadata(t *templ, token string) {
+	utils.CheckCDN()
+
+	//obtain name and owner from Kurjun
+	if id := strings.Split(t.name, "id:"); len(id) > 1 {
+		idToName(t, id[1], token)
+	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
+		t.name = line[1]
+		t.owner = append(t.owner, line[0])
+	}
+
+	//obtain full template info from Kurjun by name & owner to get latest version
+	getTemplateInfo(t, token)
+
+	log.Info("Version: " + t.version)
+
+	if len(t.id) != 0 && len(t.signature) == 0 {
+		log.Error("Template is not signed")
+	}
+
+	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
+
 }
 
 func getVersion(fileName string) string {
