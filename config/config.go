@@ -17,7 +17,6 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-var client *http.Client
 var version = ""
 
 type agentConfig struct {
@@ -153,6 +152,39 @@ func InitAgentDebug() {
 		log.Level(log.DebugLevel)
 	}
 	log.ActivateSyslog("127.0.0.1:1514", "subutai")
+}
+
+//one-shot client for one long lasting request
+//no keep-alive, 1 idle connection per client
+//new client must be used for each new request
+func GetClientForUploadDownload() *http.Client {
+	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Dial:                  timeoutDialer(time.Second*15, time.Hour*5),
+			TLSHandshakeTimeout:   15 * time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+			DisableKeepAlives:     true,
+			MaxIdleConns:          1,
+			MaxIdleConnsPerHost:   1,
+			IdleConnTimeout:       time.Second * 5,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.CDN.Allowinsecure},
+		},
+	}
+
+	return client
+}
+
+func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		conn, err := net.DialTimeout(netw, addr, connectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		conn.SetDeadline(time.Now().Add(rwTimeout))
+		return conn, nil
+	}
 }
 
 // CheckKurjun checks if the Kurjun node available.
