@@ -304,7 +304,7 @@ func execute(rsp executer.EncRequest) {
 			if err == nil && len(payload) > 0 {
 				message, err := json.Marshal(map[string]string{"hostId": elem.ID, "response": string(payload)})
 				log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
-				go sendResponse(message)
+				go sendResponse(message, time.Now().Add(time.Second*time.Duration(req.Request.Timeout)))
 			}
 		} else {
 			sOut = nil
@@ -313,7 +313,7 @@ func execute(rsp executer.EncRequest) {
 	go sendHeartbeat()
 }
 
-func sendResponse(msg []byte) {
+func sendResponse(msg []byte, deadline time.Time) {
 	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
@@ -321,8 +321,11 @@ func sendResponse(msg []byte) {
 			return
 		}
 	}
-	time.Sleep(time.Second * 5)
-	go sendResponse(msg)
+
+	if deadline.After(time.Now()) {
+		time.Sleep(time.Second * 5)
+		go sendResponse(msg, deadline)
+	}
 
 }
 
