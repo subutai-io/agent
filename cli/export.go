@@ -121,7 +121,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 	defer file.Close()
 
 	//check CDN availability
-	config.CheckCDN()
+	utils.CheckCDN()
 
 	body := &bytes.Buffer{}
 
