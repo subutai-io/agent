@@ -436,6 +436,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	}
+
+	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 }
 
 func fetchTemplateMetadata(t *templ, token string) {
