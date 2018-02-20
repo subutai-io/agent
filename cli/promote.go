@@ -12,6 +12,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/agent/utils"
 )
 
 // LxcPromote turns a Subutai container into container template which may be cloned with "clone" command.
@@ -19,6 +20,8 @@ import (
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name, source string) {
+	name = utils.CleanTemplateName(name)
+
 	if len(source) > 0 && len(name) > 0 {
 		if container.State(source) == "RUNNING" {
 			container.Stop(source, true)
