@@ -319,7 +319,7 @@ func Info(command, host string) {
 
 func getOsName() string {
 
-	out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
+	out, err := exec.Command("/bin/bash", "-c", "cat /var/lib/snapd/hostfs/etc/*release").Output()
 
 	log.Check(log.ErrorLevel, "Determining OS name", err)
 

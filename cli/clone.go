@@ -24,6 +24,8 @@ import (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, token, kurjToken string) {
+	child = utils.CleanTemplateName(child)
+
 	meta := make(map[string]string)
 
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
