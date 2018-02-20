@@ -382,16 +382,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "rename", Usage: "rename Subutai container",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" || c.Args().Get(1) != "" {
-				cli.LxcRename(c.Args().Get(0), c.Args().Get(1))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
 		Name: "restore", Usage: "restore Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
