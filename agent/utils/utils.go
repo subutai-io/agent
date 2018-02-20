@@ -20,6 +20,7 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 	"io"
 	"net"
+	"regexp"
 )
 
 var (
@@ -250,4 +251,12 @@ func CheckCDN() {
 	}
 
 	log.Check(log.ErrorLevel, "Checking CDN accessibility", err)
+}
+
+func CleanTemplateName(name string) string {
+	reg, err := regexp.Compile("[^a-zA-Z0-9._-]")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return reg.ReplaceAllString(name, "")
 }
