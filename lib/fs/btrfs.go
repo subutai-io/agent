@@ -79,7 +79,7 @@ func SubvolumeDestroy(path string) {
 	}
 	qgroupDestroy(id(path))
 
-	out, err := exec.Command("btrfs", "subvolume", "delete", path).CombinedOutput()
+	out, err := exec.Command("btrfs", "subvolume", "delete", "-C", path).CombinedOutput()
 	log.Check(log.DebugLevel, "Destroying subvolume "+path+": "+string(out), err)
 }
 
