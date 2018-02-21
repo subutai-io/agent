@@ -407,6 +407,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	os.Rename(config.Agent.LxcPrefix+t.name+"/"+t.name+"-opt", config.Agent.LxcPrefix+t.name+"/opt")
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
+	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+
 	if t.name == "management" {
 		template.MngInit()
 		return
@@ -437,7 +439,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	}
 
-	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 }
 
 func fetchTemplateMetadata(t *templ, token string) {
