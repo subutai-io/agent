@@ -109,7 +109,7 @@ func main() {
 			gcli.StringFlag{Name: "token, t", Usage: "token to verify with MH"},
 			gcli.StringFlag{Name: "kurjun, k", Usage: "kurjun token to clone private and shared templates"}},
 		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
+			if c.Args().Get(0) != "" && c.Args().Get(1) != "" {
 				cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"), c.String("k"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
@@ -223,7 +223,9 @@ func main() {
 
 		Name: "hostname", Usage: "Set hostname of container or host",
 		Action: func(c *gcli.Context) error {
-			if len(c.Args().Get(1)) != 0 {
+			if c.Args().Get(0) == "" {
+				gcli.ShowSubcommandHelp(c)
+			} else if len(c.Args().Get(1)) != 0 {
 				cli.LxcHostname(c.Args().Get(0), c.Args().Get(1))
 			} else {
 				cli.Hostname(c.Args().Get(0))
@@ -265,7 +267,7 @@ func main() {
 			gcli.BoolFlag{Name: "sslbackend", Usage: "ssl backend in https upstream"},
 		},
 		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
+			if len(c.Args()) > 0 || c.NumFlags() > 0 {
 				cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
