@@ -267,7 +267,7 @@ func main() {
 			gcli.BoolFlag{Name: "sslbackend", Usage: "ssl backend in https upstream"},
 		},
 		Action: func(c *gcli.Context) error {
-			if len(c.Args()) > 0 {
+			if len(c.Args()) > 0 || c.NumFlags() > 0 {
 				cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
