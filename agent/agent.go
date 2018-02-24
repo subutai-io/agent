@@ -98,7 +98,6 @@ func Start() {
 	go func() {
 		s := make(chan os.Signal, 2)
 		signal.Notify(s, syscall.SIGUSR1, syscall.SIGTERM)
-		var wg sync.WaitGroup
 
 		for i := 1; i <= 2; i++ {
 			sig := <-s
@@ -115,18 +114,10 @@ func Start() {
 					}
 				}
 			case syscall.SIGTERM:
-				//wrap into routine to avoid blocking for-loop too long
-				//so that if SIGUSR1 comes second, we have more time to stop containers
-				//before system sends SIGKILL
-				wg.Add(1)
-				go func() {
-					log.Info(fmt.Sprintf("Received signal: %s. Sending last heartbeat to the Management server", sig))
-					forceHeartbeat()
-					wg.Done()
-				}()
+				//handle SIGTERM to have time before SIGKILL
+				log.Info(fmt.Sprintf("Received signal: %s", sig))
 			}
 		}
-		wg.Wait()
 	}()
 
 	for {
@@ -246,13 +237,6 @@ func sendHeartbeat() bool {
 	go discovery.ImportManagementKey()
 	lastHeartbeat = []byte{}
 	return false
-}
-
-func forceHeartbeat() {
-	lastHeartbeat = []byte{}
-	lastHeartbeatTime = *new(time.Time)
-	sendHeartbeat()
-	os.Exit(0)
 }
 
 func execute(rsp executer.EncRequest) {
