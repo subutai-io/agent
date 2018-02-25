@@ -1,6 +1,6 @@
 // Subutai binary is consist of two parts: Agent and CLI
 //
-// Both packages placed in relevant directories. Detailed explanation can be found in github Wiki page: https://github.com/subutai-io/subos/wiki
+// Both packages placed in relevant directories. Detailed explanation can be found in github Wiki page: https://github.com/subutai-io/snap/wiki
 package main
 
 import (
