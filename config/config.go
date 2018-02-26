@@ -77,7 +77,7 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
-    url = cdn.subut.ai
+    url = cdn.subutai.io
     sslport = 8338
     allowinsecure = false
 
@@ -122,7 +122,7 @@ func init() {
 		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
 		config.Template.Branch = strings.TrimPrefix(strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai"), "-")
 		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
-		config.CDN.URL = config.Template.Branch + "cdn.subut.ai"
+		config.CDN.URL = config.Template.Branch + "cdn.subutai.io"
 	}
 	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
