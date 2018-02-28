@@ -22,7 +22,8 @@ func Create(interfaceName, localPeepIPAddr, hash, key, ttl, portRange string) {
 	if len(portRange) > 2 {
 		cmd = append(cmd, "-ports", localPeepIPAddr)
 	}
-	log.Check(log.FatalLevel, "Creating p2p interface", exec.Command("p2p", cmd...).Run())
+	out, err := exec.Command("p2p", cmd...).CombinedOutput()
+	log.Check(log.FatalLevel, "Creating p2p interface "+string(out), err)
 }
 
 // Remove deletes P2P interface from the Resource Host.
