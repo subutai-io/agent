@@ -28,26 +28,36 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 
 	meta := make(map[string]string)
 
+	ownerAndParent := parent
 	if id := strings.Split(parent, "id:"); len(id) > 1 {
 		//check in db first and only if not found then go to CDN
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
-		parent = bolt.TemplateName(id[1])
+		ownerAndParent = bolt.TemplateName(id[1])
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-		if parent == "" {
+		if ownerAndParent == "" {
 			utils.CheckCDN()
 			var t templ
 			idToName(&t, id[1], kurjToken)
-			parent = t.name
+			if len(t.owner) > 0 {
+				ownerAndParent = t.owner[0] + "/" + t.name
+			} else {
+				ownerAndParent = t.name
+			}
 		}
 
-		log.Debug("Parent template is " + parent)
+		parent = ownerAndParent
+		if line := strings.Split(ownerAndParent, "/"); len(line) > 1 {
+			parent = line[1]
+		}
+
+		log.Debug("Parent template is " + ownerAndParent)
 	}
-	meta["parent"] = parent
+	meta["parent"] = ownerAndParent
 
 	if !container.IsTemplate(parent) {
-		LxcImport(parent, kurjToken, false)
+		LxcImport(ownerAndParent, kurjToken, false)
 	}
 	if container.ContainerOrTemplateExists(child) {
 		log.Error("Container " + child + " already exists")

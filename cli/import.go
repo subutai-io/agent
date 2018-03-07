@@ -432,10 +432,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
 
-	if t.id != "" {
+	if t.id != "" && len(t.owner) > 0 {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, t.id))
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.owner[0]+"/"+t.name, t.id))
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	}
 
