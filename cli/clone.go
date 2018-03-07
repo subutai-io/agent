@@ -52,7 +52,7 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 			parent = line[1]
 		}
 
-		log.Debug("Parent template is " + parent)
+		log.Debug("Parent template is " + ownerAndParent)
 	}
 	meta["parent"] = ownerAndParent
 
