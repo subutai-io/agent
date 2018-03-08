@@ -28,7 +28,9 @@ func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fm
 func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
 
 func (h handler) Response(message gossdp.ResponseMessage) {
-	if len(config.Management.Fingerprint) == 0 || config.Management.Fingerprint == message.DeviceId {
+	if len(config.Management.Fingerprint) == 0 ||
+		config.Management.Fingerprint == "" ||
+		strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) {
 		save(message.Location)
 	}
 }
