@@ -44,12 +44,13 @@ func Collect() {
 func doCollect() {
 
 	influx, err := utils.InfluxDbClient()
+	if err == nil {
+		defer influx.Close()
+	}
 
 	log.Check(log.WarnLevel, "Entering metrics collection routine", err)
 
 	if err == nil {
-
-		defer influx.Close()
 
 		_, _, err := influx.Ping(time.Second)
 

@@ -17,12 +17,13 @@ import (
 func initDB() bool {
 
 	influx, err := utils.InfluxDbClient()
+	if err == nil {
+		defer influx.Close()
+	}
 
 	log.Check(log.WarnLevel, "Initializing logger", err)
 
 	if err == nil {
-
-		defer influx.Close()
 
 		_, err = influx.Query(client.Query{Command: `CREATE DATABASE logs;
 		CREATE RETENTION POLICY "debug"  ON logs DURATION 24h  REPLICATION 1;
