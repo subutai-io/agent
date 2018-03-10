@@ -42,7 +42,7 @@ func StateRestore(canRestore *bool) {
 					return
 				}
 				log.Debug("Retrying container " + v + " start")
-				time.Sleep(time.Second * 3)
+				time.Sleep(time.Second * time.Duration(5+i))
 				startErr = container.Start(v)
 			}
 			if startErr != nil {
