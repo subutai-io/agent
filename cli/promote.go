@@ -37,6 +37,15 @@ func LxcPromote(name, source string) {
 			{"subutai.parent.owner", container.GetProperty(source, "subutai.template.owner")},
 			{"subutai.parent.version", container.GetProperty(source, "subutai.template.version")},
 		})
+	} else {
+		//subutai.template.version is set in export command
+		//subutai.template.owner is set by CDN
+		container.SetContainerConf(name, [][]string{
+			{"subutai.template", name},
+			{"subutai.parent", container.GetParent(name)},
+			{"subutai.parent.owner", container.GetProperty(name, "subutai.template.owner")},
+			{"subutai.parent.version", container.GetProperty(name, "subutai.template.version")},
+		})
 	}
 
 	// check: start container if it is not running already
