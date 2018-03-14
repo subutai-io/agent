@@ -20,6 +20,8 @@ import (
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name, source string) {
+	log.Debug("Name " + name)
+	log.Debug("Source " + source)
 	name = utils.CleanTemplateName(name)
 	checkSanity(name)
 
