@@ -31,14 +31,14 @@ var (
 )
 
 type templ struct {
-	name      string            `json:"name"`
-	file      string            `json:"file"`
-	version   string            `json:"version"`
-	branch    string            `json:"branch"`
-	id        string            `json:"id"`
-	md5       string            `json:"md5"`
-	owner     []string          `json:"owner"`
-	signature map[string]string `json:"signature"`
+	Name      string            `json:"name"`
+	File      string            `json:"file"`
+	Version   string            `json:"version"`
+	Branch    string            `json:"branch"`
+	Id        string            `json:"id"`
+	Md5       string            `json:"md5"`
+	Owner     []string          `json:"owner"`
+	Signature map[string]string `json:"signature"`
 }
 
 type metainfo struct {
@@ -66,7 +66,7 @@ func getTemplateInfoById(t *templ, id string, token string) {
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
-		log.Error("Template " + t.name + " not found")
+		log.Error("Template " + t.Name + " not found")
 	}
 	if response.StatusCode != 200 {
 		log.Error("Failed to get template info:  " + response.Status)
@@ -80,13 +80,13 @@ func getTemplateInfoById(t *templ, id string, token string) {
 		log.Error("Failed to parse template info:  " + response.Status)
 	}
 
-	t.name = meta[0].Name
-	t.owner = meta[0].Owner
-	t.version = meta[0].Version
-	t.id = meta[0].ID
-	t.file = meta[0].File
-	t.md5 = meta[0].Hash.Md5
-	t.signature = meta[0].Signs
+	t.Name = meta[0].Name
+	t.Owner = meta[0].Owner
+	t.Version = meta[0].Version
+	t.Id = meta[0].ID
+	t.File = meta[0].File
+	t.Md5 = meta[0].Hash.Md5
+	t.Signature = meta[0].Signs
 
 }
 
@@ -105,7 +105,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		if meta != nil {
 			templateInfo, found := meta["templateInfo"]
 			if found {
-				log.Debug("Found cached template info:\n" + templateId)
+				log.Debug("Found cached template info:\n" + templateInfo)
 				var t templ
 				err := json.Unmarshal([]byte(templateInfo), &t)
 				if err == nil {
@@ -144,7 +144,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 	verifySignature(t)
 
-	log.Info("Version: " + t.version)
+	log.Info("Version: " + t.Version)
 
 	return t
 }
@@ -178,7 +178,7 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
-		log.Error("Template " + t.name + " not found")
+		log.Error("Template " + t.Name + " not found")
 	}
 	if response.StatusCode != 200 {
 		log.Error("Failed to get template info:  " + response.Status)
@@ -192,13 +192,13 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 		log.Error("Failed to parse template info:  " + response.Status)
 	}
 
-	t.name = meta[0].Name
-	t.owner = meta[0].Owner
-	t.version = meta[0].Version
-	t.id = meta[0].ID
-	t.file = meta[0].File
-	t.md5 = meta[0].Hash.Md5
-	t.signature = meta[0].Signs
+	t.Name = meta[0].Name
+	t.Owner = meta[0].Owner
+	t.Version = meta[0].Version
+	t.Id = meta[0].ID
+	t.File = meta[0].File
+	t.Md5 = meta[0].Hash.Md5
+	t.Signature = meta[0].Signs
 
 }
 
@@ -219,7 +219,7 @@ func md5sum(filePath string) string {
 
 func downloadWithRetry(t templ, token string, retry int) bool {
 
-	if len(t.id) == 0 {
+	if len(t.Id) == 0 {
 		return false
 	}
 
@@ -238,7 +238,7 @@ func downloadWithRetry(t templ, token string, retry int) bool {
 // download gets template archive from global repository
 func download(t templ, token string) (bool, error) {
 
-	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.File)
 	if err != nil {
 		log.Debug("Failed to create archive ", err)
 		return false, err
@@ -247,7 +247,7 @@ func download(t templ, token string) (bool, error) {
 
 	client := utils.GetClientForUploadDownload()
 
-	url := config.CDN.Kurjun + "/template/download?id=" + t.id + "&token=" + token
+	url := config.CDN.Kurjun + "/template/download?id=" + t.Id + "&token=" + token
 
 	log.Debug("Template url " + url)
 
@@ -271,8 +271,8 @@ func download(t templ, token string) (bool, error) {
 		return false, err
 	}
 
-	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-	if t.md5 == hash {
+	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+	if t.Md5 == hash {
 		return true, nil
 	}
 
@@ -327,42 +327,42 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	var t templ
-	t.name = name
+	t.Name = name
 
 	if !local {
-		t = getTemplateInfo(t.name, token)
+		t = getTemplateInfo(t.Name, token)
 	}
 
-	log.Info("Importing " + t.name)
+	log.Info("Importing " + t.Name)
 
 	var lock lockfile.Lockfile
-	for lock, err = lockSubutai(t.name + ".import"); err != nil; lock, err = lockSubutai(t.name + ".import") {
+	for lock, err = lockSubutai(t.Name + ".import"); err != nil; lock, err = lockSubutai(t.Name + ".import") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
 
-	isTemplate := container.IsTemplate(t.name)
+	isTemplate := container.IsTemplate(t.Name)
 	if isTemplate {
 
 		if local {
-			log.Info(t.name + " instance exists")
+			log.Info(t.Name + " instance exists")
 			return
 		}
 
-		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.name+"/config", "subutai.template.version")
+		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.Name+"/config", "subutai.template.version")
 
 		//latest version is already installed
-		if version.Compare(t.version, existingVersion, "<=") {
-			log.Info(t.name + " instance exists")
+		if version.Compare(t.Version, existingVersion, "<=") {
+			log.Info(t.Name + " instance exists")
 			return
 		}
-	} else if container.IsContainer(t.name) {
-		log.Info(t.name + " instance exists")
+	} else if container.IsContainer(t.Name) {
+		log.Info(t.Name + " instance exists")
 		return
 	}
 
 	wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/" +
-		strings.ToLower(t.name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+		strings.ToLower(t.Name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
 
 	var archiveExists = false
 
@@ -386,22 +386,22 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				}
 			}
 
-			t.file = strings.Replace(latestVersionFile, config.Agent.LxcPrefix+"tmpdir/", "", 1)
+			t.File = strings.Replace(latestVersionFile, config.Agent.LxcPrefix+"tmpdir/", "", 1)
 
 			archiveExists = true
 
 		} else {
-			log.Warn("Template " + t.name + " not found in local cache")
+			log.Warn("Template " + t.Name + " not found in local cache")
 
 			//since we failed to find a local archive
 			//obtain template metadata from CDN
 			//to allow further download from CDN
-			t = getTemplateInfo(t.name, token)
+			t = getTemplateInfo(t.Name, token)
 		}
 
 	} else {
 
-		archiveExists = fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+		archiveExists = fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.File)
 	}
 
 	if archiveExists {
@@ -409,8 +409,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Debug("Template archive is present in local cache")
 
 		if !local {
-			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.file)
-			if t.md5 == hash {
+			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+			if t.Md5 == hash {
 
 				log.Debug("File integrity is verified")
 			} else {
@@ -425,7 +425,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		}
 
 		//clean all matching OLDER archives
-		fs.DeleteFilesWildcard(wildcardTemplateName, t.file)
+		fs.DeleteFilesWildcard(wildcardTemplateName, t.File)
 	} else {
 
 		log.Debug("Template archive is missing in local cache")
@@ -435,14 +435,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	if !archiveExists {
-		log.Info("Downloading " + t.name)
+		log.Info("Downloading " + t.Name)
 
 		downloaded := false
 
-		if len(t.owner) == 0 {
+		if len(t.Owner) == 0 {
 			for _, owner := range owners {
-				if t.owner = []string{owner}; len(owner) == 0 {
-					t.owner = []string{}
+				if t.Owner = []string{owner}; len(owner) == 0 {
+					t.Owner = []string{}
 				}
 				if downloadWithRetry(t, token, 5) {
 					downloaded = true
@@ -453,7 +453,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 		if !downloaded && !downloadWithRetry(t, token, 5) {
 
-			log.Error("Failed to download or verify template " + t.name)
+			log.Error("Failed to download or verify template " + t.Name)
 		} else {
 
 			log.Info("File integrity is verified")
@@ -462,66 +462,66 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//remove old template before installing new one
 	if isTemplate {
-		container.DestroyTemplate(t.name)
+		container.DestroyTemplate(t.Name)
 	}
 
-	log.Info("Unpacking template " + t.name)
-	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.file + " to " + t.name)
+	log.Info("Unpacking template " + t.Name)
+	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.File + " to " + t.Name)
 	tgz := extractor.NewTgz()
-	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.name
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.file, templdir))
+	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.Name
+	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.File, templdir))
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
 	parentOwner := container.GetConfigItem(templdir+"/config", "subutai.parent.owner")
 	parentVersion := container.GetConfigItem(templdir+"/config", "subutai.parent.version")
 
-	if parent != "" && parent != t.name && !container.IsTemplate(parent) && !stringInList(parent, auxDepList) {
+	if parent != "" && parent != t.Name && !container.IsTemplate(parent) && !stringInList(parent, auxDepList) {
 		// Append the template and parent name to dependency list
-		auxDepList = append(auxDepList, parent, t.name)
+		auxDepList = append(auxDepList, parent, t.Name)
 		log.Info("Parent template required: " + parent + "@" + parentOwner + ":" + parentVersion)
 		LxcImport(parent+"@"+parentOwner+":"+parentVersion, token, local, auxDepList...)
 	}
 
-	log.Info("Installing template " + t.name)
-	template.Install(parent, t.name)
+	log.Info("Installing template " + t.Name)
+	template.Install(parent, t.Name)
 	// TODO following lines kept for back compatibility with old templates, should be deleted when all templates will be replaced.
-	os.Rename(config.Agent.LxcPrefix+t.name+"/"+t.name+"-home", config.Agent.LxcPrefix+t.name+"/home")
-	os.Rename(config.Agent.LxcPrefix+t.name+"/"+t.name+"-var", config.Agent.LxcPrefix+t.name+"/var")
-	os.Rename(config.Agent.LxcPrefix+t.name+"/"+t.name+"-opt", config.Agent.LxcPrefix+t.name+"/opt")
+	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-home", config.Agent.LxcPrefix+t.Name+"/home")
+	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-var", config.Agent.LxcPrefix+t.Name+"/var")
+	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-opt", config.Agent.LxcPrefix+t.Name+"/opt")
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
 	//delete template archive
-	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.file)
+	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.File)
 
-	if t.name == "management" {
+	if t.Name == "management" {
 		template.MngInit()
 		return
 	}
 
-	container.SetContainerConf(t.name, [][]string{
+	container.SetContainerConf(t.Name, [][]string{
 		{"lxc.include", ""},
 	})
 
-	container.SetContainerConf(t.name, [][]string{
-		{"lxc.rootfs", config.Agent.LxcPrefix + t.name + "/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.name + "/rootfs"},
-		{"lxc.mount", config.Agent.LxcPrefix + t.name + "/fstab"},
+	container.SetContainerConf(t.Name, [][]string{
+		{"lxc.rootfs", config.Agent.LxcPrefix + t.Name + "/rootfs"},
+		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.Name + "/rootfs"},
+		{"lxc.mount", config.Agent.LxcPrefix + t.Name + "/fstab"},
 		{"lxc.hook.pre-start", ""},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
 		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
 		{"subutai.config.path", config.Agent.AppPrefix + "etc"},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/home home none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/opt opt none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
+		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/home home none bind,rw 0 0"},
+		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/opt opt none bind,rw 0 0"},
+		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/var var none bind,rw 0 0"},
 	})
 
-	if t.id != "" {
+	if t.Id != "" {
 		templateInfo, err := json.Marshal(&t)
 		if err == nil {
 			bolt, err := db.New()
 			log.Check(log.WarnLevel, "Opening database", err)
-			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.id, map[string]string{"templateInfo": string(templateInfo)}))
-			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, map[string]string{"id": t.id}))
+			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Id, map[string]string{"templateInfo": string(templateInfo)}))
+			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Name, map[string]string{"id": t.Id}))
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
 		}
 	}
@@ -535,13 +535,13 @@ func getVersion(fileName string) string {
 
 func verifySignature(t templ) {
 
-	if len(t.id) != 0 && len(t.signature) == 0 {
+	if len(t.Id) != 0 && len(t.Signature) == 0 {
 		log.Error("Template is not signed")
 	}
 
-	for owner, signature := range t.signature {
+	for owner, signature := range t.Signature {
 		for _, key := range gpg.KurjunUserPK(owner) {
-			if t.id == gpg.VerifySignature(key, signature) {
+			if t.Id == gpg.VerifySignature(key, signature) {
 				log.Info("Template's owner signature verified")
 				log.Debug("Signature belongs to " + owner)
 				return

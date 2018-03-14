@@ -34,22 +34,22 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 
 	t := getTemplateInfo(parent, kurjToken)
 
-	log.Debug("Parent template is " + t.name + "@" + t.owner[0] + ":" + t.version)
+	log.Debug("Parent template is " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
 
 	meta := make(map[string]string)
-	meta["parent"] = t.name
-	meta["parent.owner"] = t.owner[0]
-	meta["parent.version"] = t.version
-	meta["parent.id"] = t.id
+	meta["parent"] = t.Name
+	meta["parent.owner"] = t.Owner[0]
+	meta["parent.version"] = t.Version
+	meta["parent.id"] = t.Id
 
-	if !container.IsTemplate(t.name) {
-		LxcImport("id:"+t.id, kurjToken, false)
+	if !container.IsTemplate(t.Name) {
+		LxcImport("id:"+t.Id, kurjToken, false)
 	}
 
 	if container.ContainerOrTemplateExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
-	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.name, child))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.Name, child))
 
 	gpg.GenerateKey(child)
 	if len(token) != 0 {
@@ -73,7 +73,7 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	container.SetDNS(child)
 	container.CriuHax(child)
 	//add subutai.template.owner & subutai.template.version
-	container.CopyParentReference(child, t.owner[0], t.version)
+	container.CopyParentReference(child, t.Owner[0], t.Version)
 
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(child)
