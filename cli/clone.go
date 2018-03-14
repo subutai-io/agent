@@ -10,8 +10,14 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"regexp"
 )
 
+var (
+	templateNameNOwnerNVersionRx = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+):(?P<version>\d+\.\d+\.\d+)$`)
+	templateNameNOwnerRx         = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+)$`)
+	templateNameRx               = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)$`)
+)
 // LxcClone function creates new `child` container from a Subutai `parent` template.
 //
 // If the specified template argument is not deployed in system, Subutai first tries to import it, and if import succeeds, it then continues to clone from the imported template image.
@@ -26,45 +32,26 @@ import (
 func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	child = utils.CleanTemplateName(child)
 
+	t := getTemplateInfo(parent, kurjToken)
+
+	log.Debug("Parent template is " + t.name + "@" + t.owner[0] + ":" + t.version)
+
 	meta := make(map[string]string)
+	meta["parent"] = t.name
+	meta["parent.owner"] = t.owner[0]
+	meta["parent.version"] = t.version
+	meta["parent.id"] = t.id
 
-	ownerAndParent := parent
-	if id := strings.Split(parent, "id:"); len(id) > 1 {
-		//check in db first and only if not found then go to CDN
-		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		ownerAndParent = bolt.TemplateName(id[1])
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
-		if ownerAndParent == "" {
-			utils.CheckCDN()
-			var t templ
-			idToName(&t, id[1], kurjToken)
-			if len(t.owner) > 0 {
-				ownerAndParent = t.owner[0] + "/" + t.name
-			} else {
-				ownerAndParent = t.name
-			}
-		}
-
-		parent = ownerAndParent
-		if line := strings.Split(ownerAndParent, "/"); len(line) > 1 {
-			parent = line[1]
-		}
-
-		log.Debug("Parent template is " + ownerAndParent)
+	if !container.IsTemplate(t.name) {
+		LxcImport("id:"+t.id, kurjToken, false)
 	}
-	meta["parent"] = ownerAndParent
 
-	if !container.IsTemplate(parent) {
-		LxcImport(ownerAndParent, kurjToken, false)
-	}
 	if container.ContainerOrTemplateExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
-	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(parent, child))
-	gpg.GenerateKey(child)
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.name, child))
 
+	gpg.GenerateKey(child)
 	if len(token) != 0 {
 		gpg.ExchageAndEncrypt(child, token)
 	}
@@ -85,6 +72,8 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	container.SetApt(child)
 	container.SetDNS(child)
 	container.CriuHax(child)
+	//add subutai.template.owner & subutai.template.version
+	container.CopyParentReference(child, t.owner[0], t.version)
 
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(child)

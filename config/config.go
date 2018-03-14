@@ -31,6 +31,7 @@ type managementConfig struct {
 	RestPublicKey string
 	Fingerprint   string
 	Allowinsecure bool
+	Experimental  bool
 }
 
 type influxdbConfig struct {
@@ -66,7 +67,8 @@ const defaultConfig = `
 	debug = true
 	appPrefix = /apps/subutai/current/
 	dataPrefix = /var/lib/apps/subutai/current/
-	lxcPrefix = /mnt/lib/lxc/
+	lxcPrefix = /var/snap/subutai/common/lxc/
+	experimental = false
 
 	[management]
 	gpgUser =

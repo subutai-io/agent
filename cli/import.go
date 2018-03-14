@@ -54,13 +54,121 @@ type metainfo struct {
 	} `json:"hash"`
 }
 
-// getTemplateInfo retrieves the id of a template on global repository, id of the latest template version will be returned
-func getTemplateInfo(t *templ, token string) {
+// getTemplateInfoById retrieves template name from global repository by passed id string
+func getTemplateInfoById(t *templ, id string, token string) {
+	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
+	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
+	url := config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token
 
-	//get template info by name from Kurjun
-	url := config.CDN.Kurjun + "/template/info?name=" + t.name + "&token=" + token
-	if len(t.owner) > 0 {
-		url += "&owner=" + t.owner[0]
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
+	response, err := kurjun.Get(url)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	defer utils.Close(response)
+
+	if response.StatusCode == 404 {
+		log.Error("Template " + t.name + " not found")
+	}
+	if response.StatusCode != 200 {
+		log.Error("Failed to get template info:  " + response.Status)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
+
+	var meta []metainfo
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+		log.Error("Failed to parse template info:  " + response.Status)
+	}
+
+	t.name = meta[0].Name
+	t.owner = meta[0].Owner
+	t.version = meta[0].Version
+	t.id = meta[0].ID
+	t.file = meta[0].File
+	t.md5 = meta[0].Hash.Md5
+	t.signature = meta[0].Signs
+
+}
+
+func getTemplateInfo(template string, kurjToken string) templ {
+
+	var t templ
+
+	if id := strings.Split(template, "id:"); len(id) > 1 {
+		templateId := id[1]
+
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		meta := bolt.TemplateByName(templateId)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		if meta != nil {
+			templateInfo, found := meta["templateInfo"]
+			if found {
+				var t templ
+				err := json.Unmarshal([]byte(templateInfo), &t)
+				if err == nil {
+					return t
+				}
+			}
+		}
+
+		utils.CheckCDN()
+
+		getTemplateInfoById(&t, templateId, kurjToken)
+
+	} else {
+		utils.CheckCDN()
+
+		// full template reference is template@owner:version e.g. master@subutai:4.0.0
+		// if owner is missing then we use verified only, if version is missing we use latest version
+
+		if templateNameNOwnerNVersionRx.MatchString(template) {
+			groups := utils.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
+
+			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"], kurjToken)
+		} else if templateNameNOwnerRx.MatchString(template) {
+			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
+
+			getTemplateInfoByName(&t, groups["name"], groups["owner"], "", kurjToken)
+		} else if templateNameRx.MatchString(template) {
+			groups := utils.MatchRegexGroups(templateNameRx, template)
+
+			getTemplateInfoByName(&t, groups["name"], "", "", kurjToken)
+		} else {
+			log.Error("Invalid template name " + template)
+		}
+
+	}
+
+	verifySignature(t)
+
+	log.Info("Version: " + t.version)
+
+	return t
+}
+
+//TODO urlEncode the kurjun URL
+func getTemplateInfoByName(t *templ, name string, owner string, version string, token string) {
+	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
+	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
+
+	url := config.CDN.Kurjun + "/template/info?name=" + name
+
+	if owner == "" {
+		url += "&verified=true"
+	} else {
+		url += "&owner=" + owner
+	}
+
+	if version == "" {
+		url += "&version=latest"
+	} else {
+		url += "&version=" + version
+	}
+
+	if token != "" {
+		url += "&token=" + token
 	}
 
 	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
@@ -90,36 +198,6 @@ func getTemplateInfo(t *templ, token string) {
 	t.file = meta[0].File
 	t.md5 = meta[0].Hash.Md5
 	t.signature = meta[0].Signs
-}
-
-// idToName retrieves template name from global repository by passed id string
-func idToName(t *templ, id string, token string) {
-	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
-	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
-	url := config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token
-
-	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := kurjun.Get(url)
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
-	defer utils.Close(response)
-
-	if response.StatusCode == 404 {
-		log.Error("Template " + t.name + " not found")
-	}
-	if response.StatusCode != 200 {
-		log.Error("Failed to get template info:  " + response.Status)
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
-
-	var meta []metainfo
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
-		log.Error("Failed to parse template info:  " + response.Status)
-	}
-
-	t.name = meta[0].Name
-	t.owner = meta[0].Owner
 
 }
 
@@ -238,6 +316,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 //
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
+
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
@@ -250,7 +329,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	t.name = name
 
 	if !local {
-		fetchTemplateMetadata(&t, token)
+		t = getTemplateInfo(t.name, token)
 	}
 
 	log.Info("Importing " + t.name)
@@ -311,12 +390,12 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			archiveExists = true
 
 		} else {
-			log.Warn("Template " + name + " not found in local cache")
+			log.Warn("Template " + t.name + " not found in local cache")
 
 			//since we failed to find a local archive
 			//obtain template metadata from CDN
 			//to allow further download from CDN
-			fetchTemplateMetadata(&t, token)
+			t = getTemplateInfo(t.name, token)
 		}
 
 	} else {
@@ -391,12 +470,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.name
 	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.file, templdir))
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
+	parentOwner := container.GetConfigItem(templdir+"/config", "subutai.parent.owner")
+	parentVersion := container.GetConfigItem(templdir+"/config", "subutai.parent.version")
 
 	if parent != "" && parent != t.name && !container.IsTemplate(parent) && !stringInList(parent, auxDepList) {
 		// Append the template and parent name to dependency list
 		auxDepList = append(auxDepList, parent, t.name)
-		log.Info("Parent template required: " + parent)
-		LxcImport(parent, token, local, auxDepList...)
+		log.Info("Parent template required: " + parent + "@" + parentOwner + ":" + parentVersion)
+		LxcImport(parent+"@"+parentOwner+":"+parentVersion, token, local, auxDepList...)
 	}
 
 	log.Info("Installing template " + t.name)
@@ -407,6 +488,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	os.Rename(config.Agent.LxcPrefix+t.name+"/"+t.name+"-opt", config.Agent.LxcPrefix+t.name+"/opt")
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
+	//delete template archive
 	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.file)
 
 	if t.name == "management" {
@@ -432,36 +514,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.name + "/var var none bind,rw 0 0"},
 	})
 
-	if t.id != "" && len(t.owner) > 0 {
-		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.owner[0]+"/"+t.name, t.id))
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if t.id != "" {
+		templateInfo, err := json.Marshal(&t)
+		if err == nil {
+			bolt, err := db.New()
+			log.Check(log.WarnLevel, "Opening database", err)
+			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.id, map[string]string{"templateInfo": string(templateInfo)}))
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		}
 	}
-
-}
-
-func fetchTemplateMetadata(t *templ, token string) {
-	utils.CheckCDN()
-
-	//obtain name and owner from Kurjun
-	if id := strings.Split(t.name, "id:"); len(id) > 1 {
-		idToName(t, id[1], token)
-	} else if line := strings.Split(t.name, "/"); len(line) > 1 {
-		t.name = line[1]
-		t.owner = append(t.owner, line[0])
-	}
-
-	//obtain full template info from Kurjun by name & owner to get latest version
-	getTemplateInfo(t, token)
-
-	log.Info("Version: " + t.version)
-
-	if len(t.id) != 0 && len(t.signature) == 0 {
-		log.Error("Template is not signed")
-	}
-
-	log.Check(log.ErrorLevel, "Verifying template signature", verifySignature(t.id, t.signature))
 
 }
 
@@ -470,21 +531,23 @@ func getVersion(fileName string) string {
 	return strings.Replace(strings.SplitAfter(fileName, "subutai-template_")[1], "_"+strings.ToLower(runtime.GOARCH)+".tar.gz", "", 1)
 }
 
-func verifySignature(id string, list map[string]string) error {
-	if len(list) == 0 {
-		return nil
+func verifySignature(t templ) {
+
+	if len(t.id) != 0 && len(t.signature) == 0 {
+		log.Error("Template is not signed")
 	}
-	for owner, signature := range list {
+
+	for owner, signature := range t.signature {
 		for _, key := range gpg.KurjunUserPK(owner) {
-			if id == gpg.VerifySignature(key, signature) {
+			if t.id == gpg.VerifySignature(key, signature) {
 				log.Info("Template's owner signature verified")
 				log.Debug("Signature belongs to " + owner)
-				return nil
+				return
 			}
 			log.Debug("Signature does not match with template id")
 		}
 	}
-	return fmt.Errorf("failed to verify signature")
+	log.Error("Failed to verify signature")
 }
 
 // Verify if package is already on dependency list

@@ -306,6 +306,9 @@ func DestroyTemplate(name string) {
 func GetParent(name string) string {
 	return GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
 }
+func GetProperty(templateOrContainerName string, propertyName string) string {
+	return GetConfigItem(config.Agent.LxcPrefix+templateOrContainerName+"/config", propertyName)
+}
 
 // Clone create the duplicate container from the Subutai template.
 func Clone(parent, child string) error {
@@ -541,6 +544,13 @@ func CriuHax(name string) {
 		{"lxc.console", "none"},
 		{"lxc.tty", "0"},
 		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
+	})
+}
+
+func CopyParentReference(name string, owner string, version string) {
+	SetContainerConf(name, [][]string{
+		{"subutai.template.owner", owner},
+		{"subutai.template.version", version},
 	})
 }
 

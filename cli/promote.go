@@ -21,16 +21,23 @@ import (
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name, source string) {
 	name = utils.CleanTemplateName(name)
+	checkSanity(name)
 
 	if len(source) > 0 && len(name) > 0 {
 		if container.State(source) == "RUNNING" {
 			container.Stop(source, true)
 			defer container.Start(source)
 		}
-		log.Check(log.ErrorLevel, "Clonning source container", container.Clone(source, name))
-		container.SetContainerConf(name, [][]string{{"subutai.parent", container.GetParent(source)}})
+		log.Check(log.ErrorLevel, "Cloning source container", container.Clone(source, name))
+		//subutai.template.version is set in export command
+		//subutai.template.owner is set by CDN
+		container.SetContainerConf(name, [][]string{
+			{"subutai.template", name},
+			{"subutai.parent", container.GetParent(source)},
+			{"subutai.parent.owner", container.GetProperty(source, "subutai.template.owner")},
+			{"subutai.parent.version", container.GetProperty(source, "subutai.template.version")},
+		})
 	}
-	checkSanity(name)
 
 	// check: start container if it is not running already
 	if container.State(name) != "RUNNING" {
