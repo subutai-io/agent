@@ -296,7 +296,14 @@ func DestroyTemplate(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(name))
+	meta := bolt.TemplateByName(name)
+	if meta != nil {
+		templateId, found := meta["id"]
+		if found {
+			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
+		}
+	}
+	log.Check(log.WarnLevel, "Deleting template index entry", bolt.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 

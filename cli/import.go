@@ -520,6 +520,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			bolt, err := db.New()
 			log.Check(log.WarnLevel, "Opening database", err)
 			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.id, map[string]string{"templateInfo": string(templateInfo)}))
+			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.name, map[string]string{"id": t.id}))
 			log.Check(log.WarnLevel, "Closing database", bolt.Close())
 		}
 	}
