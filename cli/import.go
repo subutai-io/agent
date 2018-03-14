@@ -105,6 +105,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		if meta != nil {
 			templateInfo, found := meta["templateInfo"]
 			if found {
+				log.Debug("Found cached template info:\n" + templateId)
 				var t templ
 				err := json.Unmarshal([]byte(templateInfo), &t)
 				if err == nil {

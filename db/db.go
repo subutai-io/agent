@@ -175,7 +175,7 @@ func (i *Instance) TemplateAdd(name string, options map[string]string) (err erro
 func (i *Instance) TemplateDel(name string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(templates); b != nil {
-			if err = b.Delete([]byte(name)); err != nil {
+			if err = b.DeleteBucket([]byte(name)); err != nil {
 				return err
 			}
 		}
