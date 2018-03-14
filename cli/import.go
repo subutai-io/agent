@@ -90,6 +90,43 @@ func getTemplateInfoById(t *templ, id string, token string) {
 
 }
 
+func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	meta := bolt.TemplateByName(templateId)
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	if meta != nil {
+		templateInfo, found := meta["templateInfo"]
+		if found {
+			log.Debug("Found cached template info:\n" + templateInfo)
+			var t templ
+			err := json.Unmarshal([]byte(templateInfo), &t)
+			if err == nil {
+				return t, true
+			}
+		}
+	}
+
+	return templ{}, false
+}
+
+func getTemplateInfoFromCacheByName(templateName string) (templ, bool) {
+	bolt, err := db.New()
+	log.Check(log.WarnLevel, "Opening database", err)
+	meta := bolt.TemplateByName(templateName)
+	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+	if meta != nil {
+		templateId, found := meta["id"]
+		if found {
+			return getTemplateInfoFromCacheById(templateId)
+		}
+	}
+
+	return templ{}, false
+}
+
 func getTemplateInfo(template string, kurjToken string) templ {
 
 	var t templ
@@ -97,21 +134,8 @@ func getTemplateInfo(template string, kurjToken string) templ {
 	if id := strings.Split(template, "id:"); len(id) > 1 {
 		templateId := id[1]
 
-		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		meta := bolt.TemplateByName(templateId)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
-		if meta != nil {
-			templateInfo, found := meta["templateInfo"]
-			if found {
-				log.Debug("Found cached template info:\n" + templateInfo)
-				var t templ
-				err := json.Unmarshal([]byte(templateInfo), &t)
-				if err == nil {
-					return t
-				}
-			}
+		if t, found := getTemplateInfoFromCacheById(templateId); found {
+			return t
 		}
 
 		utils.CheckCDN()
@@ -119,7 +143,6 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		getTemplateInfoById(&t, templateId, kurjToken)
 
 	} else {
-		utils.CheckCDN()
 
 		// full template reference is template@owner:version e.g. master@subutai:4.0.0
 		// if owner is missing then we use verified only, if version is missing we use latest version
@@ -127,13 +150,37 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		if templateNameNOwnerNVersionRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
 
+			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
+				if t.Name == groups["name"] && t.Owner[0] == groups["owner"] && t.Version == groups["version"] {
+					return t
+				}
+			}
+
+			utils.CheckCDN()
+
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"], kurjToken)
 		} else if templateNameNOwnerRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
 
+			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
+				if t.Name == groups["name"] && t.Owner[0] == groups["owner"] {
+					return t
+				}
+			}
+
+			utils.CheckCDN()
+
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], "", kurjToken)
 		} else if templateNameRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameRx, template)
+
+			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
+				if t.Name == groups["name"] {
+					return t
+				}
+			}
+
+			utils.CheckCDN()
 
 			getTemplateInfoByName(&t, groups["name"], "", "", kurjToken)
 		} else {
