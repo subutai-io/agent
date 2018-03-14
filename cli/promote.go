@@ -20,10 +20,8 @@ import (
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name, source string) {
-	log.Debug("Name " + name)
-	log.Debug("Source " + source)
 	name = utils.CleanTemplateName(name)
-	checkSanity(name)
+	checkSanity(name, source)
 
 	if len(source) > 0 {
 		if container.State(source) == "RUNNING" {
@@ -117,23 +115,28 @@ func execDiff(dir1, dir2, output string) {
 }
 
 // checkSanity performs different checks before promote command
-func checkSanity(name string) {
+func checkSanity(name string, source string) {
 	// check: if name exists
-	if !container.ContainerOrTemplateExists(name) {
-		log.Error("Container " + name + " does not exist")
+	if source != "" {
+		if !container.IsContainer(source) {
+			log.Error("Container " + source + " does not exist")
+		}
+	} else {
+		if !container.IsContainer(name) {
+			log.Error("Container " + name + " does not exist")
+		}
 	}
 
 	// check: if name is template
 	if container.IsTemplate(name) {
 		log.Error("Template " + name + " already exists")
 	}
-	// check: remove default gateway
 
 	parent := container.GetParent(name)
 	if parent == name || len(parent) < 1 {
 		return
 	}
-	if !container.IsTemplate(container.GetParent(name)) {
-		log.Error("Parent template " + container.GetParent(name) + " not found")
+	if !container.IsTemplate(parent) {
+		log.Error("Parent template " + parent + " not found")
 	}
 }
