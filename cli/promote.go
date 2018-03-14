@@ -23,7 +23,7 @@ func LxcPromote(name, source string) {
 	name = utils.CleanTemplateName(name)
 	checkSanity(name)
 
-	if len(source) > 0 && len(name) > 0 {
+	if len(source) > 0 {
 		if container.State(source) == "RUNNING" {
 			container.Stop(source, true)
 			defer container.Start(source)
