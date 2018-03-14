@@ -31,14 +31,14 @@ var (
 )
 
 type templ struct {
-	name      string
-	file      string
-	version   string
-	branch    string
-	id        string
-	md5       string
-	owner     []string
-	signature map[string]string
+	name      string            `json:"name"`
+	file      string            `json:"file"`
+	version   string            `json:"version"`
+	branch    string            `json:"branch"`
+	id        string            `json:"id"`
+	md5       string            `json:"md5"`
+	owner     []string          `json:"owner"`
+	signature map[string]string `json:"signature"`
 }
 
 type metainfo struct {
