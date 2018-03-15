@@ -29,8 +29,6 @@ func LxcPromote(name, source string) {
 			defer container.Start(source)
 		}
 		log.Check(log.ErrorLevel, "Cloning source container", container.Clone(source, name))
-		//subutai.template.version is set in export command
-		//subutai.template.owner is set by CDN
 		container.SetContainerConf(name, [][]string{
 			{"subutai.template", name},
 			{"subutai.parent", container.GetParent(source)},
@@ -38,8 +36,6 @@ func LxcPromote(name, source string) {
 			{"subutai.parent.version", container.GetProperty(source, "subutai.template.version")},
 		})
 	} else {
-		//subutai.template.version is set in export command
-		//subutai.template.owner is set by CDN
 		container.SetContainerConf(name, [][]string{
 			{"subutai.template", name},
 			{"subutai.parent", container.GetParent(name)},

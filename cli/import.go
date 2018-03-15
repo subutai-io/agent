@@ -77,7 +77,60 @@ func getTemplateInfoById(t *templ, id string, token string) {
 
 	var meta []metainfo
 	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
-		log.Error("Failed to parse template info:  " + response.Status)
+		log.Error("Failed to parse template info")
+	}
+
+	t.Name = meta[0].Name
+	t.Owner = meta[0].Owner
+	t.Version = meta[0].Version
+	t.Id = meta[0].ID
+	t.File = meta[0].File
+	t.Md5 = meta[0].Hash.Md5
+	t.Signature = meta[0].Signs
+
+}
+
+//TODO urlEncode the kurjun URL
+func getTemplateInfoByName(t *templ, name string, owner string, version string, token string) {
+	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
+	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
+
+	url := config.CDN.Kurjun + "/template/info?name=" + name
+
+	if owner == "" {
+		url += "&verified=true"
+	} else {
+		url += "&owner=" + owner
+	}
+
+	if version == "" {
+		url += "&version=latest"
+	} else {
+		url += "&version=" + version
+	}
+
+	if token != "" {
+		url += "&token=" + token
+	}
+
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
+	response, err := kurjun.Get(url)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	defer utils.Close(response)
+
+	if response.StatusCode == 404 {
+		log.Error("Template " + t.Name + " not found")
+	}
+	if response.StatusCode != 200 {
+		log.Error("Failed to get template info:  " + response.Status)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
+
+	var meta []metainfo
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+		log.Error("Failed to parse template info")
 	}
 
 	t.Name = meta[0].Name
@@ -194,59 +247,6 @@ func getTemplateInfo(template string, kurjToken string) templ {
 	log.Info("Version: " + t.Version)
 
 	return t
-}
-
-//TODO urlEncode the kurjun URL
-func getTemplateInfoByName(t *templ, name string, owner string, version string, token string) {
-	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
-	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
-
-	url := config.CDN.Kurjun + "/template/info?name=" + name
-
-	if owner == "" {
-		url += "&verified=true"
-	} else {
-		url += "&owner=" + owner
-	}
-
-	if version == "" {
-		url += "&version=latest"
-	} else {
-		url += "&version=" + version
-	}
-
-	if token != "" {
-		url += "&token=" + token
-	}
-
-	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := kurjun.Get(url)
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
-	defer utils.Close(response)
-
-	if response.StatusCode == 404 {
-		log.Error("Template " + t.Name + " not found")
-	}
-	if response.StatusCode != 200 {
-		log.Error("Failed to get template info:  " + response.Status)
-	}
-
-	body, err := ioutil.ReadAll(response.Body)
-	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
-
-	var meta []metainfo
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
-		log.Error("Failed to parse template info:  " + response.Status)
-	}
-
-	t.Name = meta[0].Name
-	t.Owner = meta[0].Owner
-	t.Version = meta[0].Version
-	t.Id = meta[0].ID
-	t.File = meta[0].File
-	t.Md5 = meta[0].Hash.Md5
-	t.Signature = meta[0].Signs
-
 }
 
 // md5sum returns MD5 hash sum of specified file
@@ -546,9 +546,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	container.SetContainerConf(t.Name, [][]string{
 		{"lxc.include", ""},
-	})
-
-	container.SetContainerConf(t.Name, [][]string{
 		{"lxc.rootfs", config.Agent.LxcPrefix + t.Name + "/rootfs"},
 		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.Name + "/rootfs"},
 		{"lxc.mount", config.Agent.LxcPrefix + t.Name + "/fstab"},
