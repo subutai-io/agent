@@ -32,6 +32,10 @@ var (
 func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	child = utils.CleanTemplateName(child)
 
+	if container.ContainerOrTemplateExists(child) {
+		log.Error("Container " + child + " already exists")
+	}
+
 	t := getTemplateInfo(parent, kurjToken)
 
 	log.Debug("Parent template is " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
@@ -46,9 +50,6 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 		LxcImport("id:"+t.Id, kurjToken, false)
 	}
 
-	if container.ContainerOrTemplateExists(child) {
-		log.Error("Container " + child + " already exists")
-	}
 	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.Name, child))
 
 	gpg.GenerateKey(child)
