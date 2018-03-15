@@ -105,16 +105,33 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 
 	container.SetContainerConf(name, containerConf)
 
-	fs.Tar(dst, dst+".tar.gz")
+	templateArchive := dst + ".tar.gz"
+	fs.Tar(dst, templateArchive)
 	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
-	log.Info(name + " exported to " + dst + ".tar.gz")
-	if len(token) > 0 {
-		if hash, err := upload(dst+".tar.gz", token, private); err != nil {
-			log.Error("Failed to upload template: " + err.Error())
-		} else {
-			log.Info("Template uploaded, hash: " + string(hash))
-		}
+	log.Info(name + " exported to " + templateArchive)
+
+	if hash, err := upload(templateArchive, token, private); err != nil {
+		log.Error("Failed to upload template: " + err.Error())
+	} else {
+		cdnFileId := string(hash)
+		log.Info("Template uploaded, hash: " + cdnFileId)
+
+		//cache template info since template is in CDN
+		//no need to calculate signature since for locally cached info it is not checked
+
+		var templateInfo = templ{}
+		templateInfo.Id = cdnFileId
+		templateInfo.Name = name
+		templateInfo.Version = version
+		templateInfo.Owner = []string{owner}
+		templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
+		templateInfo.Md5 = md5sum(templateArchive)
+
+		cacheTemplateInfo(templateInfo)
 	}
+
+	log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+
 }
 
 func getOwner(token string) string {

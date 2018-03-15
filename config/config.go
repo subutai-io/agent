@@ -31,7 +31,6 @@ type managementConfig struct {
 	RestPublicKey string
 	Fingerprint   string
 	Allowinsecure bool
-	Experimental  bool
 }
 
 type influxdbConfig struct {

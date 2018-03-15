@@ -537,7 +537,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
 	//delete template archive
-	fs.DeleteFilesWildcard(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+	templateArchive := config.Agent.LxcPrefix + "tmpdir/" + t.File
+	log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
 
 	if t.Name == "management" {
 		template.MngInit()
@@ -560,16 +561,20 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	})
 
 	if t.Id != "" {
-		templateInfo, err := json.Marshal(&t)
-		if err == nil {
-			bolt, err := db.New()
-			log.Check(log.WarnLevel, "Opening database", err)
-			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Id, map[string]string{"templateInfo": string(templateInfo)}))
-			log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Name, map[string]string{"id": t.Id}))
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
-		}
+		cacheTemplateInfo(t)
 	}
 
+}
+
+func cacheTemplateInfo(t templ) {
+	templateInfo, err := json.Marshal(&t)
+	if err == nil {
+		bolt, err := db.New()
+		log.Check(log.WarnLevel, "Opening database", err)
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Id, map[string]string{"templateInfo": string(templateInfo)}))
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.TemplateAdd(t.Name, map[string]string{"id": t.Id}))
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 }
 
 func getVersion(fileName string) string {
