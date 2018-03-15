@@ -293,6 +293,10 @@ func DestroyTemplate(name string) {
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
+	DeleteTemplateInfoFromCache(name)
+}
+
+func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
@@ -306,7 +310,6 @@ func DestroyTemplate(name string) {
 	log.Check(log.WarnLevel, "Deleting template index entry", bolt.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
 }
 
 // GetParent return a parent of the Subutai container.
