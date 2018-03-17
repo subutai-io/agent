@@ -97,10 +97,10 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 
 	url := config.CDN.Kurjun + "/template/info?name=" + name
 
-	if owner == "" {
-		url += "&verified=true"
-	} else {
+	if owner != "" {
 		url += "&owner=" + owner
+	} else if token == "" {
+		url += "&verified=true"
 	}
 
 	if version == "" {
