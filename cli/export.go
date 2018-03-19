@@ -35,7 +35,14 @@ var (
 //
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
+//TODO update doco on site for export, import,clone
 func LxcExport(name, version, prefsize, token, description string, private bool) {
+	if token == "" {
+		log.Error("Missing CDN token")
+	}
+
+	owner := getOwner(token)
+
 	size := "tiny"
 	for _, s := range allsizes {
 		if prefsize == s {
@@ -49,13 +56,14 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 	dst := config.Agent.LxcPrefix + "tmpdir/" + name +
 		"-subutai-template_" + version + "_" + runtime.GOARCH
 
-	if !container.IsTemplate(name) {
-		LxcPromote(name, "")
-	}
 	// check: parent is template
 	parent := container.GetParent(name)
 	if !container.IsTemplate(parent) {
 		log.Error("Parent " + parent + " is not a template")
+	}
+
+	if !container.IsTemplate(name) {
+		LxcPromote(name, "")
 	}
 
 	os.MkdirAll(dst, 0755)
@@ -65,19 +73,6 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
 		err := fs.Send(config.Agent.LxcPrefix+parent+"/"+vol, config.Agent.LxcPrefix+name+"/"+vol, dst+"/deltas/"+vol+".delta")
 		log.Check(log.FatalLevel, "Sending delta "+dst+"/deltas/"+vol+".delta", err)
-	}
-
-	// changeConfigFile(name, packageVersion, dst)
-	container.SetContainerConf(name, [][]string{
-		{"subutai.template.package", dst + ".tar.gz"},
-		{"subutai.template.version", version},
-		{"subutai.template.size", size},
-	})
-
-	if len(description) != 0 {
-		container.SetContainerConf(name, [][]string{
-			{"subutai.template.description", "\"" + description + "\""},
-		})
 	}
 
 	src := config.Agent.LxcPrefix + name
@@ -94,22 +89,72 @@ func LxcExport(name, version, prefsize, token, description string, private bool)
 		fs.Copy(src+"/diff/rootfs.diff", dst+"/diff/rootfs.diff")
 	}
 
-	container.SetContainerConf(name, [][]string{
+	containerConf := [][]string{
+		{"subutai.template.package", dst + ".tar.gz"},
+		{"subutai.template.owner", owner},
+		{"subutai.template.version", version},
+		{"subutai.template.size", size},
 		{"subutai.template.package", config.Agent.LxcPrefix + "tmpdir/" + name +
 			"-subutai-template_" + srcver + "_" + runtime.GOARCH + ".tar.gz"},
 		{"subutai.template.version", srcver},
-	})
-
-	fs.Tar(dst, dst+".tar.gz")
-	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
-	log.Info(name + " exported to " + dst + ".tar.gz")
-	if len(token) > 0 {
-		if hash, err := upload(dst+".tar.gz", token, private); err != nil {
-			log.Error("Failed to upload template: " + err.Error())
-		} else {
-			log.Info("Template uploaded, hash: " + string(hash))
-		}
 	}
+
+	if len(description) != 0 {
+		containerConf = append(containerConf, []string{"subutai.template.description", "\"" + description + "\""})
+	}
+
+	container.SetContainerConf(name, containerConf)
+
+	templateArchive := dst + ".tar.gz"
+	fs.Tar(dst, templateArchive)
+	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
+	log.Info(name + " exported to " + templateArchive)
+
+	if hash, err := upload(templateArchive, token, private); err != nil {
+		log.Error("Failed to upload template: " + err.Error())
+	} else {
+		cdnFileId := string(hash)
+		log.Info("Template uploaded, hash: " + cdnFileId)
+
+		//cache template info since template is in CDN
+		//no need to calculate signature since for locally cached info it is not checked
+
+		var templateInfo = templ{}
+		templateInfo.Id = cdnFileId
+		templateInfo.Name = name
+		templateInfo.Version = version
+		templateInfo.Owner = []string{owner}
+		templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
+		templateInfo.Md5 = md5sum(templateArchive)
+
+		cacheTemplateInfo(templateInfo)
+	}
+
+	log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+
+}
+
+func getOwner(token string) string {
+
+	url := config.CDN.Kurjun + "/auth/owner?token=" + token
+
+	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
+	response, err := kurjun.Get(url)
+	log.Check(log.ErrorLevel, "Getting owner, get: "+url, err)
+	defer utils.Close(response)
+
+	if response.StatusCode == 404 {
+		log.Error("Owner not found")
+	}
+	if response.StatusCode != 200 {
+		log.Error("Failed to get owner:  " + response.Status)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	log.Check(log.ErrorLevel, "Reading owner, get: "+url, err)
+
+	return string(body)
+
 }
 
 func upload(path, token string, private bool) ([]byte, error) {

@@ -260,3 +260,18 @@ func CleanTemplateName(name string) string {
 	}
 	return reg.ReplaceAllString(name, "")
 }
+
+
+
+func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]string) {
+
+	match := regEx.FindStringSubmatch(url)
+
+	paramsMap = make(map[string]string)
+	for i, name := range regEx.SubexpNames() {
+		if i > 0 && i <= len(match) {
+			paramsMap[name] = match[i]
+		}
+	}
+	return
+}
