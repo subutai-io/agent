@@ -109,13 +109,9 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 	log.Check(log.WarnLevel, "Remove unpacked deltas dir",
 		os.RemoveAll(tmpUnpackDir))
 
-	// changing newcontainer mac
-	lxcContainer.SetContainerConf(newContainer, [][]string{
-		{"lxc.network.hwaddr", template.Mac()},
-	})
-
 	// changing newcontainer config
 	lxcContainer.SetContainerConf(newContainer, [][]string{
+		{"lxc.network.hwaddr", template.Mac()},
 		{"lxc.network.veth.pair", strings.Replace(lxcContainer.GetConfigItem(config.Agent.LxcPrefix+newContainer+"/config", "lxc.network.hwaddr"), ":", "", -1)},
 		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + newContainer + "/rootfs"},

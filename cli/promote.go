@@ -21,16 +21,28 @@ import (
 // and setting the container's filesystem to read-only to prevent changes.
 func LxcPromote(name, source string) {
 	name = utils.CleanTemplateName(name)
+	checkSanity(name, source)
 
-	if len(source) > 0 && len(name) > 0 {
+	if len(source) > 0 {
 		if container.State(source) == "RUNNING" {
 			container.Stop(source, true)
 			defer container.Start(source)
 		}
-		log.Check(log.ErrorLevel, "Clonning source container", container.Clone(source, name))
-		container.SetContainerConf(name, [][]string{{"subutai.parent", container.GetParent(source)}})
+		log.Check(log.ErrorLevel, "Cloning source container", container.Clone(source, name))
+		container.SetContainerConf(name, [][]string{
+			{"subutai.template", name},
+			{"subutai.parent", container.GetParent(source)},
+			{"subutai.parent.owner", container.GetProperty(source, "subutai.template.owner")},
+			{"subutai.parent.version", container.GetProperty(source, "subutai.template.version")},
+		})
+	} else {
+		container.SetContainerConf(name, [][]string{
+			{"subutai.template", name},
+			{"subutai.parent", container.GetParent(name)},
+			{"subutai.parent.owner", container.GetProperty(name, "subutai.template.owner")},
+			{"subutai.parent.version", container.GetProperty(name, "subutai.template.version")},
+		})
 	}
-	checkSanity(name)
 
 	// check: start container if it is not running already
 	if container.State(name) != "RUNNING" {
@@ -99,23 +111,28 @@ func execDiff(dir1, dir2, output string) {
 }
 
 // checkSanity performs different checks before promote command
-func checkSanity(name string) {
+func checkSanity(name string, source string) {
 	// check: if name exists
-	if !container.ContainerOrTemplateExists(name) {
-		log.Error("Container " + name + " does not exist")
+	if source != "" {
+		if !container.IsContainer(source) {
+			log.Error("Container " + source + " does not exist")
+		}
+	} else {
+		if !container.IsContainer(name) {
+			log.Error("Container " + name + " does not exist")
+		}
 	}
 
 	// check: if name is template
 	if container.IsTemplate(name) {
 		log.Error("Template " + name + " already exists")
 	}
-	// check: remove default gateway
 
 	parent := container.GetParent(name)
 	if parent == name || len(parent) < 1 {
 		return
 	}
-	if !container.IsTemplate(container.GetParent(name)) {
-		log.Error("Parent template " + container.GetParent(name) + " not found")
+	if !container.IsTemplate(parent) {
+		log.Error("Parent template " + parent + " not found")
 	}
 }
