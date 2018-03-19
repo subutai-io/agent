@@ -88,6 +88,7 @@ func getTemplateInfoById(t *templ, id string, token string) {
 	t.Md5 = meta[0].Hash.Md5
 	t.Signature = meta[0].Signs
 
+	log.Debug("Template identified as " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
 }
 
 //TODO urlEncode the kurjun URL
@@ -141,6 +142,7 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 	t.Md5 = meta[0].Hash.Md5
 	t.Signature = meta[0].Signs
 
+	log.Debug("Template identified as " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
 }
 
 func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
