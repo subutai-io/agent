@@ -78,7 +78,6 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 
 	src := config.Agent.LxcPrefix + name
 	fs.Copy(src+"/fstab", dst+"/fstab")
-	fs.Copy(src+"/config", dst+"/config")
 	fs.Copy(src+"/packages", dst+"/packages")
 	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
 		fs.Copy(src+"/icon.png", dst+"/icon.png")
@@ -104,6 +103,8 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 	}
 
 	container.SetContainerConf(name, containerConf)
+
+	fs.Copy(src+"/config", dst+"/config")
 
 	templateArchive := dst + ".tar.gz"
 	fs.Tar(dst, templateArchive)
