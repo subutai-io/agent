@@ -17,6 +17,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"strings"
 )
 
 var (
@@ -50,7 +51,7 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 		}
 	}
 	srcver := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
-	if len(version) == 0 {
+	if strings.TrimSpace(version) == "" {
 		version = srcver
 	}
 	dst := config.Agent.LxcPrefix + "tmpdir/" + name +
@@ -95,8 +96,7 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 		{"subutai.template.version", version},
 		{"subutai.template.size", size},
 		{"subutai.template.package", config.Agent.LxcPrefix + "tmpdir/" + name +
-			"-subutai-template_" + srcver + "_" + runtime.GOARCH + ".tar.gz"},
-		{"subutai.template.version", srcver},
+			"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"},
 	}
 
 	if len(description) != 0 {
