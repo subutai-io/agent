@@ -293,18 +293,31 @@ func DestroyTemplate(name string) {
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
+	DeleteTemplateInfoFromCache(name)
+}
+
+func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(name))
+	meta := bolt.TemplateByName(name)
+	if meta != nil {
+		templateId, found := meta["id"]
+		if found {
+			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
+		}
+	}
+	log.Check(log.WarnLevel, "Deleting template index entry", bolt.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
 }
 
 // GetParent return a parent of the Subutai container.
 func GetParent(name string) string {
 	return GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
+}
+func GetProperty(templateOrContainerName string, propertyName string) string {
+	return GetConfigItem(config.Agent.LxcPrefix+templateOrContainerName+"/config", propertyName)
 }
 
 // Clone create the duplicate container from the Subutai template.
@@ -541,6 +554,13 @@ func CriuHax(name string) {
 		{"lxc.console", "none"},
 		{"lxc.tty", "0"},
 		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
+	})
+}
+
+func CopyParentReference(name string, owner string, version string) {
+	SetContainerConf(name, [][]string{
+		{"subutai.template.owner", owner},
+		{"subutai.template.version", version},
 	})
 }
 

@@ -161,6 +161,8 @@ func outputReader(read *os.File, ch chan<- string) {
 }
 
 func outputSender(stdout, stderr chan string, ch chan<- ResponseOptions, response *ResponseOptions) {
+	ticker := time.NewTicker(time.Second * 10)
+	tickerChan := ticker.C
 	for stdout != nil || stderr != nil {
 		alive := false
 		select {
@@ -174,7 +176,7 @@ func outputSender(stdout, stderr chan string, ch chan<- ResponseOptions, respons
 			if !ok {
 				stderr = nil
 			}
-		case <-time.After(time.Second * 10):
+		case <-tickerChan:
 			alive = true
 		}
 		if len(response.StdOut) > 50000 || len(response.StdErr) > 50000 || alive {
@@ -183,6 +185,7 @@ func outputSender(stdout, stderr chan string, ch chan<- ResponseOptions, respons
 			response.ResponseNumber++
 		}
 	}
+	ticker.Stop()
 }
 
 func buildCmd(r *RequestOptions) *exec.Cmd {

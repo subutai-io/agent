@@ -66,7 +66,7 @@ const defaultConfig = `
 	debug = true
 	appPrefix = /apps/subutai/current/
 	dataPrefix = /var/lib/apps/subutai/current/
-	lxcPrefix = /mnt/lib/lxc/
+	lxcPrefix = /var/snap/subutai/common/lxc/
 
 	[management]
 	gpgUser =

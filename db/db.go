@@ -154,11 +154,17 @@ func (i *Instance) DiscoveryLoad() (ip string) {
 	return ip
 }
 
-func (i *Instance) TemplateAdd(name, id string) (err error) {
+func (i *Instance) TemplateAdd(name string, options map[string]string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(templates); b != nil {
-			if err = b.Put([]byte(name), []byte(id)); err != nil {
+			b, err = b.CreateBucketIfNotExists([]byte(name))
+			if err != nil {
 				return err
+			}
+			for k, v := range options {
+				if err = b.Put([]byte(k), []byte(v)); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -169,7 +175,7 @@ func (i *Instance) TemplateAdd(name, id string) (err error) {
 func (i *Instance) TemplateDel(name string) (err error) {
 	i.db.Update(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(templates); b != nil {
-			if err = b.Delete([]byte(name)); err != nil {
+			if err = b.DeleteBucket([]byte(name)); err != nil {
 				return err
 			}
 		}
@@ -178,12 +184,33 @@ func (i *Instance) TemplateDel(name string) (err error) {
 	return
 }
 
-func (i *Instance) TemplateName(id string) (name string) {
+func (i *Instance) TemplateByName(name string) map[string]string {
+	c := make(map[string]string)
+	i.db.View(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(templates); b != nil {
+			if b = b.Bucket([]byte(name)); b != nil {
+				b.ForEach(func(kk, vv []byte) error {
+					c[string(kk)] = string(vv)
+					return nil
+				})
+			}
+		}
+		return nil
+	})
+	return c
+}
+
+func (i *Instance) TemplateByKey(key, value string) (list []string) {
 	i.db.View(func(tx *bolt.Tx) error {
 		if b := tx.Bucket(templates); b != nil {
 			b.ForEach(func(k, v []byte) error {
-				if id == string(v) {
-					name = string(k)
+				if c := b.Bucket(k); c != nil {
+					c.ForEach(func(kk, vv []byte) error {
+						if string(kk) == key && string(vv) == value {
+							list = append(list, string(k))
+						}
+						return nil
+					})
 				}
 				return nil
 			})
