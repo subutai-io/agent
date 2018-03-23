@@ -9,7 +9,12 @@ import (
 
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"github.com/snapcore/snapd/snap"
 )
+
+func init() {
+	snap.SanitizePlugsSlots = func(snapInfo *snap.Info) {}
+}
 
 // Update operation can be divided into two different types: container updates and Resource Host updates.
 //
