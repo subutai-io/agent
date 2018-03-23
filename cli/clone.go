@@ -29,14 +29,14 @@ var (
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
-func LxcClone(parent, child, envID, addr, token, kurjToken string) {
+func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	child = utils.CleanTemplateName(child)
 
 	if container.ContainerOrTemplateExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
 
-	t := getTemplateInfo(parent, kurjToken)
+	t := getTemplateInfo(parent, cdnToken)
 
 	log.Debug("Parent template is " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
 
@@ -47,14 +47,14 @@ func LxcClone(parent, child, envID, addr, token, kurjToken string) {
 	meta["parent.id"] = t.Id
 
 	if !container.IsTemplate(t.Name) {
-		LxcImport("id:"+t.Id, kurjToken, false)
+		LxcImport("id:"+t.Id, cdnToken, false)
 	}
 
 	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.Name, child))
 
 	gpg.GenerateKey(child)
-	if len(token) != 0 {
-		gpg.ExchageAndEncrypt(child, token)
+	if len(consoleSecret) != 0 {
+		gpg.ExchageAndEncrypt(child, consoleSecret)
 	}
 
 	if len(envID) != 0 {
