@@ -366,7 +366,8 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 //
 // `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
 // "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
-
+// "subutai import management -t {secret}" is executed by Console to register the container with itself,
+// Console passes special secret token in place of CDN token using -t switch in this operation
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
