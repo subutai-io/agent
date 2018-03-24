@@ -106,11 +106,11 @@ func main() {
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
 			gcli.StringFlag{Name: "ipaddr, i", Usage: "set container IP address and VLAN"},
-			gcli.StringFlag{Name: "token, t", Usage: "token to verify with MH"},
-			gcli.StringFlag{Name: "kurjun, k", Usage: "CDN token to clone private and shared templates"}},
+			gcli.StringFlag{Name: "token, t", Usage: "CDN token to clone private and shared templates"},
+			gcli.StringFlag{Name: "secret, s", Usage: "Console secret"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" && c.Args().Get(1) != "" {
-				cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("t"), c.String("k"))
+				cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("s"), c.String("t"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
