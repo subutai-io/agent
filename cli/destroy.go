@@ -67,12 +67,7 @@ func LxcDestroy(id string, vlan bool) {
 
 			net.DelIface(c["interface"])
 
-			if container.IsTemplate(id) {
-				container.DeleteTemplateInfoFromCache(id)
-			}
-
 			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
-
 
 		} else if container.IsTemplate(id) {
 
@@ -82,6 +77,10 @@ func LxcDestroy(id string, vlan bool) {
 			err = container.DestroyContainer(id)
 
 			log.Check(log.ErrorLevel, "Destroying container", err)
+		}
+
+		if _, found := getTemplateInfoFromCacheByName(id); found {
+			container.DeleteTemplateInfoFromCache(id)
 		}
 	}
 
