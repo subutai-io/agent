@@ -104,8 +104,8 @@ func main() {
 
 		Name: "clone", Usage: "clone Subutai container",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
-			gcli.StringFlag{Name: "ipaddr, i", Usage: "set container IP address and VLAN"},
+			gcli.StringFlag{Name: "env, e", Usage: "Set environment id for container"},
+			gcli.StringFlag{Name: "ipaddr, i", Usage: "Set container IP address and VLAN"},
 			gcli.StringFlag{Name: "token, t", Usage: "CDN token to clone private and shared templates"},
 			gcli.StringFlag{Name: "secret, s", Usage: "Console secret"}},
 		Action: func(c *gcli.Context) error {
@@ -324,7 +324,7 @@ func main() {
 			return nil
 		}}, {
 
-		Name:  "promote", Usage: "promote Subutai container",
+		Name: "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
