@@ -119,6 +119,7 @@ func addAncestors(list []string) []string {
 func info(name string) (result []string) {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.FatalLevel, "Looking for container "+name, err)
+	defer lxc.Release(c)
 
 	nic := "eth0"
 	listip, _ := c.IPAddress(nic)
