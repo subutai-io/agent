@@ -292,7 +292,7 @@ func DestroyContainer(name string) error {
 
 	log.Info("Destroying container " + name)
 
-	log.Check(log.ErrorLevel, "Destroying lxc", c.Destroy())
+	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
@@ -319,7 +319,7 @@ func DestroyTemplate(name string) {
 
 	log.Info("Destroying template " + name)
 
-	log.Check(log.ErrorLevel, "Destroying lxc", c.Destroy())
+	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
