@@ -17,6 +17,7 @@ func LxcAttach(name string, cmd []string) {
 	log.Debug("Attaching to container " + name)
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.ErrorLevel, "Creating container object", err)
+	defer lxc.Release(c)
 
 	options := lxc.DefaultAttachOptions
 	options.EnvToKeep = []string{"TERM", "LS_COLORS"}
