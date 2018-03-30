@@ -69,6 +69,7 @@ func ContainerOrTemplateExists(name string) bool {
 // State returns container stat in human readable format.
 func State(name string) (state string) {
 	if c, err := lxc.NewContainer(name, config.Agent.LxcPrefix); err == nil {
+		defer lxc.Release(c)
 		return c.State().String()
 	}
 	return "UNKNOWN"
@@ -118,6 +119,8 @@ func Start(name string) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
+
 	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
 	if c.State().String() != "RUNNING" {
 		return errors.New("Unable to start container " + name)
@@ -134,6 +137,7 @@ func Stop(name string, addMetadata bool) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
 
 	log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
 
@@ -154,6 +158,8 @@ func Freeze(name string) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
+
 	if err = c.Freeze(); log.Check(log.DebugLevel, "Freezing container "+name, err) {
 		return err
 	}
@@ -167,6 +173,7 @@ func Unfreeze(name string) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
 
 	if err := c.Unfreeze(); log.Check(log.DebugLevel, "Unfreezing container "+name, err) {
 		return err
@@ -181,6 +188,8 @@ func Dump(name string, stop bool) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
+
 	options := lxc.CheckpointOptions{
 		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
 		Verbose:   true,
@@ -205,6 +214,8 @@ func DumpRestore(name string) error {
 	if err != nil {
 		return err
 	}
+	defer lxc.Release(c)
+
 	options := lxc.RestoreOptions{
 		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
 		Verbose:   true,
@@ -219,6 +230,10 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 	}
 
 	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(container)
+	}
+
 	if container.State() != lxc.RUNNING || err != nil {
 		return output, errors.New("Container is " + container.State().String())
 	}
@@ -267,6 +282,8 @@ func DestroyContainer(name string) error {
 		return err
 	}
 
+	defer lxc.Release(c)
+
 	if c.State() == lxc.RUNNING {
 		if err = c.Stop(); log.Check(log.DebugLevel, "Stopping container", err) {
 			return err
@@ -274,6 +291,8 @@ func DestroyContainer(name string) error {
 	}
 
 	log.Info("Destroying container " + name)
+
+	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
 
@@ -288,7 +307,19 @@ func DestroyContainer(name string) error {
 
 func DestroyTemplate(name string) {
 
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
+	log.Check(log.ErrorLevel, "Creating container object", err)
+
+	defer lxc.Release(c)
+
+	if c.State() == lxc.RUNNING {
+		log.Check(log.ErrorLevel, "Stopping container", c.Stop())
+	}
+
 	log.Info("Destroying template " + name)
+
+	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
 	//remove files
 	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
@@ -329,6 +360,7 @@ func Clone(parent, child string) error {
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
+	defer lxc.Release(c)
 
 	fs.SubvolumeCreate(config.Agent.LxcPrefix + child)
 	err = c.Clone(child, lxc.CloneOptions{Backend: backend})
@@ -373,6 +405,9 @@ func ResetNet(name string) {
 // If quota size argument is missing, it's just return current value.
 func QuotaRAM(name string, size ...string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	i, err := strconv.Atoi(size[0])
 	log.Check(log.DebugLevel, "Parsing quota size", err)
@@ -390,6 +425,9 @@ func QuotaRAM(name string, size ...string) int {
 // If passed value > 100, we assume that this value mean MHz.
 func QuotaCPU(name string, size ...string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	cfsPeriod := 100000
 	tmp, err := strconv.Atoi(size[0])
@@ -430,6 +468,9 @@ func QuotaCPU(name string, size ...string) int {
 // QuotaCPUset sets particular cores that can be used by the Subutai container.
 func QuotaCPUset(name string, size ...string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	if size[0] != "" {
 		log.Check(log.DebugLevel, "Setting cpuset.cpus", c.SetCgroupItem("cpuset.cpus", size[0]))
@@ -441,6 +482,9 @@ func QuotaCPUset(name string, size ...string) string {
 // QuotaNet sets network bandwidth for the Subutai container.
 func QuotaNet(name string, size ...string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	nic := GetConfigItem(c.ConfigFileName(), "lxc.network.veth.pair")
 	if size[0] != "" {
