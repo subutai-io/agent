@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	conftmpl = config.Agent.AppPrefix + "etc/nginx/tmpl/"
-	confinc  = config.Agent.DataPrefix + "nginx-includes/http/"
+	conftmpl =  "/etc/nginx/tmpl/"
+	confinc  = config.Agent.DataPrefix + "nginx/nginx-includes/http/"
 )
 
 // The reverse proxy component in Subutai provides and easy way to assign domain name and forward HTTP(S) traffic to certain environment.
