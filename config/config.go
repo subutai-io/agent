@@ -64,9 +64,9 @@ const defaultConfig = `
 	gpgPassword = 12345678
 	gpgHome =
 	debug = true
-	appPrefix = /apps/subutai/current/
-	dataPrefix = /var/lib/apps/subutai/current/
-	lxcPrefix = /var/snap/subutai/common/lxc/
+	appPrefix = /usr/share/subutai/
+	dataPrefix = /var/lib/subutai/
+	lxcPrefix = /var/lib/subutai/lxc/
 
 	[management]
 	gpgUser =
@@ -116,10 +116,10 @@ func init() {
 
 	confpath := "/var/lib/apps/subutai/current/"
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
-		confpath = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		config.Agent.AppPrefix = "/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		config.Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
-		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
+		confpath = "/var/lib/subutai/"
+		config.Agent.AppPrefix = "/usr/share/subutai/"
+		config.Agent.LxcPrefix = "/var/lib/subutai/lxc/"
+		config.Agent.DataPrefix = "/var/lib/subutai/"
 		config.Template.Branch = strings.TrimPrefix(strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai"), "-")
 		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
 		config.CDN.URL = config.Template.Branch + "cdn.subutai.io"
@@ -132,7 +132,7 @@ func init() {
 	}
 
 	if config.Agent.GpgHome == "" {
-		config.Agent.GpgHome = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/.gnupg"
+		config.Agent.GpgHome = "/var/lib/subutai/.gnupg"
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb
@@ -149,7 +149,6 @@ func InitAgentDebug() {
 	if config.Agent.Debug {
 		log.Level(log.DebugLevel)
 	}
-	log.ActivateSyslog("127.0.0.1:1514", "subutai")
 }
 
 // SaveDefaultConfig saves agent configuration file for future changes by user.

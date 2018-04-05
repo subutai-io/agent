@@ -24,7 +24,7 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 		log.Fatal("Container " + newContainer + " already exists")
 	}
 
-	backupDir := config.Agent.LxcPrefix + "/backups/"
+	backupDir := config.Agent.LxcPrefix + "backups/"
 	currentDT := strconv.Itoa(int(time.Now().Unix()))
 	tmpUnpackDir := config.Agent.LxcPrefix + "tmpdir/unpacking_" + currentDT + "/"
 
@@ -113,7 +113,7 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 	lxcContainer.SetContainerConf(newContainer, [][]string{
 		{"lxc.network.hwaddr", template.Mac()},
 		{"lxc.network.veth.pair", strings.Replace(lxcContainer.GetConfigItem(config.Agent.LxcPrefix+newContainer+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + newContainer + "/rootfs"},
 		{"lxc.rootfs.mount", config.Agent.LxcPrefix + newContainer + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/home home none bind,rw 0 0"},

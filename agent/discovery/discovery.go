@@ -28,8 +28,30 @@ func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fm
 func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
 
 func (h handler) Response(message gossdp.ResponseMessage) {
-	if strings.TrimSpace(config.Management.Fingerprint) == "" ||
+	//config.Management.Fingerprint or config.Management.Host properties determine discovery
+
+	//if both properties are set in config
+	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(config.Management.Host) != "" {
+		//if both properties match then connect
+		if strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) &&
+			strings.EqualFold(strings.TrimSpace(message.Location), strings.TrimSpace(config.Management.Host)) {
+
+			save(message.Location)
+		}
+	} else
+	//if fingerprint is set and matches then connect
+	if strings.TrimSpace(config.Management.Fingerprint) != "" &&
 		strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) {
+		save(message.Location)
+	} else
+	//if mgmt host is set and matches then connect
+	if strings.TrimSpace(config.Management.Host) != "" &&
+		strings.EqualFold(strings.TrimSpace(config.Management.Host), strings.TrimSpace(message.Location)) {
+
+		save(message.Location)
+	} else
+	//if both properties are not set then connect to first found
+	if strings.TrimSpace(config.Management.Fingerprint) == "" && strings.TrimSpace(config.Management.Host) == ""{
 		save(message.Location)
 	}
 }

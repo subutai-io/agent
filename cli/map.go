@@ -206,9 +206,9 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt", crt, 0644))
 		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key", key, 0644))
 
-		addLine(conf, "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
+		addLine(conf, "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
 			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt;", true)
-		addLine(conf, "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(conf, "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
 			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key;", true)
 	case "http":
 		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example", conf)

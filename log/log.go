@@ -2,11 +2,10 @@
 package log
 
 import (
-	"fmt"
 	"log/syslog"
 	"os"
-
-	"github.com/Sirupsen/logrus"
+	lSyslog "github.com/sirupsen/logrus/hooks/syslog"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -24,12 +23,14 @@ var (
 	PanicLevel = logrus.PanicLevel
 )
 
-var (
-	syslogServer string
-	appName      string
-)
-
 func init() {
+
+	//add syslog hook
+	//by default syslog will get only INFO-> level messages
+	hook, err := lSyslog.NewSyslogHook("", "", syslog.LOG_INFO, "")
+	if err == nil {
+		logrus.AddHook(hook)
+	}
 	format := new(logrus.TextFormatter)
 	format.FullTimestamp = true
 	format.TimestampFormat = "2006-01-02 15:04:05"
@@ -71,51 +72,32 @@ func Level(level logrus.Level) {
 func Panic(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
 	logrus.Panic(msg...)
-	sendSyslog(syslog.LOG_EMERG, msg...)
 }
 
 // Fatal stops process after showing fatal message.
 func Fatal(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
 	logrus.Fatal(msg...)
-	sendSyslog(syslog.LOG_CRIT, msg...)
 }
 
 // Error stops process after showing error message.
 func Error(msg ...interface{}) {
 	logrus.SetOutput(os.Stderr)
 	logrus.Error(msg...)
-	sendSyslog(syslog.LOG_ERR, msg...)
 	os.Exit(1)
 }
 
 // Warn keeps process working after showing warning message.
 func Warn(msg ...interface{}) {
 	logrus.Warn(msg...)
-	sendSyslog(syslog.LOG_WARNING, msg...)
 }
 
 // Info keeps process working after showing information message.
 func Info(msg ...interface{}) {
 	logrus.Info(msg...)
-	sendSyslog(syslog.LOG_INFO, msg...)
 }
 
 // Debug logs debug information
 func Debug(msg ...interface{}) {
 	logrus.Debug(msg...)
-	sendSyslog(syslog.LOG_DEBUG, msg...)
-}
-
-func sendSyslog(level syslog.Priority, msg ...interface{}) {
-	if l3, err := syslog.Dial("udp", syslogServer, level, appName); err == nil {
-		l3.Write([]byte(fmt.Sprint(msg...)))
-		l3.Close()
-	}
-}
-
-// ActivateSyslog configures logging to send data to the syslog server
-func ActivateSyslog(socket, app string) {
-	syslogServer = socket
-	appName = app
 }

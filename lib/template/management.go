@@ -19,7 +19,7 @@ func MngInit() {
 	container.SetContainerConf("management", [][]string{
 		{"lxc.network.hwaddr", Mac()},
 		{"lxc.network.veth.pair", "management"},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
 		{"lxc.network.link", ""},
 		{"lxc.mount", config.Agent.LxcPrefix + "management/fstab"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + "management/rootfs"},

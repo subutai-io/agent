@@ -21,8 +21,7 @@ func init() {
 	if os.Getuid() != 0 {
 		log.Error("Please run as root")
 	}
-	os.Setenv("PATH", "/apps/subutai/current/bin:"+os.Getenv("PATH"))
-	log.ActivateSyslog("127.0.0.1:1514", "cli")
+	os.Setenv("PATH", "/usr/share/subutai/bin:"+os.Getenv("PATH"))
 	if len(os.Args) > 1 {
 		if os.Args[1] == "-d" {
 			log.Level(log.DebugLevel)

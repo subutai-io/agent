@@ -375,7 +375,7 @@ func Clone(parent, child string) error {
 	SetContainerConf(child, [][]string{
 		{"lxc.network.link", ""},
 		{"lxc.network.veth.pair", strings.Replace(GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
 		{"subutai.parent", parent},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
@@ -552,8 +552,8 @@ func SetContainerUID(c string) (string, error) {
 	}
 
 	SetContainerConf(c, [][]string{
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
+		{"lxc.include", "/usr/share/lxc/config/ubuntu.common.conf"},
+		{"lxc.include", "/usr/share/lxc/config/ubuntu.userns.conf"},
 		{"lxc.id_map", "u 0 " + uid + " 65536"},
 		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})

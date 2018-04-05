@@ -25,4 +25,3 @@ func Checkpoint(name string, restore, stop bool) {
 	}
 }
 
-// subutai-dev.criu dump -s --tree 2140 -D /var/snap/subutai-dev/common/lxc/m1/checkpoint --enable-external-masters --ext-mount-map auto --file-locks --ext-mount-map /opt:/var/snap/subutai-dev/common/lxc/m1/opt --ext-mount-map /home:/var/snap/subutai-dev/common/lxc/m1/home --ext-mount-map /var:/var/snap/subutai-dev/common/lxc/m1/var --empty-ns net

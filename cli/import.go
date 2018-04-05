@@ -355,7 +355,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // to provide more flexibility to enable working with published and custom local templates. Official published templates in the global repository have a overriding scope
 // over custom local artifacts if there's any template naming conflict.
 //
-// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path `/var/snap/subutai/common/lxc/tmpdir/` could be used as local repository;
+// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path `/var/lib/subutai/lxc/tmpdir/` could be used as local repository;
 // the import sub command checks this directory if a requested published template or the global repository is not available.
 //
 // The import binding handles security checks to confirm the authenticity and integrity of templates. Besides using strict SSL connections for downloads,
@@ -554,10 +554,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.Name + "/rootfs"},
 		{"lxc.mount", config.Agent.LxcPrefix + t.Name + "/fstab"},
 		{"lxc.hook.pre-start", ""},
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
+		{"lxc.include", "/usr/share/lxc/config/ubuntu.common.conf"},
+		{"lxc.include", "/usr/share/lxc/config/ubuntu.userns.conf"},
 		{"subutai.config.path", config.Agent.AppPrefix + "etc"},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
+		{"lxc.network.script.up",  "/usr/sbin/create-subutai-interface"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/var var none bind,rw 0 0"},
