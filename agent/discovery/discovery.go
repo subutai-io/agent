@@ -3,7 +3,6 @@ package discovery
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -33,6 +32,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	//	save(message.Location)
 	//}
 
+	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 	//config.Management.Fingerprint or config.Management.Host properties determine discovery
 	////if both properties are set in config
 	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(config.Management.Host) != "" {
@@ -87,8 +87,10 @@ func server() error {
 	if err == nil {
 		go s.Start()
 		defer s.Stop()
+		address := "urn:subutai-" + config.Agent.Env + ":management:peer:5";
+		log.Debug("Launching SSDP server on " + address)
 		s.AdvertiseServer(gossdp.AdvertisableServer{
-			ServiceType: "urn:" + os.Getenv("SNAP_NAME") + ":management:peer:5",
+			ServiceType: address,
 			DeviceUuid:  fingerprint(),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
@@ -110,7 +112,9 @@ func client() error {
 		go c.Start()
 		defer c.Stop()
 
-		err = c.ListenFor("urn:" + os.Getenv("SNAP_NAME") + ":management:peer:5")
+		address := "urn:subutai-" + config.Agent.Env + ":management:peer:5";
+		log.Debug("Launching SSDP client on " + address)
+		err = c.ListenFor(address)
 		time.Sleep(2 * time.Second)
 	}
 	return err

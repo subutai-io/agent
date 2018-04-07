@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 	"gopkg.in/gcfg.v1"
 
 	"github.com/subutai-io/agent/log"
@@ -22,6 +21,7 @@ type agentConfig struct {
 	DataPrefix  string
 	GpgPassword string
 	GpgHome     string
+	Env         string
 }
 type managementConfig struct {
 	Host          string
@@ -34,9 +34,9 @@ type managementConfig struct {
 }
 
 type influxdbConfig struct {
-	Db     string
-	User   string
-	Pass   string
+	Db   string
+	User string
+	Pass string
 }
 type cdnConfig struct {
 	Allowinsecure bool
@@ -44,17 +44,11 @@ type cdnConfig struct {
 	SSLport       string
 	Kurjun        string
 }
-type templateConfig struct {
-	Branch  string
-	Version string
-	Arch    string
-}
 type configFile struct {
 	Agent      agentConfig
 	Management managementConfig
 	Influxdb   influxdbConfig
 	CDN        cdnConfig
-	Template   templateConfig
 }
 
 const defaultConfig = `
@@ -66,6 +60,7 @@ const defaultConfig = `
 	appPrefix = /usr/share/subutai/
 	dataPrefix = /var/lib/subutai/
 	lxcPrefix = /var/lib/subutai/lxc/
+    env=sysnet
 
 	[management]
 	gpgUser =
@@ -85,10 +80,6 @@ const defaultConfig = `
 	pass = root
 	db = metrics
 
-	[template]
-	version = 5.0.0
-	branch =
-	arch = amd64
 `
 
 var (
@@ -101,8 +92,6 @@ var (
 	Influxdb influxdbConfig
 	// CDN url and port
 	CDN cdnConfig
-	// Template describes template configuration options
-	Template templateConfig
 )
 
 func init() {
@@ -118,9 +107,7 @@ func init() {
 		config.Agent.AppPrefix = "/usr/share/subutai/"
 		config.Agent.LxcPrefix = "/var/lib/subutai/lxc/"
 		config.Agent.DataPrefix = "/var/lib/subutai/"
-		config.Template.Branch = strings.TrimPrefix(strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai"), "-")
-		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
-		config.CDN.URL = config.Template.Branch + "cdn.subutai.io"
+		config.CDN.URL = config.Agent.Env + "cdn.subutai.io"
 	}
 	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
@@ -130,11 +117,10 @@ func init() {
 	}
 
 	if config.Agent.GpgHome == "" {
-		config.Agent.GpgHome = config.Agent.DataPrefix+".gnupg"
+		config.Agent.GpgHome = config.Agent.DataPrefix + ".gnupg"
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb
-	Template = config.Template
 	Management = config.Management
 	CDN = config.CDN
 
