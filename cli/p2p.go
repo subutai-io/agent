@@ -53,7 +53,7 @@ func P2P(create, remove, update, status, peers bool, args []string) {
 		if len(args) < 4 {
 			p2p.Status("")
 		} else {
-			p2p.Status(args[4])
+			p2p.Status(args[3])
 		}
 	}
 }
