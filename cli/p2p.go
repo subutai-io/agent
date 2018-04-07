@@ -14,7 +14,7 @@ import (
 // P2P is a base layer for Subutai environment networking:
 // all containers in same environment are connected to each other via VXLAN tunnels and are accesses as if they were in one LAN.
 // It doesn't matter where the containers are physically located.
-func P2P(create, remove, update, list, peers bool, args []string) {
+func P2P(create, remove, update, status, peers bool, args []string) {
 	if create {
 		if len(args) > 8 {
 			p2p.Create(args[3], args[7], args[4], args[5], args[6], args[8]) //p2p -c interfaceName hash key ttl localPeepIPAddr portRange
@@ -44,10 +44,16 @@ func P2P(create, remove, update, list, peers bool, args []string) {
 		p2p.Remove(args[3])
 
 	} else if peers {
-		if len(args) < 3 {
-			p2p.Peers(args[3])
-		} else {
+		if len(args) < 4 {
 			p2p.Peers("")
+		} else {
+			p2p.Peers(args[3])
+		}
+	} else if status {
+		if len(args) < 4 {
+			p2p.Status("")
+		} else {
+			p2p.Status(args[3])
 		}
 	}
 }
@@ -59,8 +65,7 @@ func P2Pversion() {
 
 // P2PInterfaces prints list of interfaces used by P2P
 func P2PInterfaces() {
-	list, err := p2p.Interfaces()
-	log.Check(log.ErrorLevel, "Getting list of p2p interfaces", err)
+	list := p2p.Interfaces()
 
 	for _, iface := range list {
 		fmt.Println(iface.Name)

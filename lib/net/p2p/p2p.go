@@ -70,39 +70,35 @@ func iptablesCleanUp(name string) {
 
 // UpdateKey sets new encryption key for the P2P instance to replace it during work.
 func UpdateKey(hash, newkey, ttl string) {
-	err := exec.Command("p2p", "set", "-key", newkey, "-ttl", ttl, "-hash", hash).Run()
-	log.Check(log.FatalLevel, "Updating p2p key", err)
+	out, err := exec.Command("p2p", "set", "-key", newkey, "-ttl", ttl, "-hash", hash).CombinedOutput()
+	log.Check(log.FatalLevel, "Updating p2p key "+string(out), err)
 }
 
 // Version returns version of the P2P on the Resource Host.
 func Version() {
 	out, err := exec.Command("p2p", "-v").CombinedOutput()
+	log.Check(log.ErrorLevel, "Getting p2p version", err)
 	fmt.Printf("%s", out)
-	log.Check(log.FatalLevel, "Getting p2p version", err)
 }
 
 // Peers prints list of the participants of the swarm.
 func Peers(hash string) {
-	args := []string{"show", "-hash", hash}
-	if hash == "" {
-		args = []string{"show"}
+	args := []string{"show"}
+	if hash != "" {
+		args = append(args, "-hash", hash)
 	}
-	out, err := exec.Command("p2p", args...).Output()
-	log.Check(log.FatalLevel, "Getting list of p2p participants", err)
-	fmt.Println(string(out))
+	out, err := exec.Command("p2p", args...).CombinedOutput()
+	log.Check(log.ErrorLevel, "Getting list of p2p participants", err)
+	fmt.Printf("%s", out)
 }
 
 // Interfaces returns list of interfaces that is used by P2P in the system
-func Interfaces() (list []net.Interface, err error) {
+func Interfaces() (list []net.Interface) {
 	l, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
+	log.Check(log.ErrorLevel, "Getting list of p2p interfaces", err)
 
-	out, err := exec.Command("p2p", "show", "--interfaces", "--all").Output()
-	if err != nil {
-		return nil, err
-	}
+	out, err := exec.Command("p2p", "show", "--interfaces", "--all").CombinedOutput()
+	log.Check(log.ErrorLevel, "Getting list of p2p interfaces "+string(out), err)
 
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
@@ -112,5 +108,21 @@ func Interfaces() (list []net.Interface, err error) {
 			}
 		}
 	}
-	return list, nil
+
+	return list
+}
+
+func Status(hash string) {
+
+	args := []string{"status"}
+
+	if hash != "" {
+		args = append(args, "-hash", hash)
+	}
+
+	out, err := exec.Command("p2p", args...).CombinedOutput()
+
+	log.Check(log.ErrorLevel, "Getting p2p status "+string(out), err)
+
+	fmt.Printf("%s", out)
 }
