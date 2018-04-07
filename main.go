@@ -308,9 +308,9 @@ func main() {
 			gcli.BoolFlag{Name: "create, c", Usage: "create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
 			gcli.BoolFlag{Name: "delete, d", Usage: "delete p2p instance by swarm hash"},
 			gcli.BoolFlag{Name: "update, u", Usage: "update p2p instance encryption key (hash newkey ttl)"},
-			gcli.BoolFlag{Name: "list, l", Usage: "list of p2p instances"},
 			gcli.BoolFlag{Name: "interfaces, i", Usage: "list of p2p interfaces"},
 			gcli.BoolFlag{Name: "peers, p", Usage: "list of p2p swarm participants by hash"},
+			gcli.BoolFlag{Name: "status, s", Usage: "status of p2p swarm(s) (optional hash to get particular swarm status)"},
 			gcli.BoolFlag{Name: "version, v", Usage: "print p2p version"}},
 		Action: func(c *gcli.Context) error {
 			switch {
@@ -319,7 +319,7 @@ func main() {
 			case c.Bool("v"):
 				cli.P2Pversion()
 			default:
-				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("l"), c.Bool("p"), os.Args)
+				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("s"), c.Bool("p"), os.Args)
 			}
 			return nil
 		}}, {
