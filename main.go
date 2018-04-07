@@ -38,9 +38,6 @@ func main() {
 			if len(config.Management.Host) < 7 {
 				config.Management.Host = base.DiscoveryLoad()
 			}
-			if len(config.Influxdb.Server) < 7 {
-				config.Influxdb.Server = base.DiscoveryLoad()
-			}
 			base.Close()
 		}
 	}

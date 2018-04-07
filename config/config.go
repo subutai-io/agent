@@ -34,7 +34,6 @@ type managementConfig struct {
 }
 
 type influxdbConfig struct {
-	Server string
 	Db     string
 	User   string
 	Pass   string
@@ -82,7 +81,6 @@ const defaultConfig = `
     allowinsecure = false
 
 	[influxdb]
-	server =
 	user = root
 	pass = root
 	db = metrics
@@ -132,7 +130,7 @@ func init() {
 	}
 
 	if config.Agent.GpgHome == "" {
-		config.Agent.GpgHome = "/var/lib/subutai/.gnupg"
+		config.Agent.GpgHome = config.Agent.DataPrefix+".gnupg"
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb

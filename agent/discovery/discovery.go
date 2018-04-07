@@ -28,9 +28,13 @@ func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fm
 func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
 
 func (h handler) Response(message gossdp.ResponseMessage) {
-	//config.Management.Fingerprint or config.Management.Host properties determine discovery
+	//if strings.TrimSpace(config.Management.Fingerprint) == "" ||
+	//	strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) {
+	//	save(message.Location)
+	//}
 
-	//if both properties are set in config
+	//config.Management.Fingerprint or config.Management.Host properties determine discovery
+	////if both properties are set in config
 	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(config.Management.Host) != "" {
 		//if both properties match then connect
 		if strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) &&
@@ -51,7 +55,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 		save(message.Location)
 	} else
 	//if both properties are not set then connect to first found
-	if strings.TrimSpace(config.Management.Fingerprint) == "" && strings.TrimSpace(config.Management.Host) == ""{
+	if strings.TrimSpace(config.Management.Fingerprint) == "" && strings.TrimSpace(config.Management.Host) == "" {
 		save(message.Location)
 	}
 }
@@ -97,7 +101,7 @@ func server() error {
 }
 
 func client() error {
-	if len(config.Influxdb.Server) > 6 && len(config.Management.Host) > 6 {
+	if len(config.Management.Host) > 6 {
 		return nil
 	}
 
@@ -142,11 +146,9 @@ func save(ip string) {
 	base.DiscoverySave(ip)
 	base.Close()
 
-	config.Influxdb.Server = ip
-	if config.Management.Host != ip {
-		utils.ResetInfluxDbClient()
-	}
 	config.Management.Host = ip
+
+	utils.ResetInfluxDbClient()
 }
 
 func getKey() []byte {
@@ -172,7 +174,7 @@ func getKey() []byte {
 }
 
 func extractKeyID(k []byte) string {
-	command := exec.Command("gpg")
+	command := exec.Command("gpg1")
 	stdin, err := command.StdinPipe()
 	if err != nil {
 		return ""
