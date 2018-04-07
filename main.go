@@ -104,8 +104,8 @@ func main() {
 
 		Name: "clone", Usage: "clone Subutai container",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
-			gcli.StringFlag{Name: "ipaddr, i", Usage: "set container IP address and VLAN"},
+			gcli.StringFlag{Name: "env, e", Usage: "Set environment id for container"},
+			gcli.StringFlag{Name: "ipaddr, i", Usage: "Set container IP address and VLAN"},
 			gcli.StringFlag{Name: "token, t", Usage: "CDN token to clone private and shared templates"},
 			gcli.StringFlag{Name: "secret, s", Usage: "Console secret"}},
 		Action: func(c *gcli.Context) error {
@@ -305,13 +305,13 @@ func main() {
 
 		Name: "p2p", Usage: "P2P network operations",
 		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "create, c", Usage: "create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
-			gcli.BoolFlag{Name: "delete, d", Usage: "delete p2p instance by swarm hash"},
-			gcli.BoolFlag{Name: "update, u", Usage: "update p2p instance encryption key (hash newkey ttl)"},
-			gcli.BoolFlag{Name: "list, l", Usage: "list of p2p instances"},
-			gcli.BoolFlag{Name: "interfaces, i", Usage: "list of p2p interfaces"},
-			gcli.BoolFlag{Name: "peers, p", Usage: "list of p2p swarm participants by hash"},
-			gcli.BoolFlag{Name: "version, v", Usage: "print p2p version"}},
+			gcli.BoolFlag{Name: "create, c", Usage: "Create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
+			gcli.BoolFlag{Name: "delete, d", Usage: "Delete p2p instance by swarm hash"},
+			gcli.BoolFlag{Name: "update, u", Usage: "Update p2p instance encryption key (hash newkey ttl)"},
+			gcli.BoolFlag{Name: "list, l", Usage: "List of p2p instances"},
+			gcli.BoolFlag{Name: "interfaces, i", Usage: "List of p2p interfaces"},
+			gcli.BoolFlag{Name: "peers, p", Usage: "List of p2p swarm participants by hash"},
+			gcli.BoolFlag{Name: "version, v", Usage: "Print p2p version"}},
 		Action: func(c *gcli.Context) error {
 			switch {
 			case c.Bool("i"):
@@ -324,7 +324,7 @@ func main() {
 			return nil
 		}}, {
 
-		Name:  "promote", Usage: "promote Subutai container",
+		Name: "promote", Usage: "promote Subutai container",
 		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
