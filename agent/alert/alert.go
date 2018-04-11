@@ -66,7 +66,7 @@ func id() (list map[string]string) {
 }
 
 func stat() string {
-	out, err := exec.Command("btrfs", "qgroup", "show", "-r", "--raw", config.Agent.LxcPrefix).Output()
+	out, err := exec.Command("btrfs", "qgroup", "show", "-re", "--raw", config.Agent.LxcPrefix).Output()
 	if err != nil {
 		return ""
 	}
