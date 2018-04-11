@@ -153,7 +153,7 @@ func SetVolReadOnly(subvol string, flag bool) {
 
 // Stat returns quota and usage for BTRFS subvolume.
 func Stat(path, index string, raw bool) (value string) {
-	var row = map[string]int{"quota": 3, "usage": 2}
+	var row = map[string]int{"quota": 4, "usage": 2}
 
 	args := []string{"qgroup", "show", "-re", config.Agent.LxcPrefix}
 	if raw {
