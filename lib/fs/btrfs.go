@@ -130,10 +130,13 @@ func Send(src, dst, delta string) error {
 		defer SubvolumeDestroy(tmpVolume)
 		SetVolReadOnly(tmpVolume, true)
 
+		args := []string{"btrfs", "send"}
 		if src != dst {
-			return exec.Command("btrfs", "send", "-p", src, tmpVolume, "-f", delta).Run()
+			args = append(args, "-p", src)
 		}
-		return exec.Command("btrfs", "send", tmpVolume, "-f", delta).Run()
+		args = append(args, tmpVolume, ">", delta)
+
+		return exec.Command("/bin/bash", "-c", strings.Join(args, " ")).Run()
 	}
 	return nil
 }
