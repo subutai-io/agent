@@ -62,7 +62,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	}
 
 	if ip := strings.Fields(addr); len(ip) > 1 {
-		addNetConf(child, addr)
+		meta["gw"] = addNetConf(child, addr)
 		meta["ip"] = strings.Split(ip[0], "/")[0]
 		meta["vlan"] = ip[1]
 	}
@@ -92,7 +92,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 }
 
 // addNetConf adds network related configuration values to container config file
-func addNetConf(name, addr string) {
+func addNetConf(name, addr string) string {
 	ipvlan := strings.Fields(addr)
 	gateway := getEnvGw(ipvlan[1])
 	if len(gateway) == 0 {
@@ -109,13 +109,26 @@ func addNetConf(name, addr string) {
 		{"#vlan_id", ipvlan[1]},
 	})
 	container.SetStaticNet(name)
+
+	return gateway
 }
 
-func getEnvGw(vlan string) string {
-	for _, v := range container.Containers() {
-		if container.GetConfigItem(config.Agent.LxcPrefix+v+"/config", "#vlan_id") == vlan {
-			return container.GetConfigItem(config.Agent.LxcPrefix+v+"/config", "lxc.network.ipv4.gateway")
-		}
+func getEnvGw(vlan string) (gw string) {
+
+	bolt, err := db.New()
+	if err == nil {
+		defer bolt.Close()
+	} else {
+		log.Warn("Failed to open db", err)
+		return
 	}
-	return ""
+
+	list := bolt.ContainerByKey("vlan", vlan)
+
+	if len(list) > 0 {
+		meta := bolt.ContainerByName(list[0])
+		gw = meta["gw"]
+	}
+
+	return
 }

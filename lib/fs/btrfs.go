@@ -136,7 +136,7 @@ func Send(src, dst, delta string) error {
 		}
 		args = append(args, tmpVolume, ">", delta)
 
-		return exec.Command("bash", "-c", strings.Join(args, " ")).Run()
+		return exec.Command("/bin/bash", "-c", strings.Join(args, " ")).Run()
 	}
 	return nil
 }
@@ -157,7 +157,7 @@ func SetVolReadOnly(subvol string, flag bool) {
 
 // Stat returns quota and usage for BTRFS subvolume.
 func Stat(path, index string, raw bool) (value string) {
-	var row = map[string]int{"quota": 3, "usage": 2}
+	var row = map[string]int{"quota": 4, "usage": 2}
 
 	args := []string{"qgroup", "show", "-re", config.Agent.LxcPrefix}
 	if raw {
@@ -186,7 +186,7 @@ func DiskQuota(path string, size ...string) string {
 	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
 
 	if len(size) > 0 && len(size[0]) > 0 {
-		out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput()
+		out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput()
 		log.Check(log.ErrorLevel, "Limiting BTRFS group 1/"+parent+" "+string(out), err)
 		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
 	}
@@ -197,7 +197,7 @@ func DiskQuota(path string, size ...string) string {
 // If size argument is set, it sets new quota value.
 func Quota(path string, size ...string) string {
 	if len(size) > 0 && len(size[0]) > 0 {
-		out, err := exec.Command("btrfs", "qgroup", "limit", size[0]+"G", config.Agent.LxcPrefix+path).CombinedOutput()
+		out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", config.Agent.LxcPrefix+path).CombinedOutput()
 		log.Check(log.ErrorLevel, "Limiting BTRFS subvolume "+config.Agent.LxcPrefix+path+" "+string(out), err)
 		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
 	}
