@@ -9,6 +9,7 @@ import (
 
 	"github.com/subutai-io/agent/log"
 	"strings"
+	"os/exec"
 )
 
 // Copy creates a copy of passed "source" file to "dest" file
@@ -87,4 +88,10 @@ func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
 			log.Check(log.WarnLevel, "Removing file: "+f, os.Remove(f))
 		}
 	}
+}
+
+func IsMountPoint(path string) bool {
+	out, err := exec.Command("mountpoint", path).CombinedOutput()
+	log.Check(log.DebugLevel, "Checking mountpoint "+string(out), err)
+	return err == nil
 }
