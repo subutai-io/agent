@@ -371,6 +371,10 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
+	if !fs.IsMountPoint(config.Agent.LxcPrefix) {
+		log.Fatal("Lxc directory " + config.Agent.LxcPrefix + " not mounted")
+	}
+
 	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
 		gpg.ExchageAndEncrypt("management", token)
 		return
