@@ -20,6 +20,7 @@ import (
 	"github.com/subutai-io/agent/log"
 
 	"gopkg.in/lxc/go-lxc.v2"
+	"path"
 )
 
 // All returns list of all containers
@@ -29,11 +30,11 @@ func All() []string {
 
 // IsTemplate checks if Subutai container is template.
 func IsTemplate(name string) bool {
-	return fs.IsSubvolumeReadonly(config.Agent.LxcPrefix + name + "/rootfs/")
+	return fs.DatasetExists(name+"/rootfs") && fs.IsDatasetReadOnly(name+"/rootfs/")
 }
 
 func IsContainer(name string) bool {
-	return fs.IsSubvolumeReadWrite(config.Agent.LxcPrefix + name + "/rootfs/")
+	return fs.DatasetExists(name+"/rootfs") && !fs.IsDatasetReadOnly(name + "/rootfs/")
 }
 
 // Templates returns list of all templates
@@ -66,7 +67,7 @@ func ContainerOrTemplateExists(name string) bool {
 	return false
 }
 
-// State returns container stat in human readable format.
+// State returns container state in human readable format.
 func State(name string) (state string) {
 	if c, err := lxc.NewContainer(name, config.Agent.LxcPrefix); err == nil {
 		defer lxc.Release(c)
@@ -294,7 +295,9 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
-	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+	if fs.DatasetExists(name) {
+		fs.RemoveDataset(name, true)
+	}
 
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
@@ -321,8 +324,9 @@ func DestroyTemplate(name string) {
 
 	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
-	//remove files
-	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+	if fs.DatasetExists(name) {
+		fs.RemoveDataset(name, true)
+	}
 
 	DeleteTemplateInfoFromCache(name)
 }
@@ -353,34 +357,31 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 
 // Clone create the duplicate container from the Subutai template.
 func Clone(parent, child string) error {
-	var backend lxc.BackendStore
-	log.Check(log.DebugLevel, "Setting LXC backend to BTRFS", backend.Set("btrfs"))
 
-	c, err := lxc.NewContainer(parent, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
+	//create parent dataset
+	fs.CreateDataset(child)
+
+	//create partitions
+	fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
+	fs.CloneSnapshot(parent+"/home@now", child+"/home")
+	fs.CloneSnapshot(parent+"/var@now", child+"/var")
+	fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
+
+	for _, file := range []string{"config", "fstab", "packages"} {
+		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
-	defer lxc.Release(c)
-
-	fs.SubvolumeCreate(config.Agent.LxcPrefix + child)
-	err = c.Clone(child, lxc.CloneOptions{Backend: backend})
-	if log.Check(log.DebugLevel, "Cloning container", err) {
-		return err
-	}
-
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/home", config.Agent.LxcPrefix+child+"/home")
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/opt", config.Agent.LxcPrefix+child+"/opt")
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/var", config.Agent.LxcPrefix+child+"/var")
 
 	SetContainerConf(child, [][]string{
 		{"lxc.network.link", ""},
 		{"lxc.network.veth.pair", strings.Replace(GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
 		{"subutai.parent", parent},
+		{"lxc.rootfs", config.Agent.LxcPrefix + child + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
 		{"lxc.network.mtu", "1300"},
+		{"lxc.utsname", child},
 	})
 	return nil
 }
@@ -552,8 +553,6 @@ func SetContainerUID(c string) (string, error) {
 	}
 
 	SetContainerConf(c, [][]string{
-		{"lxc.include", "/usr/share/lxc/config/ubuntu.common.conf"},
-		{"lxc.include", "/usr/share/lxc/config/ubuntu.userns.conf"},
 		{"lxc.id_map", "u 0 " + uid + " 65536"},
 		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})

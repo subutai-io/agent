@@ -33,7 +33,7 @@ func netConf(name, ip, vlan string) {
 		{"lxc.network.ipv4", ip},
 		{"lxc.network.link", ""},
 		{"lxc.network.veth.pair", strings.Replace(container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
 		{"#vlan_id", vlan},
 	})
 	return

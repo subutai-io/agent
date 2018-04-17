@@ -536,11 +536,9 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	log.Info("Installing template " + t.Name)
-	template.Install(parent, t.Name)
-	// TODO following lines kept for back compatibility with old templates, should be deleted when all templates will be replaced.
-	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-home", config.Agent.LxcPrefix+t.Name+"/home")
-	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-var", config.Agent.LxcPrefix+t.Name+"/var")
-	os.Rename(config.Agent.LxcPrefix+t.Name+"/"+t.Name+"-opt", config.Agent.LxcPrefix+t.Name+"/opt")
+
+	template.Install(t.Name)
+
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
 	//delete template archive
@@ -552,19 +550,22 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
+	//TODO use new config util
+
 	container.SetContainerConf(t.Name, [][]string{
-		{"lxc.include", ""},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + t.Name + "/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + t.Name + "/rootfs"},
-		{"lxc.mount", config.Agent.LxcPrefix + t.Name + "/fstab"},
-		{"lxc.hook.pre-start", ""},
-		{"lxc.include", "/usr/share/lxc/config/ubuntu.common.conf"},
-		{"lxc.include", "/usr/share/lxc/config/ubuntu.userns.conf"},
-		{"subutai.config.path", config.Agent.AppPrefix + "etc"},
-		{"lxc.network.script.up",  "/usr/sbin/create-subutai-interface"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/var var none bind,rw 0 0"},
+		//properties to be removed:
+		//{"subutai.config.path", config.Agent.AppPrefix + "etc"},
+		{"lxc.include", ""},
+		{"lxc.hook.pre-start", ""},
+		{"lxc.mount", ""},
+		{"lxc.rootfs.mount", ""},
+		{"subutai.template.package", ""},
+		{"subutai.config.path", ""},
 	})
 
 	if t.Id != "" {

@@ -27,7 +27,6 @@ func LxcRename(src, dst string) {
 		{"subutai.git.branch", dst},
 		{"lxc.mount", config.Agent.LxcPrefix + dst + "/fstab"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + dst + "/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + dst + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + dst + "/opt  opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + dst + "/home  opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + dst + "/var  opt none bind,rw 0 0"},

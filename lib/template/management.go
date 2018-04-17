@@ -14,17 +14,20 @@ import (
 
 // MngInit performs initial operations for SS Management deployment
 func MngInit() {
-	fs.ReadOnly("management", false)
+	// set partitions as read-write
+	fs.SetDatasetReadWrite("management/rootfs")
+	fs.SetDatasetReadWrite("management/home")
+	fs.SetDatasetReadWrite("management/var")
+	fs.SetDatasetReadWrite("management/opt")
+
 	container.SetContainerUID("management")
 	container.SetContainerConf("management", [][]string{
 		{"lxc.network.hwaddr", Mac()},
 		{"lxc.network.veth.pair", "management"},
-		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
+		{"lxc.utsname", "management"},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
 		{"lxc.network.link", ""},
-		{"lxc.mount", config.Agent.LxcPrefix + "management/fstab"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + "management/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + "management/rootfs"},
-		// TODO following lines kept for back compatibility with old templates, should be deleted when all templates will be replaced.
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/var var none bind,rw 0 0"},

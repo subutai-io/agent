@@ -113,9 +113,8 @@ func RestoreContainer(container, date, newContainer string, force bool) {
 	lxcContainer.SetContainerConf(newContainer, [][]string{
 		{"lxc.network.hwaddr", template.Mac()},
 		{"lxc.network.veth.pair", strings.Replace(lxcContainer.GetConfigItem(config.Agent.LxcPrefix+newContainer+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", "/usr/sbin/create-subutai-interface"},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
 		{"lxc.rootfs", config.Agent.LxcPrefix + newContainer + "/rootfs"},
-		{"lxc.rootfs.mount", config.Agent.LxcPrefix + newContainer + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + newContainer + "/var var none bind,rw 0 0"},
