@@ -10,6 +10,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 // MngInit performs initial operations for SS Management deployment
@@ -21,8 +22,9 @@ func MngInit() {
 	fs.SetDatasetReadWrite("management/opt")
 
 	container.SetContainerUID("management")
+	//TODO
 	container.SetContainerConf("management", [][]string{
-		{"lxc.network.hwaddr", Mac()},
+		{"lxc.network.hwaddr", common.Mac()},
 		{"lxc.network.veth.pair", "management"},
 		{"lxc.utsname", "management"},
 		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},

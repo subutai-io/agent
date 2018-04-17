@@ -21,6 +21,7 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 	"path"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 // All returns list of all containers
@@ -371,18 +372,29 @@ func Clone(parent, child string) error {
 		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
 
+	//TODO
+	mac := common.Mac()
 	SetContainerConf(child, [][]string{
-		{"lxc.network.link", ""},
-		{"lxc.network.veth.pair", strings.Replace(GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.hwaddr"), ":", "", -1)},
 		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
+		{"lxc.network.hwaddr", mac},
+		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
 		{"subutai.parent", parent},
 		{"lxc.rootfs", config.Agent.LxcPrefix + child + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
+		{"lxc.rootfs.backend", "zfs"},
 		{"lxc.network.mtu", "1300"},
 		{"lxc.utsname", child},
-	})
+		//to remove
+		{"lxc.network.link", ""},
+		{"lxc.include", ""},
+		{"lxc.hook.pre-start", ""},
+		{"lxc.mount", ""},
+		{"lxc.rootfs.mount", ""},
+		{"subutai.template.package", ""},
+		{"subutai.config.path", ""},})
+
 	return nil
 }
 

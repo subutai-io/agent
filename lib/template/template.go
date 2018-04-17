@@ -2,12 +2,8 @@
 package template
 
 import (
-	"crypto/rand"
-	"fmt"
-
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/log"
 	"path"
 )
 
@@ -34,12 +30,4 @@ func Install(templateName string) {
 	for _, file := range []string{"config", "fstab", "packages"} {
 		fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
 	}
-}
-
-// Mac function generates random mac address for LXC containers
-func Mac() string {
-	buf := make([]byte, 6)
-	_, err := rand.Read(buf)
-	log.Check(log.ErrorLevel, "Generating random mac", err)
-	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 }

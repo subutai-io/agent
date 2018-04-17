@@ -24,6 +24,8 @@ import (
 	"github.com/mcuadros/go-version"
 	"github.com/subutai-io/agent/lib/fs"
 	"runtime"
+	"path"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 var (
@@ -550,28 +552,38 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	//TODO use new config util
-
-	container.SetContainerConf(t.Name, [][]string{
-		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
-		{"lxc.rootfs", config.Agent.LxcPrefix + t.Name + "/rootfs"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/home home none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/opt opt none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + t.Name + "/var var none bind,rw 0 0"},
-		//properties to be removed:
-		//{"subutai.config.path", config.Agent.AppPrefix + "etc"},
-		{"lxc.include", ""},
-		{"lxc.hook.pre-start", ""},
-		{"lxc.mount", ""},
-		{"lxc.rootfs.mount", ""},
-		{"subutai.template.package", ""},
-		{"subutai.config.path", ""},
-	})
+	log.Check(log.ErrorLevel, "Setting lxc config", updateContainerConfig(t.Name))
 
 	if t.Id != "" {
 		cacheTemplateInfo(t)
 	}
 
+}
+
+func updateContainerConfig(templateName string) error {
+
+	cfg := common.LxcConfig{}
+	err := cfg.Load(path.Join(config.Agent.LxcPrefix, templateName, "config"))
+	if err != nil {
+		return err
+	}
+
+	cfg.SetParams([][]string{
+		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/home home none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/opt opt none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/var var none bind,rw 0 0"},
+		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
+		//properties to remove:
+		{"lxc.include"},
+		{"lxc.hook.pre-start"},
+		{"lxc.mount"},
+		{"lxc.rootfs.mount"},
+		{"subutai.template.package"},
+		{"subutai.config.path"},
+	})
+
+	return cfg.Save()
 }
 
 func cacheTemplateInfo(t templ) {
