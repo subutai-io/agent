@@ -311,10 +311,9 @@ func Info(command, host string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	} else if command == "du" {
-		//todo remove
-		fmt.Println(fs.DiskUsage(host))
+		fmt.Println(fs.DatasetDiskUsage(host))
 	} else if command == "quota" {
-		//todo remove
+		//todo migrate
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}

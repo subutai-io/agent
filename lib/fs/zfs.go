@@ -5,8 +5,8 @@ import (
 	"strings"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/lib/exec"
-	"github.com/c2h5oh/datasize"
 	"strconv"
+	"github.com/pkg/errors"
 )
 
 const ZFS_ROOT_DATASET = "subutai/fs"
@@ -106,24 +106,93 @@ func SetQuota(dataset string, quotaInGb int) {
 	log.Check(log.ErrorLevel, "Setting quota "+strconv.Itoa(quotaInGb)+"G to "+dataset+" "+out, err)
 }
 
-// Returns dataset quota in GB
+// Returns dataset quota in GB, 0 if no quota set
 // e.g. GetQuota("foo")
-func GetQuota(dataset string) int {
+func GetQuota(dataset string) (int, error) {
 	out, err := exec.Execute("zfs", "get", "quota", path.Join(ZFS_ROOT_DATASET, dataset))
-	log.Check(log.WarnLevel, "Reading quota of "+dataset+" "+out, err)
-
-	fields := strings.Fields(out)
-
-	if (len(fields) > 3) {
-		var v datasize.ByteSize
-		err := v.UnmarshalText([]byte(fields[2]))
-
-		log.Check(log.WarnLevel, "Parsing quota of "+dataset+" "+out, err)
-
-		return (int)(v.GBytes())
-	} else {
-		log.Warn("Failed to parse quota from " + out)
+	if err != nil {
+		return -1, err
 	}
 
-	return 0
+	lines := strings.Split(out, "\n")
+
+	if len(lines) > 1 {
+		//skip header
+		fields := strings.Fields(lines[1])
+
+		if len(fields) > 3 {
+
+			if fields[2] == "none" {
+				return 0, nil
+			}
+
+			bytes, err := convertToBytes(fields[2])
+
+			if err != nil {
+				return -1, err
+			}
+
+			return bytes / 1024 / 1024 / 1024, nil
+		} else {
+			return -1, errors.New("Failed to parse quota from " + out)
+		}
+	} else {
+		return -1, errors.New("Failed to parse quota from " + out)
+	}
+}
+
+//Returns dataset disk usage in bytes
+func DatasetDiskUsage(dataset string) int {
+	out, err := exec.Execute("zfs", "list", "-r", path.Join(ZFS_ROOT_DATASET, dataset))
+	log.Check(log.ErrorLevel, "Getting disk usage of "+dataset+" "+out, err)
+
+	var used int
+	for idx, line := range strings.Split(out, "\n") {
+		//skip header
+		if idx == 0 {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) > 1 {
+
+			val, err := convertToBytes(fields[1])
+			log.Check(log.ErrorLevel, "Parsing disk usage of "+dataset+" from "+fields[1], err)
+
+			used += val
+		}
+	}
+
+	return used
+
+}
+
+func convertToBytes(input string) (int, error) {
+	input = strings.ToUpper(strings.TrimSpace(input))
+
+	multiplier := 1
+	value := input
+
+	if len(input) > 1 {
+
+		unit := input[len(input)-1]
+		value = input[:len(input)-1]
+		switch unit {
+		case 'K':
+			multiplier = 1024
+		case 'M':
+			multiplier = 1024 * 1024
+		case 'G':
+			multiplier = 1024 * 1024 * 1024
+		case 'T':
+			multiplier = 1024 * 1024 * 1024 * 1024
+		case 'P':
+			multiplier = 1024 * 1024 * 1024 * 1024 * 1024
+
+		}
+
+	}
+
+	num, err := strconv.ParseFloat(value, 64)
+	res := float64(multiplier) * num
+	return int(res), err
 }
