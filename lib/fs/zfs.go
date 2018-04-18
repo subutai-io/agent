@@ -106,7 +106,7 @@ func SetQuota(dataset string, quotaInGb int) {
 	log.Check(log.ErrorLevel, "Setting quota "+strconv.Itoa(quotaInGb)+"G to "+dataset+" "+out, err)
 }
 
-// Returns dataset quota in GB, 0 if no quota set
+// Returns dataset quota in bytes, 0 if no quota set
 // e.g. GetQuota("foo")
 func GetQuota(dataset string) (int, error) {
 	out, err := exec.Execute("zfs", "get", "quota", path.Join(ZFS_ROOT_DATASET, dataset))
@@ -128,11 +128,13 @@ func GetQuota(dataset string) (int, error) {
 
 			bytes, err := convertToBytes(fields[2])
 
+			log.Debug("Quota ", bytes)
+
 			if err != nil {
 				return -1, err
 			}
 
-			return bytes / 1024 / 1024 / 1024, nil
+			return bytes, nil
 		} else {
 			return -1, errors.New("Failed to parse quota from " + out)
 		}
@@ -142,9 +144,11 @@ func GetQuota(dataset string) (int, error) {
 }
 
 //Returns dataset disk usage in bytes
-func DatasetDiskUsage(dataset string) int {
+func DatasetDiskUsage(dataset string) (int, error) {
 	out, err := exec.Execute("zfs", "list", "-r", path.Join(ZFS_ROOT_DATASET, dataset))
-	log.Check(log.ErrorLevel, "Getting disk usage of "+dataset+" "+out, err)
+	if err != nil {
+		return -1, err
+	}
 
 	var used int
 	for idx, line := range strings.Split(out, "\n") {
@@ -156,13 +160,14 @@ func DatasetDiskUsage(dataset string) int {
 		if len(fields) > 1 {
 
 			val, err := convertToBytes(fields[1])
-			log.Check(log.ErrorLevel, "Parsing disk usage of "+dataset+" from "+fields[1], err)
-
+			if err != nil {
+				return -1, err
+			}
 			used += val
 		}
 	}
 
-	return used
+	return used, nil
 
 }
 

@@ -48,13 +48,8 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk struct {
-		Home   int `json:"home"`
-		Opt    int `json:"opt"`
-		Rootfs int `json:"rootfs"`
-		Var    int `json:"var"`
-	} `json:"Disk"`
-	RAM int `json:"ram"`
+	Disk      int
+	RAM       int    `json:"ram"`
 }
 
 func queryDB(cmd string) (res []client.Result, err error) {
@@ -169,7 +164,8 @@ func diskLoad() (disktotal, diskused interface{}) {
 func cpuQuotaUsage(h string) int {
 	cpuCurLoad, err := queryDB("SELECT non_negative_derivative(mean(value), 1s) FROM lxc_cpu WHERE time > now() - 1m and hostname =~ /^" + h + "$/ GROUP BY time(10s), type fill(none)")
 	if err != nil {
-		log.Error("No data received for container cpu load")
+		log.Warn("No data received for container cpu load")
+		return 0
 	}
 	sys, err := cpuCurLoad[0].Series[0].Values[0][1].(json.Number).Float64()
 	user, err := cpuCurLoad[0].Series[1].Values[0][1].(json.Number).Float64()
@@ -207,12 +203,12 @@ func ramQuotaUsage(h string) int {
 }
 
 func diskQuotaUsage(path string) int {
-	u, err := strconv.Atoi(fs.Stat(path, "usage", true))
+	u, err := fs.DatasetDiskUsage(path) //strconv.Atoi(fs.Stat(path, "usage", true))
 	if err != nil {
 		u = 0
 	}
 
-	l, err := strconv.Atoi(fs.Stat(path, "quota", true))
+	l, err := fs.GetQuota(path) //strconv.Atoi(fs.Stat(path, "quota", true))
 	if err != nil {
 		l = 0
 	}
@@ -231,10 +227,7 @@ func quota(h string) string {
 	usage.Container = h
 	usage.CPU = cpuQuotaUsage(h)
 	usage.RAM = ramQuotaUsage(h)
-	usage.Disk.Rootfs = diskQuotaUsage(h + "/rootfs")
-	usage.Disk.Home = diskQuotaUsage(h + "/home")
-	usage.Disk.Opt = diskQuotaUsage(h + "/opt")
-	usage.Disk.Var = diskQuotaUsage(h + "/var")
+	usage.Disk = diskQuotaUsage(h)
 
 	a, err := json.Marshal(usage)
 	if err != nil {
@@ -311,7 +304,9 @@ func Info(command, host string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	} else if command == "du" {
-		fmt.Println(fs.DatasetDiskUsage(host))
+		usage, err := fs.DatasetDiskUsage(host)
+		log.Check(log.ErrorLevel, "Checking disk usage", err)
+		fmt.Println(usage)
 	} else if command == "quota" {
 		//todo migrate
 		if len(host) == 0 {
