@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	exc "github.com/subutai-io/agent/lib/exec"
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/subutai-io/agent/config"
@@ -146,17 +147,23 @@ func cpuLoad(h string) interface{} {
 }
 
 func diskLoad() (disktotal, diskused interface{}) {
-	out, _ := exec.Command("df", "-TB1").Output()
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if strings.HasPrefix(line[1], "btrfs") {
-			disktotal, _ = strconv.Atoi(line[3])
-			diskused, _ = strconv.Atoi(line[2])
-			break
+	out, _ := exc.Execute("df", "-TB1")
+
+	var total, used int
+	for _, str := range strings.Split(out, "\n") {
+		f := strings.Fields(str)
+		if len(f) > 3 {
+			if f[0] == "subutai" {
+				total, _ = strconv.Atoi(f[2])
+			}
+			if f[1] == "zfs" {
+				t, _ := strconv.Atoi(f[3])
+				used += t
+			}
 		}
 	}
-	return
+
+	return total, used
 }
 
 func cpuQuotaUsage(h string) int {
@@ -247,7 +254,7 @@ func sysLoad(h string) string {
 	result.CPU.CoreCount = runtime.NumCPU()
 	result.CPU.Frequency = grep("cpu MHz", "/proc/cpuinfo")
 	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad()
-	result.Disk.Used, result.Disk.Total = diskLoad()
+	result.Disk.Total, result.Disk.Used = diskLoad()
 
 	a, err := json.Marshal(result)
 	if err != nil {
@@ -304,8 +311,10 @@ func Info(command, host string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	} else if command == "du" {
+		//todo remove
 		fmt.Println(fs.DiskUsage(host))
 	} else if command == "quota" {
+		//todo remove
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}
