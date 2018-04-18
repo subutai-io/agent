@@ -22,7 +22,7 @@ func LxcDemote(name, ip, vlan string) {
 	}
 
 	netConf(name, ip, vlan)
-	fs.ReadOnly(name, false)
+	fs.SetDatasetReadWrite(name)
 	container.SetContainerUID(name)
 	log.Info(name + " demote succesfully")
 }

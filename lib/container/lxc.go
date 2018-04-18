@@ -507,6 +507,7 @@ func QuotaNet(name string, size ...string) string {
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
+//TODO use the new lxc config type
 func SetContainerConf(container string, conf [][]string) error {
 	confPath := config.Agent.LxcPrefix + container + "/config"
 	newconf := ""

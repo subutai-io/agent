@@ -72,8 +72,12 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 	os.MkdirAll(dst+"/diff", 0755)
 
 	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
-		err := fs.Send(config.Agent.LxcPrefix+parent+"/"+vol, config.Agent.LxcPrefix+name+"/"+vol, dst+"/deltas/"+vol+".delta")
-		log.Check(log.FatalLevel, "Sending delta "+dst+"/deltas/"+vol+".delta", err)
+		//1 snapshot each partition
+		//2 send incremental delta between parent and child to delta file
+		//3 destroy snapshots
+		fs.CreateSnapshot(name + "/" + vol + "@export")
+		fs.SendStream(parent+"/"+vol+"@now", name+"/"+vol+"@export", dst+"/deltas/"+vol+".delta")
+		fs.RemoveDataset(name+"/"+vol+"@export", false)
 	}
 
 	src := config.Agent.LxcPrefix + name

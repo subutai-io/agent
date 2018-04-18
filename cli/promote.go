@@ -68,7 +68,7 @@ func LxcPromote(name, source string) {
 	makeDiff(name)
 
 	container.ResetNet(name)
-	fs.ReadOnly(name, true)
+	fs.SetDatasetReadOnly(name)
 	log.Info(name + " promoted")
 }
 
