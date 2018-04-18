@@ -68,7 +68,7 @@ func ReceiveStream(dataset string, delta string) {
 }
 
 // Saves incremental stream to delta file
-// e.g. SendStream("debian-stretch/rootfs@now", "foo/rootfs@export", "/tmp/rootfs.delta")
+// e.g. SendStream("debian-stretch/rootfs@now", "foo/rootfs@now", "/tmp/rootfs.delta")
 func SendStream(snapshotFrom, snapshotTo, delta string) {
 	out, err := exec.ExecuteWithBash("zfs send -i " + path.Join(ZFS_ROOT_DATASET, snapshotFrom) +
 		" " + path.Join(ZFS_ROOT_DATASET, snapshotTo) + " > " + delta)
@@ -83,7 +83,7 @@ func SetMountpoint(dataset string, mountpoint string) {
 }
 
 // Creates snapshot
-// e.g. CreateSnapshot("foo/rootfs@export")
+// e.g. CreateSnapshot("foo/rootfs@now")
 func CreateSnapshot(snapshot string) {
 	out, err := exec.Execute("zfs", "snapshot", path.Join(ZFS_ROOT_DATASET, snapshot))
 	log.Check(log.FatalLevel, "Creating zfs snapshot "+snapshot+" "+out, err)

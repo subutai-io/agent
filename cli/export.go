@@ -73,11 +73,11 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 
 	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
 		// snapshot each partition
-		fs.CreateSnapshot(name + "/" + vol + "@export")
+		if !fs.DatasetExists(name + "/" + vol + "@now") {
+			fs.CreateSnapshot(name + "/" + vol + "@now")
+		}
 		// send incremental delta between parent and child to delta file
-		fs.SendStream(parent+"/"+vol+"@now", name+"/"+vol+"@export", dst+"/deltas/"+vol+".delta")
-		// destroy snapshots
-		fs.RemoveDataset(name+"/"+vol+"@export", false)
+		fs.SendStream(parent+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
 	}
 
 	src := config.Agent.LxcPrefix + name

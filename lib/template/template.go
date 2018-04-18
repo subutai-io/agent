@@ -17,9 +17,9 @@ func Install(templateName string) {
 
 	// create partitions
 	fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"))
-	fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "homefs.delta"))
-	fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "varfs.delta"))
-	fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "optfs.delta"))
+	fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"))
+	fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"))
+	fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"))
 
 	// set partitions as read-only
 	fs.SetDatasetReadOnly(templateName + "/rootfs")
