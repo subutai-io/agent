@@ -19,6 +19,7 @@ import (
 // Promote executes several simple steps, such as dropping a container's configuration to default values,
 // dumping the list of installed packages (this step requires the target container to still be running),
 // and setting the container's filesystem to read-only to prevent changes.
+//TODO handle cached metadata conversion container -> template or unify metadata
 func LxcPromote(name, source string) {
 	name = utils.CleanTemplateName(name)
 	checkSanity(name, source)
@@ -28,7 +29,18 @@ func LxcPromote(name, source string) {
 			container.Stop(source, true)
 			defer container.Start(source)
 		}
+
+		// create snapshots of source container partitions
+		for _, vol := range []string{"rootfs", "home", "opt", "var"} {
+			if !fs.DatasetExists(source + "/" + vol + "@now") {
+				//create fresh snapshot
+				fs.CreateSnapshot(source + "/" + vol + "@now")
+			}
+		}
+
+		// clone source container
 		log.Check(log.ErrorLevel, "Cloning source container", container.Clone(source, name))
+
 		container.SetContainerConf(name, [][]string{
 			{"subutai.template", name},
 			{"subutai.parent", container.GetParent(source)},
