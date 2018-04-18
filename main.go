@@ -85,19 +85,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "checkpoint", Usage: "chekpoint/restore in user space",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "stop, s", Usage: "Stop container during checkpoint"},
-			gcli.BoolFlag{Name: "restore, r", Usage: "Restore checkpoint"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Checkpoint(c.Args().Get(0), c.Bool("r"), c.Bool("s"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
 		Name: "clone", Usage: "clone Subutai container",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
@@ -280,19 +267,6 @@ func main() {
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
 				cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "migrate", Usage: "migrate Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "stage, s", Usage: "migration stage"},
-			gcli.StringFlag{Name: "destination, d", Usage: "peer destination address"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Migrate(c.Args().Get(0), c.String("s"), c.String("d"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}

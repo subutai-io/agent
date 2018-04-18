@@ -193,17 +193,6 @@ func DiskQuota(path string, size ...string) string {
 	return Stat(path, "quota", false)
 }
 
-// Quota returns subvolume quota.
-// If size argument is set, it sets new quota value.
-func Quota(path string, size ...string) string {
-	if len(size) > 0 && len(size[0]) > 0 {
-		out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", config.Agent.LxcPrefix+path).CombinedOutput()
-		log.Check(log.ErrorLevel, "Limiting BTRFS subvolume "+config.Agent.LxcPrefix+path+" "+string(out), err)
-		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
-	}
-	return Stat(path, "quota", false)
-}
-
 // GetBtrfsRoot returns BTRFS root
 func GetBtrfsRoot() string {
 	data, err := exec.Command("findmnt", "-nT", config.Agent.LxcPrefix).Output()

@@ -28,8 +28,6 @@ func LxcQuota(name, res, size, threshold string) {
 	switch res {
 	case "network":
 		quota = container.QuotaNet(name, size)
-	case "rootfs", "home", "var", "opt":
-		quota = fs.Quota(name+"/"+res, size)
 	case "disk":
 		quota = fs.DiskQuota(name, size)
 	case "cpuset":

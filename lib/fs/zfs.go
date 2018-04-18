@@ -5,6 +5,8 @@ import (
 	"strings"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/lib/exec"
+	"github.com/c2h5oh/datasize"
+	"strconv"
 )
 
 const ZFS_ROOT_DATASET = "subutai/fs"
@@ -97,3 +99,31 @@ func CloneSnapshot(snapshot, dataset string) {
 	log.Check(log.FatalLevel, "Cloning zfs snapshot "+snapshot+" to "+dataset+" "+out, err)
 }
 
+// Sets dataset quota in GB
+// e.g. SetQuota("foo", 10)
+func SetQuota(dataset string, quotaInGb int) {
+	out, err := exec.Execute("zfs", "set", "quota="+strconv.Itoa(quotaInGb)+"G", path.Join(ZFS_ROOT_DATASET, dataset))
+	log.Check(log.ErrorLevel, "Setting quota "+strconv.Itoa(quotaInGb)+"G to "+dataset+" "+out, err)
+}
+
+// Returns dataset quota in GB
+// e.g. GetQuota("foo")
+func GetQuota(dataset string) int {
+	out, err := exec.Execute("zfs", "get", "quota", path.Join(ZFS_ROOT_DATASET, dataset))
+	log.Check(log.WarnLevel, "Reading quota of "+dataset+" "+out, err)
+
+	fields := strings.Fields(out)
+
+	if (len(fields) > 3) {
+		var v datasize.ByteSize
+		err := v.UnmarshalText([]byte(fields[2]))
+
+		log.Check(log.WarnLevel, "Parsing quota of "+dataset+" "+out, err)
+
+		return (int)(v.GBytes())
+	} else {
+		log.Warn("Failed to parse quota from " + out)
+	}
+
+	return 0
+}
