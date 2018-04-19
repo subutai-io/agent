@@ -173,6 +173,15 @@ func netStat(bp client.BatchPoints) {
 	}
 }
 
+//TODO
+/*
+map[name]used := parse(zfs list -r)
+for name in  All()
+{
+    from map where name ends with map.name or map.name + partition(s)
+    sum up used into total[name]used
+}
+ */
 func btrfsStat(bp client.BatchPoints) {
 	list := make(map[string]string)
 	out, err := exec.Command("btrfs", "subvolume", "list", config.Agent.LxcPrefix).Output()
@@ -225,7 +234,7 @@ func diskFree(bp client.BatchPoints) {
 		if strings.HasPrefix(line[0], "/dev") {
 			for i := range metrics {
 				value, err := strconv.Atoi(line[i+1])
-				log.Check(log.DebugLevel, "Parsing network disk stats", err)
+				log.Check(log.DebugLevel, "Parsing disk stats", err)
 				point, err := client.NewPoint("host_disk",
 					map[string]string{"hostname": hostname, "mount": line[5], "type": metrics[i]},
 					map[string]interface{}{"value": value},
