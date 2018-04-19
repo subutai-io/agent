@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	exc "github.com/subutai-io/agent/lib/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/lib/fs"
 )
 
 var (
@@ -66,7 +68,7 @@ func doCollect() {
 
 				netStat(bp)
 				cgroupStat(bp)
-				btrfsStat(bp)
+				zfsStat(bp)
 				diskFree(bp)
 				cpuStat(bp)
 				memStat(bp)
@@ -79,7 +81,7 @@ func doCollect() {
 	}
 }
 
-func parsefile(bp client.BatchPoints, hostname, lxc, cgtype, filename string) {
+func parsefile(bp client.BatchPoints, lxc, cgtype, filename string) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return
@@ -113,15 +115,13 @@ func parsefile(bp client.BatchPoints, hostname, lxc, cgtype, filename string) {
 }
 
 func cgroupStat(bp client.BatchPoints) {
-	hostname, err := os.Hostname()
-	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	for _, item := range cgtype {
 		path := "/sys/fs/cgroup/" + item + "/lxc/"
 		files, err := ioutil.ReadDir(path)
 		if err == nil {
 			for _, f := range files {
 				if f.IsDir() {
-					parsefile(bp, hostname, f.Name(), item, path+f.Name()+"/"+item+".stat")
+					parsefile(bp, f.Name(), item, path+f.Name()+"/"+item+".stat")
 				}
 			}
 		}
@@ -173,48 +173,37 @@ func netStat(bp client.BatchPoints) {
 	}
 }
 
-//TODO
-/*
-map[name]used := parse(zfs list -r)
-for name in  All()
-{
-    from map where name ends with map.name or map.name + partition(s)
-    sum up used into total[name]used
-}
- */
-func btrfsStat(bp client.BatchPoints) {
-	list := make(map[string]string)
-	out, err := exec.Command("btrfs", "subvolume", "list", config.Agent.LxcPrefix).Output()
-	if log.Check(log.DebugLevel, "Getting BTRFS stats", err) {
+func zfsStat(bp client.BatchPoints) {
+	all := container.All()
+	output, err := exc.Execute("zfs", "list", "-r")
+	if log.Check(log.DebugLevel, "Getting zfs stats", err) {
 		return
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		list["0/"+line[1]] = line[8]
+
+	lines := strings.Split(output, "\n")
+
+	var usageMap = make(map[string]string)
+	for _, line := range lines {
+
+		if strings.HasPrefix(line, "subutai") {
+			fields := strings.Fields(line)
+			if len(fields) > 1 {
+				usageMap[fields[0]] = fields[1]
+			}
+		}
+
 	}
-	out, err = exec.Command("btrfs", "qgroup", "show", "-repc", "--raw", config.Agent.LxcPrefix).Output()
-	if log.Check(log.DebugLevel, "Getting BTRFS stats", err) {
-		return
-	}
-	scanner = bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if path := strings.Split(list[line[0]], "/"); len(path) == 1 {
-			if value, err := strconv.Atoi(line[1]); err == nil {
+
+	for _, cont := range all {
+		for key, val := range usageMap {
+			if key == "subutai/fs/"+cont {
+				value, _ := fs.ConvertToBytes(val)
 				point, err := client.NewPoint("lxc_disk",
-					map[string]string{"hostname": path[0], "mount": "total", "type": "used"},
+					map[string]string{"hostname": cont, "mount": "total", "type": "used"},
 					map[string]interface{}{"value": value},
 					time.Now())
 				if err == nil {
 					bp.AddPoint(point)
-				}
-			}
-		} else if line[5] == "---" {
-			for k, v := range list {
-				if v == strings.Split(list[line[0]], "/")[0] && len(k) > 1 {
-					exec.Command("btrfs", "qgroup", "create", "1"+k[1:], config.Agent.LxcPrefix).Run()
-					exec.Command("btrfs", "qgroup", "assign", line[0], "1"+k[1:], config.Agent.LxcPrefix).Run()
 				}
 			}
 		}

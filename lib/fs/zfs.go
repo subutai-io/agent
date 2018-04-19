@@ -126,7 +126,7 @@ func GetQuota(dataset string) (int, error) {
 				return 0, nil
 			}
 
-			bytes, err := convertToBytes(fields[2])
+			bytes, err := ConvertToBytes(fields[2])
 
 			log.Debug("Quota ", bytes)
 
@@ -144,6 +144,7 @@ func GetQuota(dataset string) (int, error) {
 }
 
 //Returns dataset disk usage in bytes
+//TODO redo to use only parent dataset info
 func DatasetDiskUsage(dataset string) (int, error) {
 	out, err := exec.Execute("zfs", "list", "-r", path.Join(ZFS_ROOT_DATASET, dataset))
 	if err != nil {
@@ -159,7 +160,7 @@ func DatasetDiskUsage(dataset string) (int, error) {
 		fields := strings.Fields(line)
 		if len(fields) > 1 {
 
-			val, err := convertToBytes(fields[1])
+			val, err := ConvertToBytes(fields[1])
 			if err != nil {
 				return -1, err
 			}
@@ -171,7 +172,7 @@ func DatasetDiskUsage(dataset string) (int, error) {
 
 }
 
-func convertToBytes(input string) (int, error) {
+func ConvertToBytes(input string) (int, error) {
 	input = strings.ToUpper(strings.TrimSpace(input))
 
 	multiplier := 1
