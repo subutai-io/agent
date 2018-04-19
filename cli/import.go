@@ -573,14 +573,6 @@ func updateContainerConfig(templateName string) error {
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/var var none bind,rw 0 0"},
-		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
-		//properties to remove:
-		{"lxc.include"},
-		{"lxc.hook.pre-start"},
-		{"lxc.mount"},
-		{"lxc.rootfs.mount"},
-		{"subutai.template.package"},
-		{"subutai.config.path"},
 	})
 
 	return cfg.Save()

@@ -384,16 +384,8 @@ func Clone(parent, child string) error {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
 		{"lxc.rootfs.backend", "zfs"},
-		{"lxc.network.mtu", "1300"},
 		{"lxc.utsname", child},
-		//to remove
-		{"lxc.network.link", ""},
-		{"lxc.include", ""},
-		{"lxc.hook.pre-start", ""},
-		{"lxc.mount", ""},
-		{"lxc.rootfs.mount", ""},
-		{"subutai.template.package", ""},
-		{"subutai.config.path", ""},})
+	})
 
 	return nil
 }
