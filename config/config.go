@@ -99,9 +99,9 @@ func init() {
 
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
-	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg"))
 
-	confpath := "/var/lib/apps/subutai/current/"
+	confpath := "/var/lib/subutai/"
+	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
 		confpath = "/var/lib/subutai/"
 		config.Agent.AppPrefix = "/usr/share/subutai/"
