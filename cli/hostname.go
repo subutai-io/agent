@@ -14,7 +14,7 @@ import (
 
 // LxcHostname command changes container configs to apply a new name for the container. Used for internal SS purposes.
 func LxcHostname(c, name string) {
-	if !container.ContainerOrTemplateExists(c) || container.IsTemplate(c) {
+	if !container.LxcInstanceExists(c) || container.IsTemplate(c) {
 		log.Error(c + " is not an container")
 		return
 	}

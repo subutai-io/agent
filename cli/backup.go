@@ -26,7 +26,7 @@ func BackupContainer(container string, full, stop bool) string {
 	backupDir := config.Agent.LxcPrefix + "/backups/"
 	var changelog []string
 
-	if !lxcContainer.ContainerOrTemplateExists(container) {
+	if !lxcContainer.LxcInstanceExists(container) {
 		log.Fatal("Container " + container + " not found!")
 	}
 

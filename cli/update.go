@@ -55,7 +55,7 @@ func updateRH(name string, check bool) {
 }
 
 func updateContainer(name string, check bool) {
-	if !container.ContainerOrTemplateExists(name) {
+	if !container.LxcInstanceExists(name) {
 		log.Error("no such instance \"" + name + "\"")
 	}
 	_, err := container.AttachExec(name, []string{"apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})

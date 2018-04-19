@@ -58,8 +58,8 @@ func Containers() (containers []string) {
 	return
 }
 
-// ContainerOrTemplateExists checks if container or template exists
-func ContainerOrTemplateExists(name string) bool {
+// LxcInstanceExists checks if container or template exists
+func LxcInstanceExists(name string) bool {
 	for _, item := range All() {
 		if name == item {
 			return true
@@ -105,7 +105,7 @@ func SetApt(name string) {
 
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
-	if !ContainerOrTemplateExists(name) {
+	if !LxcInstanceExists(name) {
 		return errors.New("Container does not exists")
 	}
 	bolt, err := db.New()
@@ -154,36 +154,6 @@ func Stop(name string, addMetadata bool) error {
 	return nil
 }
 
-// Freeze pause container processes
-func Freeze(name string) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
-	}
-	defer lxc.Release(c)
-
-	if err = c.Freeze(); log.Check(log.DebugLevel, "Freezing container "+name, err) {
-		return err
-	}
-	AddMetadata(name, map[string]string{"state": State(name)})
-	return nil
-}
-
-// Unfreeze unpause container processes
-func Unfreeze(name string) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
-	}
-	defer lxc.Release(c)
-
-	if err := c.Unfreeze(); log.Check(log.DebugLevel, "Unfreezing container "+name, err) {
-		return err
-	}
-	AddMetadata(name, map[string]string{"state": State(name)})
-	return nil
-}
-
 // Dump creates container memory dump on disk
 func Dump(name string, stop bool) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -210,24 +180,9 @@ func Dump(name string, stop bool) error {
 	return nil
 }
 
-// DumpRestore restores container memory from dump on disk
-func DumpRestore(name string) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
-		return err
-	}
-	defer lxc.Release(c)
-
-	options := lxc.RestoreOptions{
-		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
-		Verbose:   true,
-	}
-	return c.Restore(options)
-}
-
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
-	if !ContainerOrTemplateExists(name) {
+	if !LxcInstanceExists(name) {
 		return output, errors.New("Container does not exist")
 	}
 

@@ -35,7 +35,7 @@ func LxcQuota(name, res, size, threshold string) {
 		}
 		vr, _ := fs.GetQuota(name)
 		//convert bytes to GB
-		vr /= ( 1024 * 1024 * 1024)
+		vr /= 1024 * 1024 * 1024
 		quota = strconv.Itoa(vr)
 	case "cpuset":
 		quota = container.QuotaCPUset(name, size)

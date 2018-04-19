@@ -377,7 +377,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		log.Fatal("Lxc directory " + config.Agent.LxcPrefix + " not mounted")
 	}
 
-	if container.ContainerOrTemplateExists(name) && name == "management" && len(token) > 1 {
+	if container.LxcInstanceExists(name) && name == "management" && len(token) > 1 {
 		gpg.ExchageAndEncrypt("management", token)
 		return
 	}

@@ -32,7 +32,7 @@ var (
 func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	child = utils.CleanTemplateName(child)
 
-	if container.ContainerOrTemplateExists(child) {
+	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
 

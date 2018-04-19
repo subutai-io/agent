@@ -99,7 +99,7 @@ func GenerateKey(name string) {
 	path := config.Agent.LxcPrefix + name
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
-	if !container.ContainerOrTemplateExists(name) {
+	if !container.LxcInstanceExists(name) {
 		err := os.MkdirAll("/root/.gnupg/", 0700)
 		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
 		path = "/root/.gnupg"
@@ -129,7 +129,7 @@ func GenerateKey(name string) {
 	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
 		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg1", "--batch", "--gen-key", path+"/defaults").Run())
 	}
-	if !container.ContainerOrTemplateExists(name) {
+	if !container.LxcInstanceExists(name) {
 		out, err := exec.Command("gpg1", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
 			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
