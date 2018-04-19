@@ -308,7 +308,6 @@ func Info(command, host string) {
 		log.Check(log.ErrorLevel, "Checking disk usage", err)
 		fmt.Println(usage)
 	} else if command == "quota" {
-		//todo migrate
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}
