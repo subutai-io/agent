@@ -45,10 +45,6 @@ type Quota struct {
 	CPU  int `json:"cpu,omitempty"`
 	RAM  int `json:"ram,omitempty"`
 	Disk int `json:"disk,omitempty"`
-	Root int `json:"root,omitempty"`
-	Home int `json:"home,omitempty"`
-	Opt  int `json:"opt,omitempty"`
-	Var  int `json:"var,omitempty"`
 }
 
 func init() {
@@ -89,7 +85,7 @@ func parsePasswd(path, name string) (uid string, gid string) {
 
 // Active provides list of active Subutai containers.
 func Active(details bool) []Container {
-	contArr := []Container{}
+	var contArr []Container
 
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)

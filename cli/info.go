@@ -203,12 +203,12 @@ func ramQuotaUsage(h string) int {
 }
 
 func diskQuotaUsage(path string) int {
-	u, err := fs.DatasetDiskUsage(path) //strconv.Atoi(fs.Stat(path, "usage", true))
+	u, err := fs.DatasetDiskUsage(path)
 	if err != nil {
 		u = 0
 	}
 
-	l, err := fs.GetQuota(path) //strconv.Atoi(fs.Stat(path, "quota", true))
+	l, err := fs.GetQuota(path)
 	if err != nil {
 		l = 0
 	}
