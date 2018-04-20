@@ -404,22 +404,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 	defer lock.Unlock()
 
-	isTemplate := container.IsTemplate(t.Name)
-	if isTemplate {
-
-		if local {
-			log.Info(t.Name + " instance exists")
-			return
-		}
-
-		existingVersion := container.GetConfigItem(config.Agent.LxcPrefix+t.Name+"/config", "subutai.template.version")
-
-		//latest version is already installed
-		if version.Compare(t.Version, existingVersion, "<=") {
-			log.Info(t.Name + " instance exists")
-			return
-		}
-	} else if container.IsContainer(t.Name) {
+	if container.LxcInstanceExists(t.Name) {
 		log.Info(t.Name + " instance exists")
 		return
 	}
@@ -523,11 +508,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		}
 	}
 
-	//remove old template before installing new one
-	if isTemplate {
-		container.DestroyTemplate(t.Name)
-	}
-
 	log.Info("Unpacking template " + t.Name)
 	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.File + " to " + t.Name)
 	tgz := extractor.NewTgz()
@@ -561,6 +541,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	log.Check(log.ErrorLevel, "Setting lxc config", updateContainerConfig(t.Name))
 
+	//TODO use name:owner:version as template cache idx so that we can cache info even for locally imported templates
 	if t.Id != "" {
 		cacheTemplateInfo(t)
 	}
