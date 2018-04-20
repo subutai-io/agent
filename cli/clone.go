@@ -72,7 +72,6 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	//Need to change it in parent templates
 	container.SetApt(child)
 	container.SetDNS(child)
-	container.CriuHax(child)
 	//add subutai.template.owner & subutai.template.version
 	container.CopyParentReference(child, t.Owner[0], t.Version)
 

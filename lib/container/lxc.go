@@ -154,32 +154,6 @@ func Stop(name string, addMetadata bool) error {
 	return nil
 }
 
-// Dump creates container memory dump on disk
-func Dump(name string, stop bool) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
-	}
-	defer lxc.Release(c)
-
-	options := lxc.CheckpointOptions{
-		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
-		Verbose:   true,
-		Stop:      stop,
-	}
-	if err = c.Checkpoint(options); log.Check(log.DebugLevel, "Creating container checkpoint", err) {
-		return err
-	}
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.ContainerByName(name)
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-	uid, _ := strconv.Atoi(meta["uid"])
-	log.Check(log.WarnLevel, "Chowning checkpoint",
-		fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
-	return nil
-}
-
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !LxcInstanceExists(name) {
@@ -549,15 +523,6 @@ func SetDNS(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/tail", resolv, 0644))
 	log.Check(log.DebugLevel, "Writing resolv.conf",
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
-}
-
-// CriuHax adds container config needed by CRIU
-func CriuHax(name string) {
-	SetContainerConf(name, [][]string{
-		{"lxc.console", "none"},
-		{"lxc.tty", "0"},
-		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
-	})
 }
 
 func CopyParentReference(name string, owner string, version string) {
