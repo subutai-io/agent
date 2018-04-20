@@ -4,7 +4,6 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -106,16 +105,13 @@ func Start() {
 
 			switch sig {
 
-			case syscall.SIGUSR1:
+			case syscall.SIGUSR1, syscall.SIGTERM:
 				//stop containers
 				for _, containerName := range lxc.Containers() {
 					if lxc.State(containerName) == "RUNNING" {
 						lxc.Stop(containerName, false)
 					}
 				}
-			case syscall.SIGTERM:
-				//handle SIGTERM to have time before SIGKILL
-				log.Info(fmt.Sprintf("Received signal: %s", sig))
 			}
 		}
 	}()
