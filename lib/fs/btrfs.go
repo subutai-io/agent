@@ -14,43 +14,6 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-// IsSubvolumeReadonly checks if BTRFS subvolume have "readonly" property.
-// It's used in Subutai to check if LXC container template or not.
-func IsSubvolumeReadonly(path string) bool {
-	out, err := exec.Command("btrfs", "property", "get", "-ts", path).Output()
-	log.Check(log.DebugLevel, "Getting BTRFS subvolume readonly property", err)
-	return strings.Contains(string(out), "true")
-}
-func IsSubvolumeReadWrite(path string) bool {
-	out, err := exec.Command("btrfs", "property", "get", "-ts", path).Output()
-	log.Check(log.DebugLevel, "Getting BTRFS subvolume readonly property", err)
-	return strings.Contains(string(out), "false")
-}
-
-func DiskUsage(container string) string {
-
-	out, err := exec.Command("btrfs", "filesystem", "du", "-s", "--raw", config.Agent.LxcPrefix+container).CombinedOutput()
-
-	log.Check(log.ErrorLevel, "Checking disk usage of container "+container+": "+string(out), err)
-
-	output := strings.Split(string(out), "\n")
-
-	for idx, line := range output {
-
-		//skip header
-		if idx == 1 {
-
-			return strings.Fields(line)[0]
-		}
-
-	}
-
-	log.Error("Failed to parse output: " + string(out))
-
-	//should not reach here
-	return ""
-}
-
 // SubvolumeCreate creates BTRFS subvolume.
 func SubvolumeCreate(dst string) {
 	if id(dst) == "" {
@@ -141,56 +104,10 @@ func Send(src, dst, delta string) error {
 	return nil
 }
 
-// ReadOnly sets readonly flag for Subutai container.
-// Subvolumes with active readonly flag is Subutai templates.
-func ReadOnly(container string, flag bool) {
-	for _, path := range []string{container + "/rootfs/", container + "/opt", container + "/var", container + "/home"} {
-		SetVolReadOnly(config.Agent.LxcPrefix+path, flag)
-	}
-}
-
 // SetVolReadOnly sets readonly flag for BTRFS subvolume.
 func SetVolReadOnly(subvol string, flag bool) {
 	out, err := exec.Command("btrfs", "property", "set", "-ts", subvol, "ro", strconv.FormatBool(flag)).CombinedOutput()
 	log.Check(log.FatalLevel, "Setting readonly: "+strconv.FormatBool(flag)+": "+string(out), err)
-}
-
-// Stat returns quota and usage for BTRFS subvolume.
-func Stat(path, index string, raw bool) (value string) {
-	var row = map[string]int{"quota": 4, "usage": 2}
-
-	args := []string{"qgroup", "show", "-re", config.Agent.LxcPrefix}
-	if raw {
-		args = []string{"qgroup", "show", "-re", "--raw", config.Agent.LxcPrefix}
-	}
-	out, err := exec.Command("btrfs", args...).Output()
-	log.Check(log.FatalLevel, "Getting btrfs stats", err)
-	ind := id(path)
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		if line := strings.Fields(scanner.Text()); len(line) > 3 && strings.HasSuffix(line[0], "/"+ind) {
-			value = line[row[index]]
-		}
-	}
-	return value
-}
-
-// DiskQuota returns total disk quota for Subutai container.
-// If size argument is set, it sets new quota value.
-func DiskQuota(path string, size ...string) string {
-	parent := id(path)
-	exec.Command("btrfs", "qgroup", "create", "1/"+parent, config.Agent.LxcPrefix+path).Run()
-	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/opt"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
-	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/var"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
-	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/home"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
-	exec.Command("btrfs", "qgroup", "assign", "0/"+id(path+"/rootfs"), "1/"+parent, config.Agent.LxcPrefix+path).Run()
-
-	if len(size) > 0 && len(size[0]) > 0 {
-		out, err := exec.Command("btrfs", "qgroup", "limit", "-e", size[0]+"G", "1/"+parent, config.Agent.LxcPrefix+path).CombinedOutput()
-		log.Check(log.ErrorLevel, "Limiting BTRFS group 1/"+parent+" "+string(out), err)
-		exec.Command("btrfs", "quota", "rescan", "-w", config.Agent.LxcPrefix).Run()
-	}
-	return Stat(path, "quota", false)
 }
 
 // GetBtrfsRoot returns BTRFS root
