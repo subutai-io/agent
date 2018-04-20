@@ -60,19 +60,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "backup", Usage: "backup Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "full, f", Usage: "make full backup"},
-			gcli.BoolFlag{Name: "stop, s", Usage: "stop container at the time of backup"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.BackupContainer(c.Args().Get(0), c.Bool("f"), c.Bool("s"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
 		Name: "batch", Usage: "batch commands execution",
 		Flags: []gcli.Flag{
 			gcli.StringFlag{Name: "json, j", Usage: "JSON string with commands"}},
@@ -353,19 +340,6 @@ func main() {
 			gcli.StringFlag{Name: "threshold, t", Usage: "set alert threshold"}},
 		Action: func(c *gcli.Context) error {
 			cli.LxcQuota(c.Args().Get(0), c.Args().Get(1), c.String("s"), c.String("t"))
-			return nil
-		}}, {
-
-		Name: "restore", Usage: "restore Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
-			gcli.StringFlag{Name: "container, c", Usage: "name of new container"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
 			return nil
 		}}, {
 

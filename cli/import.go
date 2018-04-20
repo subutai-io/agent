@@ -56,6 +56,13 @@ type metainfo struct {
 	} `json:"hash"`
 }
 
+func init() {
+	tmpdir := path.Join(config.Agent.LxcPrefix, "tmpdir")
+	if _, err := os.Stat(tmpdir); os.IsNotExist(err) {
+		os.MkdirAll(tmpdir, 0755)
+	}
+}
+
 // getTemplateInfoById retrieves template name from global repository by passed id string
 func getTemplateInfoById(t *templ, id string, token string) {
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
