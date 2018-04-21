@@ -47,6 +47,10 @@ func LxcDestroy(id string, vlan bool) {
 		}
 		cleanupNet(id)
 	} else if id != "everything" {
+		if container.IsTemplate(id) {
+			log.Error("Pass -t flag to destroy template")
+		}
+
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
 		log.Debug("Obtaining container by name")
@@ -69,10 +73,7 @@ func LxcDestroy(id string, vlan bool) {
 
 			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
 
-		} else if container.IsTemplate(id) {
-
-			container.DestroyTemplate(id)
-		} else {
+		} else if container.IsContainer(id) {
 
 			err = container.DestroyContainer(id)
 
@@ -113,6 +114,10 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	log.Info(msg)
+}
+
+func LxcDestroyTemplate(name string) {
+	container.DestroyTemplate(name)
 }
 
 func cleanupNet(id string) {

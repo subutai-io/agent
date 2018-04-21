@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	templateNameNOwnerNVersionRx = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+):(?P<version>\d+\.\d+\.\d+)$`)
-	templateNameNOwnerRx         = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+)$`)
+	templateNameNOwnerNVersionRx = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)[@:](?P<owner>[a-zA-Z0-9._-]+):(?P<version>\d+\.\d+\.\d+)$`)
+	templateNameNOwnerRx         = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)[@:](?P<owner>[a-zA-Z0-9._-]+)$`)
 	templateNameRx               = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)$`)
 )
 // LxcClone function creates new `child` container from a Subutai `parent` template.
@@ -46,11 +46,13 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	meta["parent.version"] = t.Version
 	meta["parent.id"] = t.Id
 
-	if !container.IsTemplate(t.Name) {
+	fullRef := strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
+
+	if !container.IsTemplate(fullRef) {
 		LxcImport("id:"+t.Id, cdnToken, false)
 	}
 
-	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.Name, child))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child))
 
 	gpg.GenerateKey(child)
 	if len(consoleSecret) != 0 {

@@ -246,6 +246,7 @@ func DestroyTemplate(name string) {
 
 	defer lxc.Release(c)
 
+	//check just in case
 	if c.State() == lxc.RUNNING {
 		log.Check(log.ErrorLevel, "Stopping container", c.Stop())
 	}
@@ -288,6 +289,8 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 // Clone create the duplicate container from the Subutai template.
 func Clone(parent, child string) error {
 
+	parentParts := strings.Split(parent, ":")
+
 	//create parent dataset
 	fs.CreateDataset(child)
 
@@ -301,18 +304,20 @@ func Clone(parent, child string) error {
 		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
 
-	//TODO
+	//TODO check for mac duplication
 	mac := common.Mac()
 	SetContainerConf(child, [][]string{
-		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
+		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
 		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
-		{"subutai.parent", parent},
+		{"subutai.parent", parentParts[0]},
+		{"subutai.parent.owner", parentParts[1]},
+		{"subutai.parent.version", parentParts[2]},
 		{"lxc.rootfs", config.Agent.LxcPrefix + child + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
-		{"lxc.rootfs.backend", "zfs"},
+		//{"lxc.rootfs.backend", "zfs"},//must be in template
 		{"lxc.utsname", child},
 	})
 

@@ -18,13 +18,13 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
+	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/exec"
 )
 
 var (
 	allsizes = []string{"tiny", "small", "medium", "large", "huge"}
 )
-
-// cfg declared in promote.go
 
 // LxcExport sub command prepares an archive from a template in the `/mnt/lib/lxc/tmpdir/` path.
 // This archive can be moved to another Subutai peer and deployed as ready-to-use template or uploaded to Subutai's global template repository to make it
@@ -37,12 +37,24 @@ var (
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
 //TODO update doco on site for export, import,clone
+
 func LxcExport(name, version, prefsize, token, description string, private bool, local bool) {
+
+	if !container.IsContainer(name) {
+		log.Error("Container " + name + " not found")
+	}
+
 	if token == "" {
 		log.Error("Missing CDN token")
 	}
 
 	owner := getOwner(token)
+
+	wasRunning := false
+	if container.State(name) == "RUNNING" {
+		LxcStop(name)
+		wasRunning = true
+	}
 
 	size := "tiny"
 	for _, s := range allsizes {
@@ -50,26 +62,25 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 			size = prefsize
 		}
 	}
-	srcver := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.template.version")
+
+	parent := container.GetProperty(name, "subutai.parent")
+	parentOwner := container.GetProperty(name, "subutai.parent.owner")
+	parentVersion := container.GetProperty(name, "subutai.parent.version")
+	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
+
 	if strings.TrimSpace(version) == "" {
-		version = srcver
+		version = parentVersion
 	}
+
+	//cleanup files
+	cleanupFS(config.Agent.LxcPrefix+name+"/var/log/", 0775)
+	cleanupFS(config.Agent.LxcPrefix+name+"/var/cache", 0775)
+
 	dst := config.Agent.LxcPrefix + "tmpdir/" + name +
 		"-subutai-template_" + version + "_" + runtime.GOARCH
 
-	// check: parent is template
-	parent := container.GetParent(name)
-	if !container.IsTemplate(parent) {
-		log.Error("Parent " + parent + " is not a template")
-	}
-
-	if !container.IsTemplate(name) {
-		LxcPromote(name, "")
-	}
-
 	os.MkdirAll(dst, 0755)
 	os.MkdirAll(dst+"/deltas", 0755)
-	os.MkdirAll(dst+"/diff", 0755)
 
 	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
 		// snapshot each partition
@@ -77,44 +88,63 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 			fs.CreateSnapshot(name + "/" + vol + "@now")
 		}
 		// send incremental delta between parent and child to delta file
-		fs.SendStream(parent+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
+		fs.SendStream(parentRef+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
 	}
 
+	//copy config files
 	src := config.Agent.LxcPrefix + name
 	fs.Copy(src+"/fstab", dst+"/fstab")
-	fs.Copy(src+"/packages", dst+"/packages")
-	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
-		fs.Copy(src+"/icon.png", dst+"/icon.png")
-	}
-	if parent != name {
-		fs.Copy(src+"/diff/var.diff", dst+"/diff/var.diff")
-		fs.Copy(src+"/diff/opt.diff", dst+"/diff/opt.diff")
-		fs.Copy(src+"/diff/home.diff", dst+"/diff/home.diff")
-		fs.Copy(src+"/diff/rootfs.diff", dst+"/diff/rootfs.diff")
-	}
+	fs.Copy(src+"/config", dst+"/config")
 
-	containerConf := [][]string{
-		{"subutai.template.package", dst + ".tar.gz"},
+	//update template config
+	templateConf := [][]string{
+		{"subutai.template", name},
 		{"subutai.template.owner", owner},
 		{"subutai.template.version", version},
 		{"subutai.template.size", size},
-		{"subutai.template.package", config.Agent.LxcPrefix + "tmpdir/" + name +
-			"-subutai-template_" + version + "_" + runtime.GOARCH + ".tar.gz"},
+		//{"lxc.network.type", "veth"},//must be in taken from default.conf
+		//{"lxc.network.flags", "up"},//must be in taken from default.conf
+		{"lxc.network.ipv4.gateway"},
+		{"lxc.network.ipv4"},
+		{"lxc.network.veth.pair"},
+		{"lxc.network.hwaddr"},
+		{"#vlan_id"}, //todo review
 	}
 
 	if len(description) != 0 {
-		containerConf = append(containerConf, []string{"subutai.template.description", "\"" + description + "\""})
+		templateConf = append(templateConf, []string{"subutai.template.description", "\"" + description + "\""})
+	}
+	updateTemplateConfig(dst+"/config", templateConf)
+
+	//copy template icon if any
+	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
+		fs.Copy(src+"/icon.png", dst+"/icon.png")
 	}
 
-	container.SetContainerConf(name, containerConf)
+	//create diffs
+	os.MkdirAll(dst+"/diff", 0755)
+	execDiff(config.Agent.LxcPrefix+parentRef+"/rootfs", config.Agent.LxcPrefix+name+"/rootfs", dst+"/diff/rootfs.diff")
+	execDiff(config.Agent.LxcPrefix+parentRef+"/home", config.Agent.LxcPrefix+name+"/home", dst+"/diff/home.diff")
+	execDiff(config.Agent.LxcPrefix+parentRef+"/opt", config.Agent.LxcPrefix+name+"/opt", dst+"/diff/opt.diff")
+	execDiff(config.Agent.LxcPrefix+parentRef+"/var", config.Agent.LxcPrefix+name+"/var", dst+"/diff/var.diff")
 
-	fs.Copy(src+"/config", dst+"/config")
+	// check: write package list to packages
+	if container.State(name) != "RUNNING" {
+		LxcStart(name)
+	}
+	pkgCmdResult, _ := container.AttachExec(name, []string{"timeout", "60", "dpkg", "-l"})
+	strCmdRes := strings.Join(pkgCmdResult, "\n")
+	log.Check(log.FatalLevel, "Write packages",
+		ioutil.WriteFile(dst+"/packages",
+			[]byte(strCmdRes), 0755))
 
+	//archive template contents
 	templateArchive := dst + ".tar.gz"
 	fs.Tar(dst, templateArchive)
 	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
+	//upload to CDN
 	if !local {
 
 		if hash, err := upload(templateArchive, token, private); err != nil {
@@ -137,7 +167,13 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 			cacheTemplateInfo(templateInfo)
 		}
 
-		log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+		//log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+	}
+
+	if wasRunning {
+		LxcStart(name)
+	} else {
+		LxcStop(name)
 	}
 
 }
@@ -235,4 +271,41 @@ func upload(path, token string, private bool) ([]byte, error) {
 	}
 
 	return ioutil.ReadAll(resp.Body)
+}
+
+func updateTemplateConfig(path string, params [][]string) error {
+
+	cfg := common.LxcConfig{}
+	err := cfg.Load(path)
+	if err != nil {
+		return err
+	}
+
+	cfg.SetParams(params)
+
+	return cfg.Save()
+}
+
+// execDiff executes `diff` command for specified directories and writes command output
+func execDiff(dir1, dir2, output string) {
+	out, _ := exec.Execute("diff", "-Nur", dir1, dir2)
+	err := ioutil.WriteFile(output, []byte(out), 0600)
+	log.Check(log.FatalLevel, "Writing diff to file"+output, err)
+}
+
+// clearFile writes an empty byte array to specified file
+func clearFile(path string, f os.FileInfo, err error) error {
+	if !f.IsDir() {
+		ioutil.WriteFile(path, []byte{}, 0775)
+	}
+	return nil
+}
+
+// cleanupFS removes files in specified path
+func cleanupFS(path string, perm os.FileMode) {
+	if perm == 0000 {
+		os.RemoveAll(path)
+	} else {
+		filepath.Walk(path, clearFile)
+	}
 }

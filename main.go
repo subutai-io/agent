@@ -129,27 +129,17 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "demote", Usage: "demote Subutai container",
+		Name: "destroy", Usage: "destroy Subutai container/template",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "ipaddr, i", Usage: "IPv4 address, ie 192.168.1.1/24"},
-			gcli.StringFlag{Name: "vlan, v", Usage: "VLAN tag"},
+			gcli.BoolFlag{Name: "template, t", Usage: "destroy template"},
 		},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDemote(c.Args().Get(0), c.String("i"), c.String("v"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "destroy", Usage: "destroy Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "vlan, v", Usage: "destroy environment by passed vlan"},
-		},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
+				if c.Bool("t") {
+					cli.LxcDestroyTemplate(c.Args().Get(0))
+				} else {
+					cli.LxcDestroy(c.Args().Get(0), false)
+				}
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -210,10 +200,9 @@ func main() {
 			gcli.BoolFlag{Name: "container, c", Usage: "containers only"},
 			gcli.BoolFlag{Name: "template, t", Usage: "templates only"},
 			gcli.BoolFlag{Name: "info, i", Usage: "detailed container info"},
-			gcli.BoolFlag{Name: "ancestor, a", Usage: "with ancestors"},
 			gcli.BoolFlag{Name: "parent, p", Usage: "with parent"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("a"), c.Bool("p"))
+			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("p"))
 			return nil
 		}}, {
 
@@ -277,17 +266,6 @@ func main() {
 				cli.P2Pversion()
 			default:
 				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("s"), c.Bool("p"), os.Args)
-			}
-			return nil
-		}}, {
-
-		Name:  "promote", Usage: "promote Subutai container",
-		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcPromote(c.Args().Get(0), c.String("s"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
 			}
 			return nil
 		}}, {

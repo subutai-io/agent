@@ -392,19 +392,23 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var t templ
 	t.Name = name
 
+	templateRef := t.Name
+
 	if !local {
 		t = getTemplateInfo(t.Name, token)
+		templateRef = strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
 	}
 
 	log.Info("Importing " + t.Name)
 
 	var lock lockfile.Lockfile
-	for lock, err = lockSubutai(t.Name + ".import"); err != nil; lock, err = lockSubutai(t.Name + ".import") {
+	for lock, err = lockSubutai(templateRef + ".import"); err != nil; lock, err = lockSubutai(templateRef + ".import") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
 
-	if container.LxcInstanceExists(t.Name) {
+	if container.LxcInstanceExists(templateRef) {
+		//!important used by Console
 		log.Info(t.Name + " instance exists")
 		return
 	}
@@ -445,6 +449,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			//obtain template metadata from CDN
 			//to allow further download from CDN
 			t = getTemplateInfo(t.Name, token)
+			templateRef = strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
 		}
 
 	} else {
@@ -483,6 +488,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	if !archiveExists {
+		//!important used by Console
 		log.Info("Downloading " + t.Name)
 
 		downloaded := false
@@ -509,24 +515,26 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	log.Info("Unpacking template " + t.Name)
-	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.File + " to " + t.Name)
+	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.File + " to " + templateRef)
 	tgz := extractor.NewTgz()
-	templdir := config.Agent.LxcPrefix + "tmpdir/" + t.Name
+	templdir := config.Agent.LxcPrefix + "tmpdir/" + templateRef
 	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.File, templdir))
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
 	parentOwner := container.GetConfigItem(templdir+"/config", "subutai.parent.owner")
 	parentVersion := container.GetConfigItem(templdir+"/config", "subutai.parent.version")
 
-	if parent != "" && parent != t.Name && !container.IsTemplate(parent) && !stringInList(parent, auxDepList) {
+	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
+	if parentRef != templateRef && !container.IsTemplate(parentRef) && !stringInList(parentRef, auxDepList) {
 		// Append the template and parent name to dependency list
-		auxDepList = append(auxDepList, parent, t.Name)
-		log.Info("Parent template required: " + parent + "@" + parentOwner + ":" + parentVersion)
-		LxcImport(parent+"@"+parentOwner+":"+parentVersion, token, local, auxDepList...)
+		auxDepList = append(auxDepList, parentRef, templateRef)
+		log.Info("Parent template required: " + parentRef)
+		LxcImport(parentRef, token, local, auxDepList...)
 	}
 
+	//!important used by Console
 	log.Info("Installing template " + t.Name)
 
-	template.Install(t.Name)
+	template.Install(templateRef)
 
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
 
@@ -539,9 +547,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	log.Check(log.ErrorLevel, "Setting lxc config", updateContainerConfig(t.Name))
+	log.Check(log.ErrorLevel, "Setting lxc config", updateContainerConfig(templateRef))
 
 	//TODO use name:owner:version as template cache idx so that we can cache info even for locally imported templates
+	//in addition to id!
 	if t.Id != "" {
 		cacheTemplateInfo(t)
 	}
