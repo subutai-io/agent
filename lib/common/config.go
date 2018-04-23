@@ -3,7 +3,6 @@ package common
 import (
 	"io/ioutil"
 	"strings"
-	"github.com/subutai-io/agent/log"
 )
 
 type LxcConfig struct {
@@ -11,12 +10,12 @@ type LxcConfig struct {
 	path   string
 }
 
-func GetConfig(path string) LxcConfig {
+func GetConfig(path string) (LxcConfig, error) {
 	cfg := LxcConfig{}
 
-	log.Check(log.FatalLevel, "Loading config", cfg.Load(path))
+	err := cfg.Load(path)
 
-	return cfg
+	return cfg, err
 }
 
 func (c *LxcConfig) Load(path string) error {
