@@ -52,7 +52,7 @@ func RemoveDataset(dataset string, recursive bool) {
 	}
 	args = append(args, path.Join(zfsRootDataset, dataset))
 	out, err := exec.Execute("zfs", args...)
-	log.Check(log.WarnLevel, "Removing zfs dataset/snapshot "+dataset+" "+out, err)
+	log.Check(log.ErrorLevel, "Removing zfs dataset/snapshot "+dataset+" "+out, err)
 }
 
 // Creates dataset

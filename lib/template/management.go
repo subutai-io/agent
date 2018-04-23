@@ -28,7 +28,6 @@ func MngInit() {
 		{"lxc.network.veth.pair", "management"},
 		{"lxc.utsname", "management"},
 		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
-		{"lxc.network.link", ""},
 		{"lxc.rootfs", config.Agent.LxcPrefix + "management/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/opt opt none bind,rw 0 0"},
