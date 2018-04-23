@@ -4,9 +4,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/snapcore/snapd/client"
-	"github.com/snapcore/snapd/store"
-
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 	"github.com/snapcore/snapd/snap"
@@ -39,19 +36,28 @@ func Update(name string, check bool) {
 }
 
 func updateRH(name string, check bool) {
-	local, _, _ := client.New(nil).Snap(os.Getenv("SNAP_NAME"))
-	remote, _ := store.New(nil, nil).SnapInfo(store.SnapSpec{Name: os.Getenv("SNAP_NAME"), Channel: "beta"}, nil)
-	if local != nil && remote != nil && remote.Revision.N > local.Revision.N {
-		if check {
-			log.Info("Update is available")
-		} else {
-			out, err := exec.Command("snap", "refresh", "--devmode", os.Getenv("SNAP_NAME")).CombinedOutput()
-			log.Check(log.FatalLevel, "Updating RH snap: "+string(out), err)
-		}
+
+	_, err := exec.Command("apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5").CombinedOutput()
+	log.Check(log.FatalLevel, "Updating apt index", err)
+	output, err := exec.Command("apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s").CombinedOutput()
+	log.Check(log.FatalLevel, "Checking for available update", err)
+	if len(output) == 0 {
+		log.Info("No update is available")
+		os.Exit(1)
+	} else if check {
+		log.Info("Update is available")
 		os.Exit(0)
 	}
-	log.Info("No update is available")
-	os.Exit(1)
+
+	cmd := exec.Command("dpkg", "--configure", "-a")
+	cmd.Env = []string{"DEBIAN_FRONTEND=noninteractive", "PATH=" + os.Getenv("PATH")}
+	output, err = cmd.CombinedOutput()
+	log.Check(log.WarnLevel, "Configuring dpkg "+string(output), err)
+
+	cmd = exec.Command("apt-get", "-qq", "upgrade", "-y", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
+	cmd.Env = []string{"DEBIAN_FRONTEND=noninteractive", "PATH=" + os.Getenv("PATH")}
+	output, err = cmd.CombinedOutput()
+	log.Check(log.FatalLevel, "Updating host "+string(output), err)
 }
 
 func updateContainer(name string, check bool) {
