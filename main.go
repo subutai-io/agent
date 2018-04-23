@@ -347,6 +347,16 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "restart", Usage: "restart Subutai container",
+		Action: func(c *gcli.Context) error {
+			if c.Args().Get(0) != "" {
+				cli.LxcRestart(c.Args().Get(0))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
+			return nil
+		}}, {
+
 		Name: "tunnel", Usage: "SSH tunnel management",
 		Subcommands: []gcli.Command{
 			{

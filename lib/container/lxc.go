@@ -154,6 +154,25 @@ func Stop(name string, addMetadata bool) error {
 	return nil
 }
 
+func Restart(name string) error {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
+	if log.Check(log.DebugLevel, "Creating container object", err) {
+		return err
+	}
+	defer lxc.Release(c)
+
+	if c.State().String() == "RUNNING" {
+		err = c.Reboot()
+	} else {
+		err = c.Start()
+	}
+
+	log.Check(log.DebugLevel, "Restarting LXC container "+name, err)
+
+	return err
+}
+
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
 	if !LxcInstanceExists(name) {
