@@ -80,9 +80,6 @@ func LxcDestroy(id string, vlan bool) {
 			log.Check(log.ErrorLevel, "Destroying container", err)
 		}
 
-		if _, found := getTemplateInfoFromCacheByName(id); found {
-			container.DeleteTemplateInfoFromCache(id)
-		}
 	}
 
 	if id == "everything" {
