@@ -3,35 +3,20 @@ package template
 import (
 	"os/exec"
 
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/lib/common"
 )
 
 // MngInit performs initial operations for SS Management deployment
-func MngInit() {
-	// set partitions as read-write
-	fs.SetDatasetReadWrite("management/rootfs")
-	fs.SetDatasetReadWrite("management/home")
-	fs.SetDatasetReadWrite("management/var")
-	fs.SetDatasetReadWrite("management/opt")
+func MngInit(templateRef string) {
+	container.Clone(templateRef, "management")
 
 	container.SetContainerUID("management")
-	//TODO
 	container.SetContainerConf("management", [][]string{
-		{"lxc.network.hwaddr", common.Mac()},
 		{"lxc.network.veth.pair", "management"},
-		{"lxc.utsname", "management"},
-		{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"},
-		{"lxc.rootfs", config.Agent.LxcPrefix + "management/rootfs"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/home home none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/opt opt none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + "management/var var none bind,rw 0 0"},
 	})
 	gpg.GenerateKey("management")
 	container.SetApt("management")

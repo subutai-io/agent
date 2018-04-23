@@ -541,7 +541,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	if t.Name == "management" {
-		template.MngInit()
+		template.MngInit(templateRef)
 		return
 	}
 

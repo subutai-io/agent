@@ -323,7 +323,6 @@ func Clone(parent, child string) error {
 		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
 
-	//TODO check for mac duplication
 	mac := common.Mac()
 	SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
@@ -336,7 +335,7 @@ func Clone(parent, child string) error {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
-		//{"lxc.rootfs.backend", "zfs"},//must be in template
+		{"lxc.rootfs.backend", "zfs"},//must be in template
 		{"lxc.utsname", child},
 	})
 
