@@ -439,6 +439,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//for local import this check currently does not work
 	if container.LxcInstanceExists(templateRef) {
+		if t.Name == "management" && !container.IsContainer("management") {
+			template.MngInit(templateRef)
+			return
+		}
 		//!important used by Console
 		log.Info(t.Name + " instance exists")
 		return
