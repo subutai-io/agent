@@ -340,6 +340,9 @@ func Clone(parent, child string) error {
 		{"lxc.utsname", child},
 	})
 
+	//create default hostname
+	ioutil.WriteFile(config.Agent.LxcPrefix+child+"/rootfs/etc/hostname", []byte(child), 0644)
+
 	return nil
 }
 
