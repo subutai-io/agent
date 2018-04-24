@@ -573,7 +573,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 func updateContainerConfig(templateName string) error {
 
-	cfg := common.LxcConfig{}
+	cfg := container.LxcConfig{}
 	err := cfg.Load(path.Join(config.Agent.LxcPrefix, templateName, "config"))
 	if err != nil {
 		return err

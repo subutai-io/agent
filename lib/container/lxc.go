@@ -21,7 +21,8 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 	"path"
-	"github.com/subutai-io/agent/lib/common"
+	"fmt"
+	"crypto/rand"
 )
 
 // All returns list of all containers
@@ -323,7 +324,7 @@ func Clone(parent, child string) error {
 		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
 
-	mac := common.Mac()
+	mac := Mac()
 	SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
@@ -335,7 +336,7 @@ func Clone(parent, child string) error {
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
-		{"lxc.rootfs.backend", "zfs"},//must be in template
+		{"lxc.rootfs.backend", "zfs"}, //must be in template
 		{"lxc.utsname", child},
 	})
 
@@ -582,4 +583,33 @@ func DisableSSHPwd(name string) {
 	output := strings.Join(lines, "\n")
 	err = ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/ssh/sshd_config", []byte(output), 0644)
 	log.Check(log.WarnLevel, "Writing new sshd config", err)
+}
+
+// Mac function generates random mac address for LXC containers
+func Mac() string {
+
+	usedMacs := make(map[string]bool)
+	for _, cont := range Containers() {
+		cfg, err := GetConfig(path.Join(config.Agent.LxcPrefix, cont, "config"))
+		//skip error
+		if err == nil {
+			usedMacs[cfg.GetParam("lxc.network.hwaddr")] = true
+		}
+	}
+
+	buf := make([]byte, 6)
+
+	_, err := rand.Read(buf)
+	log.Check(log.ErrorLevel, "Generating random mac", err)
+
+	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5]);
+	for usedMacs[mac] {
+
+		_, err := rand.Read(buf)
+		log.Check(log.ErrorLevel, "Generating random mac", err)
+
+		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5]);
+	}
+
+	return mac
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
-	"github.com/subutai-io/agent/lib/common"
 	"github.com/subutai-io/agent/lib/exec"
 )
 
@@ -275,7 +274,7 @@ func upload(path, token string, private bool) ([]byte, error) {
 
 func updateTemplateConfig(path string, params [][]string) error {
 
-	cfg := common.LxcConfig{}
+	cfg := container.LxcConfig{}
 	err := cfg.Load(path)
 	if err != nil {
 		return err

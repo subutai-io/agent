@@ -21,7 +21,6 @@ type agentConfig struct {
 	DataPrefix  string
 	GpgPassword string
 	GpgHome     string
-	Env         string
 }
 type managementConfig struct {
 	Host          string
@@ -60,7 +59,6 @@ const defaultConfig = `
 	appPrefix = /usr/share/subutai/
 	dataPrefix = /var/lib/subutai/
 	lxcPrefix = /var/lib/subutai/lxc/
-    env=sysnet
 
 	[management]
 	gpgUser =
@@ -103,13 +101,8 @@ func init() {
 	confpath := "/var/lib/subutai/"
 	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
-		confpath = "/var/lib/subutai/"
-		config.Agent.AppPrefix = "/usr/share/subutai/"
-		config.Agent.LxcPrefix = "/var/lib/subutai/lxc/"
-		config.Agent.DataPrefix = "/var/lib/subutai/"
-		config.CDN.URL = config.Agent.Env + "cdn.subutai.io"
+		log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	}
-	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
 
 	if config.Agent.GpgUser == "" {
