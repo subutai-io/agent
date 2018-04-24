@@ -105,6 +105,7 @@ func addNetConf(name, addr string) string {
 	}
 
 	container.SetContainerConf(name, [][]string{
+		{"lxc.network.flags", "up"},
 		{"lxc.network.ipv4", ipvlan[0]},
 		{"lxc.network.ipv4.gateway", gateway},
 		{"#vlan_id", ipvlan[1]},
