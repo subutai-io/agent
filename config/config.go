@@ -96,12 +96,13 @@ func init() {
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
-	confpath := "/var/lib/subutai/"
-	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
+	confpath := "/var/lib/subutai/agent.gcfg"
+	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath))
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
-		log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
+		log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath))
 	}
-	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
+
+	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath, gcfg.ReadFileInto(&config, confpath))
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
