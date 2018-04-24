@@ -11,8 +11,6 @@ import (
 	"github.com/subutai-io/agent/log"
 )
 
-var version = ""
-
 type agentConfig struct {
 	Debug       bool
 	GpgUser     string
