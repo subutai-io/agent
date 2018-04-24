@@ -174,17 +174,26 @@ func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
 	return templ{}, false
 }
 
-func getTemplateInfoFromCacheByName(templateName string) (templ, bool) {
+func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.TemplateByName(templateName)
+	var key, value string
+	if name != "" && owner != "" && version != "" {
+		key = "nameAndOwnerAndVersion"
+		value = strings.Join([]string{name, owner, version}, ":")
+	} else if name != "" && owner != "" {
+		key = "nameAndOwner"
+		value = strings.Join([]string{name, owner}, ":")
+	} else {
+		key = "name"
+		value = name
+	}
+	meta := bolt.TemplateByKey(key, value)
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	if meta != nil {
-		templateId, found := meta["id"]
-		if found {
-			return getTemplateInfoFromCacheById(templateId)
-		}
+	if meta != nil && len(meta) > 0 {
+		//first found template is returned if several meet the specified criteria
+		return getTemplateInfoFromCacheById(meta[0])
 	}
 
 	return templ{}, false
@@ -213,10 +222,8 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		if templateNameNOwnerNVersionRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
 
-			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
-				if t.Name == groups["name"] && t.Owner[0] == groups["owner"] && t.Version == groups["version"] {
-					return t
-				}
+			if t, found := getTemplateInfoFromCacheByName(groups["name"], groups["owner"], groups["version"]); found {
+				return t
 			}
 
 			utils.CheckCDN()
@@ -225,10 +232,8 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		} else if templateNameNOwnerRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
 
-			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
-				if t.Name == groups["name"] && t.Owner[0] == groups["owner"] {
-					return t
-				}
+			if t, found := getTemplateInfoFromCacheByName(groups["name"], groups["owner"], ""); found {
+				return t
 			}
 
 			utils.CheckCDN()
@@ -237,10 +242,8 @@ func getTemplateInfo(template string, kurjToken string) templ {
 		} else if templateNameRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameRx, template)
 
-			if t, found := getTemplateInfoFromCacheByName(groups["name"]); found {
-				if t.Name == groups["name"] {
-					return t
-				}
+			if t, found := getTemplateInfoFromCacheByName(groups["name"], "", ""); found {
+				return t
 			}
 
 			utils.CheckCDN()
@@ -594,8 +597,13 @@ func cacheTemplateInfo(t templ) {
 	if err == nil {
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
-		log.Check(log.WarnLevel, "Writing template data to database", bolt.TemplateAdd(t.Id, map[string]string{"templateInfo": string(templateInfo)}))
-		log.Check(log.WarnLevel, "Writing template data to database", bolt.TemplateAdd(t.Name, map[string]string{"id": t.Id}))
+		log.Check(log.WarnLevel, "Writing template data to database",
+			bolt.TemplateAdd(t.Id,
+				map[string]string{"templateInfo": string(templateInfo),
+					"name": t.Name,
+					"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
+					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
+				}))
 		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	}
 }

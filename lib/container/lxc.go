@@ -286,14 +286,13 @@ func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.TemplateByName(name)
-	if meta != nil {
-		templateId, found := meta["id"]
-		if found {
-			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
-		}
+	//obtain id of template by ref
+	meta := bolt.TemplateByKey("nameAndOwnerAndVersion", name)
+	if meta != nil && len(meta) > 0 {
+		//take first element only since ref is unique
+		templateId := meta[0]
+		log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
 	}
-	log.Check(log.WarnLevel, "Deleting template index entry", bolt.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
