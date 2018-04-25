@@ -37,7 +37,7 @@ var (
 // The template's version can also specified on export so the import command can use it to request specific versions.
 //TODO update doco on site for export, import,clone
 
-func LxcExport(name, version, prefsize, token, description string, private bool, local bool) {
+func LxcExport(name, newname, version, prefsize, token, description string, private bool, local bool) {
 
 	if !container.IsContainer(name) {
 		log.Error("Container " + name + " not found")
@@ -75,8 +75,14 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 	cleanupFS(config.Agent.LxcPrefix+name+"/var/log/", 0775)
 	cleanupFS(config.Agent.LxcPrefix+name+"/var/cache", 0775)
 
-	dst := config.Agent.LxcPrefix + "tmpdir/" + name +
-		"-subutai-template_" + version + "_" + runtime.GOARCH
+	var dst string
+	if newname != "" {
+		dst = config.Agent.LxcPrefix + "tmpdir/" + newname +
+			"-subutai-template_" + version + "_" + runtime.GOARCH
+	} else {
+		dst = config.Agent.LxcPrefix + "tmpdir/" + name +
+			"-subutai-template_" + version + "_" + runtime.GOARCH
+	}
 
 	os.MkdirAll(dst, 0755)
 	os.MkdirAll(dst+"/deltas", 0755)
@@ -97,12 +103,10 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 
 	//update template config
 	templateConf := [][]string{
-		{"subutai.template", name},
+		//{"subutai.template", name},
 		{"subutai.template.owner", owner},
 		{"subutai.template.version", version},
 		{"subutai.template.size", size},
-		//{"lxc.network.type", "veth"},//must be in taken from default.conf
-		//{"lxc.network.flags", "up"},//must be in taken from default.conf
 		{"lxc.network.ipv4.gateway"},
 		{"lxc.network.ipv4"},
 		{"lxc.network.veth.pair"},
@@ -112,7 +116,22 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 
 	if len(description) != 0 {
 		templateConf = append(templateConf, []string{"subutai.template.description", "\"" + description + "\""})
+	} else {
+		templateConf = append(templateConf, []string{"subutai.template.description"})
 	}
+
+	if newname != "" {
+		templateConf = append(templateConf, []string{"subutai.template", newname})
+		templateConf = append(templateConf, []string{"lxc.utsname", newname})
+		templateConf = append(templateConf, []string{"lxc.rootfs", config.Agent.LxcPrefix + newname + "/rootfs"})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/home home none bind,rw 0 0"})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/var var none bind,rw 0 0"})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/opt opt none bind,rw 0 0"})
+
+	}else{
+		templateConf = append(templateConf, []string{"subutai.template", name})
+	}
+
 	updateTemplateConfig(dst+"/config", templateConf)
 
 	//copy template icon if any
@@ -157,10 +176,16 @@ func LxcExport(name, version, prefsize, token, description string, private bool,
 
 			var templateInfo = templ{}
 			templateInfo.Id = cdnFileId
-			templateInfo.Name = name
+			if newname != "" {
+				templateInfo.Name = newname
+				templateInfo.File = newname + "-subutai-template_" + version + "_" + runtime.GOARCH
+
+			}else{
+				templateInfo.Name = name
+				templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
+			}
 			templateInfo.Version = version
 			templateInfo.Owner = []string{owner}
-			templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
 			templateInfo.Md5 = md5sum(templateArchive)
 
 			cacheTemplateInfo(templateInfo)

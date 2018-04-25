@@ -148,6 +148,7 @@ func main() {
 
 		Name: "export", Usage: "export Subutai container",
 		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "name, n", Usage: "new template name"},
 			gcli.StringFlag{Name: "version, v", Usage: "template version"},
 			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"},
 			gcli.StringFlag{Name: "token, t", Usage: "mandatory CDN token"},
@@ -156,7 +157,7 @@ func main() {
 			gcli.BoolFlag{Name: "local, l", Usage: "export template to local cache"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"),
+				cli.LxcExport(c.Args().Get(0), c.String("n"), c.String("v"), c.String("s"),
 					c.String("t"), c.String("d"), c.Bool("p"), c.Bool("l"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
