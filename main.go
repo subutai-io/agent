@@ -22,11 +22,6 @@ func init() {
 		log.Error("Please run as root")
 	}
 	os.Setenv("PATH", "/usr/share/subutai/bin:"+os.Getenv("PATH"))
-	if len(os.Args) > 1 {
-		if os.Args[1] == "-d" {
-			log.Level(log.DebugLevel)
-		}
-	}
 }
 
 func main() {
@@ -48,6 +43,16 @@ func main() {
 	app.Flags = []gcli.Flag{gcli.BoolFlag{
 		Name:  "d",
 		Usage: "debug mode"}}
+
+	app.Before = func(c *gcli.Context) error {
+		if c.IsSet("d") {
+			log.Level(log.DebugLevel)
+		} else {
+			println("No flag set")
+		}
+
+		return nil
+	}
 
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
