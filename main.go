@@ -47,10 +47,7 @@ func main() {
 	app.Before = func(c *gcli.Context) error {
 		if c.IsSet("d") {
 			log.Level(log.DebugLevel)
-		} else {
-			println("No flag set")
 		}
-
 		return nil
 	}
 
