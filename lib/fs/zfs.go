@@ -7,9 +7,14 @@ import (
 	"github.com/subutai-io/agent/lib/exec"
 	"strconv"
 	"github.com/pkg/errors"
+	"github.com/subutai-io/agent/config"
 )
 
-const zfsRootDataset = "subutai/fs"
+var zfsRootDataset string
+
+func init() {
+	zfsRootDataset = config.Agent.Dataset
+}
 
 // Checks if dataset is readonly
 // e.g. IsDatasetReadOnly("debian-stretch")

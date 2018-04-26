@@ -20,6 +20,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/lib/fs"
+	"path"
 )
 
 var (
@@ -196,7 +197,7 @@ func zfsStat(bp client.BatchPoints) {
 
 	for _, cont := range all {
 		for key, val := range usageMap {
-			if key == "subutai/fs/"+cont {
+			if key == path.Join(config.Agent.Dataset, cont) {
 				value, _ := fs.ConvertToBytes(val)
 				point, err := client.NewPoint("lxc_disk",
 					map[string]string{"hostname": cont, "mount": "total", "type": "used"},
