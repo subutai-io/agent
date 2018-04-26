@@ -56,9 +56,8 @@ type metainfo struct {
 }
 
 func init() {
-	tmpdir := path.Join(config.Agent.LxcPrefix, "tmpdir")
-	if _, err := os.Stat(tmpdir); os.IsNotExist(err) {
-		os.MkdirAll(tmpdir, 0755)
+	if _, err := os.Stat(config.Agent.CacheDir); os.IsNotExist(err) {
+		os.MkdirAll(config.Agent.CacheDir, 0755)
 	}
 }
 
@@ -298,7 +297,7 @@ func downloadWithRetry(t templ, token string, retry int) bool {
 // download gets template archive from global repository
 func download(t templ, token string) (bool, error) {
 
-	out, err := os.Create(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+	out, err := os.Create(path.Join(config.Agent.CacheDir, t.File))
 	if err != nil {
 		log.Debug("Failed to create archive ", err)
 		return false, err
@@ -331,7 +330,7 @@ func download(t templ, token string) (bool, error) {
 		return false, err
 	}
 
-	hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+	hash := md5sum(path.Join(config.Agent.CacheDir, t.File))
 	if t.Md5 == hash {
 		return true, nil
 	}
@@ -366,7 +365,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 // to provide more flexibility to enable working with published and custom local templates. Official published templates in the global repository have a overriding scope
 // over custom local artifacts if there's any template naming conflict.
 //
-// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path `/var/lib/subutai/lxc/tmpdir/` could be used as local repository;
+// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path config.Agent.CacheDir could be used as local repository;
 // the import sub command checks this directory if a requested published template or the global repository is not available.
 //
 // The import binding handles security checks to confirm the authenticity and integrity of templates. Besides using strict SSL connections for downloads,
@@ -403,8 +402,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		t.Name = nameParts[0]
 		templateRef = t.Name
 
-		wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/" +
-			strings.ToLower(t.Name) + "-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+		wildcardTemplateName := path.Join(config.Agent.CacheDir, strings.ToLower(t.Name)+
+			"-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz")
 
 		//check if template with the same name but any version exists locally
 		files := fs.GetFilesWildCard(wildcardTemplateName)
@@ -425,7 +424,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				}
 			}
 
-			t.File = strings.Replace(latestVersionFile, config.Agent.LxcPrefix+"tmpdir/", "", 1)
+			t.File = strings.Replace(latestVersionFile, path.Join(config.Agent.CacheDir)+"/", "", 1)
 
 		} else {
 			log.Error("Template " + t.Name + " not found in local cache")
@@ -451,14 +450,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	var archiveExists = fs.FileExists(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+	var archiveExists = fs.FileExists(path.Join(config.Agent.CacheDir, t.File))
 
 	if archiveExists {
 
 		log.Debug("Template archive is present in local cache")
 
 		if !local {
-			hash := md5sum(config.Agent.LxcPrefix + "tmpdir/" + t.File)
+			hash := md5sum(path.Join(config.Agent.CacheDir, t.File))
 			if t.Md5 == hash {
 
 				log.Debug("File integrity is verified")
@@ -506,10 +505,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	log.Info("Unpacking template " + t.Name)
-	log.Debug(config.Agent.LxcPrefix + "tmpdir/" + t.File + " to " + templateRef)
+	log.Debug(path.Join(config.Agent.CacheDir, t.File) + " to " + templateRef)
 	tgz := extractor.NewTgz()
-	templdir := config.Agent.LxcPrefix + "tmpdir/" + templateRef
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(config.Agent.LxcPrefix+"tmpdir/"+t.File, templdir))
+	templdir := path.Join(config.Agent.CacheDir, templateRef)
+	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(path.Join(config.Agent.CacheDir, t.File), templdir))
 
 	templateName := container.GetConfigItem(templdir+"/config", "subutai.template")
 	templateOwner := container.GetConfigItem(templdir+"/config", "subutai.template.owner")
@@ -518,8 +517,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	if local {
 		//rename template directory to follow full reference convention
 		templateRef = strings.Join([]string{templateName, templateOwner, templateVersion}, ":")
-		os.Rename(templdir, config.Agent.LxcPrefix+"tmpdir/"+templateRef)
-		templdir = config.Agent.LxcPrefix + "tmpdir/" + templateRef
+		os.Rename(templdir, path.Join(config.Agent.CacheDir, templateRef))
+		templdir = path.Join(config.Agent.CacheDir, templateRef)
 	}
 
 	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
@@ -543,7 +542,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//delete template archive
 	if !local {
-		templateArchive := config.Agent.LxcPrefix + "tmpdir/" + t.File
+		templateArchive := path.Join(config.Agent.CacheDir, t.File)
 		log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
 	}
 
@@ -565,7 +564,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			Version: templateVersion,
 			Name:    templateName,
 			File:    t.File,
-			Md5:     md5sum(path.Join(config.Agent.LxcPrefix, "tmpdir", t.File)),
+			Md5:     md5sum(path.Join(config.Agent.CacheDir, t.File)),
 		}
 
 		cacheTemplateInfo(templateInfo)

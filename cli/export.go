@@ -19,13 +19,14 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
 	"github.com/subutai-io/agent/lib/exec"
+	"path"
 )
 
 var (
 	allsizes = []string{"tiny", "small", "medium", "large", "huge"}
 )
 
-// LxcExport sub command prepares an archive from a template in the `/mnt/lib/lxc/tmpdir/` path.
+// LxcExport sub command prepares an archive from a template config.Agent.CacheDir
 // This archive can be moved to another Subutai peer and deployed as ready-to-use template or uploaded to Subutai's global template repository to make it
 // widely available for others to use.
 //
@@ -77,11 +78,11 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 	var dst string
 	if newname != "" {
-		dst = config.Agent.LxcPrefix + "tmpdir/" + newname +
-			"-subutai-template_" + version + "_" + runtime.GOARCH
+		dst = path.Join(config.Agent.CacheDir, newname+
+			"-subutai-template_"+ version+ "_"+ runtime.GOARCH)
 	} else {
-		dst = config.Agent.LxcPrefix + "tmpdir/" + name +
-			"-subutai-template_" + version + "_" + runtime.GOARCH
+		dst = path.Join(config.Agent.CacheDir, name+
+			"-subutai-template_"+ version+ "_"+ runtime.GOARCH)
 	}
 
 	os.MkdirAll(dst, 0755)
@@ -128,7 +129,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/var var none bind,rw 0 0"})
 		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/opt opt none bind,rw 0 0"})
 
-	}else{
+	} else {
 		templateConf = append(templateConf, []string{"subutai.template", name})
 	}
 
@@ -159,7 +160,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	//archive template contents
 	templateArchive := dst + ".tar.gz"
 	fs.Tar(dst, templateArchive)
-	log.Check(log.FatalLevel, "Remove tmpdir", os.RemoveAll(dst))
+	log.Check(log.FatalLevel, "Removing temporary file", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
 	//upload to CDN
@@ -180,7 +181,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 				templateInfo.Name = newname
 				templateInfo.File = newname + "-subutai-template_" + version + "_" + runtime.GOARCH
 
-			}else{
+			} else {
 				templateInfo.Name = name
 				templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
 			}

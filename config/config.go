@@ -18,6 +18,7 @@ type agentConfig struct {
 	LxcPrefix   string
 	Dataset     string
 	DataPrefix  string
+	CacheDir    string
 	GpgPassword string
 	GpgHome     string
 }
@@ -59,6 +60,7 @@ const defaultConfig = `
 	dataPrefix = /var/lib/subutai/
 	lxcPrefix = /var/lib/subutai/lxc/
     dataset = subutai/fs
+    cacheDir = /var/cache/subutai
 
 	[management]
 	gpgUser =

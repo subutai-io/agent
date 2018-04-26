@@ -10,7 +10,7 @@ import (
 // Install deploys downloaded and unpacked templates to the system
 func Install(templateName string) {
 
-	pathToDecompressedTemplate := path.Join(config.Agent.LxcPrefix, "tmpdir", templateName)
+	pathToDecompressedTemplate := path.Join(config.Agent.CacheDir, templateName)
 
 	// create parent dataset
 	fs.CreateDataset(templateName)

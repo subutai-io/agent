@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"runtime"
 	"github.com/subutai-io/agent/config"
+	"path"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -150,7 +151,7 @@ func Prune(what string) {
 	if what == "archives" {
 
 		//remove all template archives
-		wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/*" +
+		wildcardTemplateName := path.Join(config.Agent.CacheDir, "*") +
 			"-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
 
 		fs.DeleteFilesWildcard(wildcardTemplateName)
