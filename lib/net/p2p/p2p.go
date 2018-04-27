@@ -19,7 +19,7 @@ func Create(interfaceName, localPeepIPAddr, hash, key, ttl, portRange string) {
 		cmd = append(cmd, "-ip", localPeepIPAddr)
 	}
 	if len(portRange) > 2 {
-		cmd = append(cmd, "-ports", localPeepIPAddr)
+		cmd = append(cmd, "-ports", portRange)
 	}
 	out, err := exec.Command("p2p", cmd...).CombinedOutput()
 	log.Check(log.FatalLevel, "Creating p2p interface "+string(out), err)
