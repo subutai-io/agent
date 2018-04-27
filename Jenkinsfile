@@ -13,6 +13,7 @@ try {
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 		def CWD = mktemp -d
+		def VER = 6.4.12+$(date +%Y%m%d%H%M%S)
 		sh """
 			set +x
 			rm -rf *
@@ -36,7 +37,7 @@ try {
 		stage("Tweaks for version")
 
 		sh """
-			VER=6.4.12+$(date +%Y%m%d%H%M%S)
+			
 			echo 'VERSION is ${VER}'
 			cd agent && sed -i 's/quilt/native/' debian/source/format
 			dch -v '${VER}' -D stable 'Test build for ${VER}' 1>/dev/null 2>/dev/null
