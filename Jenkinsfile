@@ -51,7 +51,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			dpkg-buildpackage -rfakeroot
-			cd \${CWD} || exit 1
+			#cd \${CWD} || exit 1
 
 			for i in *.deb; do
     		echo '${i}:';
