@@ -12,14 +12,14 @@ try {
 		stage("Checkout source")
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
-		def CWD = mktemp -d
+		/*def CWD = "mktemp -d" */
 		
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
 		def VER = "6.4.12+${date}"
 		sh """
 			set +x
 			rm -rf *
-				
+			CWD=$(mktemp -d)	
 			cd '${CWD}' || exit 1
 
 			# Clone agent code
