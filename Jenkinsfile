@@ -14,9 +14,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 		sh """
 			rm -rf *
-		"""
-
-		sh """
+		
 			CWD=$(mktemp -d)
 			cd "$CWD" || exit 1
 
