@@ -6,14 +6,66 @@ agentVersion = ""
 
 try {
 	notifyBuild('STARTED')
+	node("deb") {
+		deleteDir()
 
-	/* JUST TRIGGER snap build */
-	if (env.BRANCH_NAME == 'dev') {
-		build job: 'snap.subutai-io.pipeline/dev/', propagate: false, wait: false
-	}
-	
-	if (env.BRANCH_NAME == 'master') {
-		build job: 'snap.subutai-io.pipeline/master/', propagate: false, wait: false
+		stage("Checkout source")
+		
+		notifyBuildDetails = "\nFailed on Stage - Checkout source"
+		sh """
+			rm -rf *
+		"""
+
+		sh """
+			CWD=$(mktemp -d)
+			cd "$CWD" || exit 1
+
+			# Clone agent code
+			git clone https://github.com/subutai-io/agent
+			cd agent || exit 1
+			git checkout --track origin/no-snap && rm -rf .git*
+			cd "$CWD" || exit 1
+
+			# Clone debian packaging
+			git clone https://github.com/happyaron/subutai-agent
+
+			# Put debian directory into agent tree
+			cp -r subutai-agent/debian/ agent/
+			echo "Copied debian directory"
+
+		"""		
+		stage("Tweaks for version")
+
+		sh """
+			VER=6.4.12+$(date +%Y%m%d%H%M%S)
+			echo "VERSION is $VER"
+			cd agent && sed -i "s/quilt/native/" debian/source/format
+			dch -v "$VER" -D stable "Test build for $VER" 1>/dev/null 2>/dev/null
+
+		"""
+
+		stage("Build package")
+		notifyBuildDetails = "\nFailed on Stage - Build package"
+		sh """
+			dpkg-buildpackage -rfakeroot
+			cd "$CWD" || exit 1
+
+			for i in *.deb; do
+    		echo "$i:";
+    		dpkg -c $i;
+			done
+		"""
+		stage("Upload")
+		notifyBuildDetails = "\nFailed on Stage - Upload"
+		sh """
+			touch uploading_agent
+			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
+			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
+		"""
+		stage("Clean Up")
+		sh """
+			cd "$CWD"/.. && rm -rf "$CWD"
+		"""
 	}
 
 } catch (e) { 
