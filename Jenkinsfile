@@ -13,7 +13,9 @@ try {
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 		def CWD = mktemp -d
-		def VER = 6.4.12+$(date +%Y%m%d%H%M%S)
+		
+		String date = new Date().format( 'yyyyMMddHHMMSS' )
+		def VER = "6.4.12+${date}"
 		sh """
 			set +x
 			rm -rf *
