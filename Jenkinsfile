@@ -8,7 +8,7 @@ try {
 	notifyBuild('STARTED')
 	node("deb") {
 		deleteDir()
-
+    def CWD = pwd() 
 		stage("Checkout source")
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
@@ -17,19 +17,19 @@ try {
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
 		def VER = "6.4.12+${date}"
 		sh """
-			set +x
+			#set +x
 			rm -rf *
 			#CWD=\$(mktemp -d)	
-			#cd \$CWD || exit 1
+			cd ${CWD} || exit 1
 
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
-			cd agent || exit 1
+			cd agent
 			git checkout --track origin/no-snap && rm -rf .git*
-			#cd \$CWD || exit 1
+			cd ${CWD}|| exit 1
 
 			# Clone debian packaging
-			cd ../
+			#cd ../
 			git clone https://github.com/happyaron/subutai-agent
 
 			# Put debian directory into agent tree
@@ -53,7 +53,7 @@ try {
 			export LC_ALL=C.UTF-8
 			export LANG=C.UTF-8
 			dpkg-buildpackage -rfakeroot
-			#cd \${CWD} || exit 1
+			cd ${CWD} || exit 1
 
 			for i in *.deb; do
     		echo \$i:';
@@ -70,7 +70,7 @@ try {
 		stage("Clean Up")
 		sh """
 			echo 'Done'
-			#cd \${CWD} /.. && rm -rf \$CWD
+			cd ${CWD} /.. && rm -rf ${CWD}
 		"""
 	}
 
