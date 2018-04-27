@@ -51,7 +51,7 @@ func printList(list []string, c, t, i, p bool) {
 
 // LxcList function shows a listing of Subutai instances with information such as IP address, parent template, etc.
 func LxcList(name string, c, t, i, p bool) {
-	list := []string{}
+	var list []string
 	if i {
 		if name == "" {
 			for _, item := range container.Containers() {

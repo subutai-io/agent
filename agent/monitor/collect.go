@@ -117,12 +117,12 @@ func parsefile(bp client.BatchPoints, lxc, cgtype, filename string) {
 
 func cgroupStat(bp client.BatchPoints) {
 	for _, item := range cgtype {
-		path := "/sys/fs/cgroup/" + item + "/lxc/"
-		files, err := ioutil.ReadDir(path)
+		gpath := "/sys/fs/cgroup/" + item + "/lxc/"
+		files, err := ioutil.ReadDir(gpath)
 		if err == nil {
 			for _, f := range files {
 				if f.IsDir() {
-					parsefile(bp, f.Name(), item, path+f.Name()+"/"+item+".stat")
+					parsefile(bp, f.Name(), item, gpath+f.Name()+"/"+item+".stat")
 				}
 			}
 		}

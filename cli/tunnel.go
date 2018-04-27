@@ -26,7 +26,7 @@ import (
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
 
 // TunAdd adds tunnel to specified network socket
-func TunAdd(socket, timeout string, global bool) {
+func TunAdd(socket, timeout string) {
 	if len(socket) == 0 {
 		log.Error("Please specify socket")
 	}
@@ -55,7 +55,7 @@ func TunAdd(socket, timeout string, global bool) {
 	prepareKey()
 	args, tunsrv := getArgs(socket)
 
-	log.Debug("Executing command ssh " + strings.Join(args," "))
+	log.Debug("Executing command ssh " + strings.Join(args, " "))
 
 	cmd := exec.Command("ssh", args...)
 
@@ -152,7 +152,7 @@ func TunCheck() {
 			if ttl-int(time.Now().Unix()) > 0 {
 				newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
 			}
-			TunAdd(item["local"], newttl, true)
+			TunAdd(item["local"], newttl)
 		}
 	}
 }
