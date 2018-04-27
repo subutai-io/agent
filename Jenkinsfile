@@ -84,14 +84,11 @@ try {
 		stage("Upload Packages")
 		notifyBuildDetails = "\nFailed on Stage - Upload"
 		sh """
-			cd ${CWD}/agent
+			cd ${CWD}
 			touch uploading_agent
-			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
-			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
-			
-			cd ${CWD}/p2p
 			touch uploading_p2p
-			scp uploading_p2p subutai*.deb dak@deb.subutai.io:incoming/
+			scp uploading_agent uploading_p2p subutai*.deb dak@deb.subutai.io:incoming/
+			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
 			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh p2p
 		"""
 	}
