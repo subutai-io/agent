@@ -18,6 +18,8 @@ try {
 		def CWD = pwd()
 		sh """
 			#set +x
+			export LC_ALL=C.UTF-8
+			export LANG=C.UTF-8
 			rm -rf *
 			cd ${CWD} || exit 1
 
@@ -49,6 +51,7 @@ try {
 		stage("Build package")
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
+			cd ${CWD}/agent
 			dpkg-buildpackage -rfakeroot
 			cd ${CWD} || exit 1
 
@@ -67,7 +70,7 @@ try {
 		stage("Clean Up")
 		sh """
 			echo 'Done'
-			cd ${CWD} /.. && rm -rf ${CWD}
+			#cd ${CWD} /.. && rm -rf ${CWD}
 		"""
 	}
 
