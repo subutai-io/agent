@@ -50,12 +50,14 @@ try {
 		stage("Build package")
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
+			export LC_ALL=C.UTF-8
+			export LANG=C.UTF-8
 			dpkg-buildpackage -rfakeroot
 			#cd \${CWD} || exit 1
 
 			for i in *.deb; do
-    		echo '${i}:';
-    		dpkg -c ${i};
+    		echo \$i:';
+    		dpkg -c \$i;
 			done
 		"""
 		stage("Upload")
