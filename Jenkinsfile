@@ -12,11 +12,11 @@ try {
 		stage("Checkout source")
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
+		def CWD = mktemp -d
 		sh """
 			set +x
 			rm -rf *
-		
-			CWD=$(mktemp -d)
+				
 			cd '${CWD}' || exit 1
 
 			# Clone agent code
