@@ -86,9 +86,10 @@ try {
 		sh """
 			cd ${CWD}
 			touch uploading_agent
-			touch uploading_p2p
-			scp uploading_agent uploading_p2p subutai*.deb dak@deb.subutai.io:incoming/
+			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
 			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
+			touch uploading_p2p
+			scp uploading_p2p dak@deb.subutai.io:incoming/
 			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh p2p
 		"""
 	}
