@@ -53,15 +53,15 @@ try {
 
 		"""		
 		stage("Tweaks for version")
-
+		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
 			
 			echo 'VERSION is ${agent_version}'
-			cd agent && sed -i 's/quilt/native/' debian/source/format
+			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
 			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
 			
 			echo "VERSION is ${p2p_version}"
-			cd p2p && sed -i "s/quilt/native/" debian/source/format
+			cd ${CWD}/p2p && sed -i "s/quilt/native/" debian/source/format
 			dch -v "${p2p_version}" -D stable "Test build for ${p2p_version}" 1>/dev/null 2>/dev/null
 
 		"""
