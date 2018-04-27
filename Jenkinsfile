@@ -29,6 +29,7 @@ try {
 			#cd \$CWD || exit 1
 
 			# Clone debian packaging
+			cd ../
 			git clone https://github.com/happyaron/subutai-agent
 
 			# Put debian directory into agent tree
