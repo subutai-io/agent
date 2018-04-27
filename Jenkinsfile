@@ -13,16 +13,17 @@ try {
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 		sh """
+			set +x
 			rm -rf *
 		
 			CWD=$(mktemp -d)
-			cd "$CWD" || exit 1
+			cd '$CWD' || exit 1
 
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent || exit 1
 			git checkout --track origin/no-snap && rm -rf .git*
-			cd "$CWD" || exit 1
+			cd '$CWD' || exit 1
 
 			# Clone debian packaging
 			git clone https://github.com/happyaron/subutai-agent
@@ -36,9 +37,9 @@ try {
 
 		sh """
 			VER=6.4.12+$(date +%Y%m%d%H%M%S)
-			echo "VERSION is $VER"
-			cd agent && sed -i "s/quilt/native/" debian/source/format
-			dch -v "$VER" -D stable "Test build for $VER" 1>/dev/null 2>/dev/null
+			echo 'VERSION is $VER'
+			cd agent && sed -i 's/quilt/native/' debian/source/format
+			dch -v '$VER' -D stable 'Test build for $VER' 1>/dev/null 2>/dev/null
 
 		"""
 
@@ -46,10 +47,10 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			dpkg-buildpackage -rfakeroot
-			cd "$CWD" || exit 1
+			cd '$CWD' || exit 1
 
 			for i in *.deb; do
-    		echo "$i:";
+    		echo '$i:';
     		dpkg -c $i;
 			done
 		"""
@@ -62,7 +63,7 @@ try {
 		"""
 		stage("Clean Up")
 		sh """
-			cd "$CWD"/.. && rm -rf "$CWD"
+			cd '$CWD'/.. && rm -rf '$CWD'
 		"""
 	}
 
