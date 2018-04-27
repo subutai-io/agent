@@ -20,13 +20,13 @@ try {
 			set +x
 			rm -rf *
 			CWD=\$(mktemp -d)	
-			cd '${CWD}' || exit 1
+			cd \$CWD || exit 1
 
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent || exit 1
 			git checkout --track origin/no-snap && rm -rf .git*
-			cd '${CWD}' || exit 1
+			cd \$CWD || exit 1
 
 			# Clone debian packaging
 			git clone https://github.com/happyaron/subutai-agent
@@ -50,7 +50,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			dpkg-buildpackage -rfakeroot
-			cd '${CWD}' || exit 1
+			cd \${CWD} || exit 1
 
 			for i in *.deb; do
     		echo '${i}:';
@@ -66,7 +66,7 @@ try {
 		"""
 		stage("Clean Up")
 		sh """
-			cd '${CWD}'/.. && rm -rf '${CWD}'
+			cd \${CWD} /.. && rm -rf $CWD
 		"""
 	}
 
