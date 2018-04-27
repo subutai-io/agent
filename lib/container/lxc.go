@@ -345,22 +345,6 @@ func Clone(parent, child string) error {
 	return nil
 }
 
-// ResetNet sets default parameters of the network configuration for container.
-// It's used right before converting container into template.
-func ResetNet(name string) {
-	SetContainerConf(name, [][]string{
-		{"lxc.network.type", "veth"},
-		{"lxc.network.flags", "up"},
-		{"lxc.network.link", "lxcbr0"},
-		{"lxc.network.ipv4.gateway", ""},
-		{"lxc.network.veth.pair", ""},
-		{"lxc.network.script.up", ""},
-		{"lxc.network.mtu", ""},
-		{"lxc.network.ipv4", ""},
-		{"#vlan_id", ""},
-	})
-}
-
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, it's just return current value.
 func QuotaRAM(name string, size ...string) int {
@@ -604,13 +588,13 @@ func Mac() string {
 	_, err := rand.Read(buf)
 	log.Check(log.ErrorLevel, "Generating random mac", err)
 
-	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5]);
+	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 	for usedMacs[mac] {
 
 		_, err := rand.Read(buf)
 		log.Check(log.ErrorLevel, "Generating random mac", err)
 
-		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5]);
+		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 	}
 
 	return mac

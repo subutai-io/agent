@@ -319,7 +319,7 @@ func execDiff(dir1, dir2, output string) {
 }
 
 // clearFile writes an empty byte array to specified file
-func clearFile(path string, f os.FileInfo, err error) error {
+func clearFile(path string, f os.FileInfo, ignore error) error {
 	if !f.IsDir() {
 		ioutil.WriteFile(path, []byte{}, 0775)
 	}

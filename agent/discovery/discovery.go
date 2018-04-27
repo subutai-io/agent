@@ -87,7 +87,7 @@ func server() error {
 	if err == nil {
 		go s.Start()
 		defer s.Stop()
-		address := "urn:subutai:management:peer:5";
+		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP server on " + address)
 		s.AdvertiseServer(gossdp.AdvertisableServer{
 			ServiceType: address,
@@ -112,7 +112,7 @@ func client() error {
 		go c.Start()
 		defer c.Stop()
 
-		address := "urn:subutai:management:peer:5";
+		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
 		err = c.ListenFor(address)
 		time.Sleep(2 * time.Second)

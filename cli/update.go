@@ -29,13 +29,13 @@ func Update(name string, check bool) {
 	defer lock.Unlock()
 
 	if name == "rh" {
-		updateRH(name, check)
+		updateRH(check)
 	} else {
 		updateContainer(name, check)
 	}
 }
 
-func updateRH(name string, check bool) {
+func updateRH(check bool) {
 
 	_, err := exec.Command("apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5").CombinedOutput()
 	log.Check(log.FatalLevel, "Updating apt index", err)

@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	nginxInc = config.Agent.DataPrefix+"nginx/nginx-includes/"
+	nginxInc = config.Agent.DataPrefix + "nginx/nginx-includes/"
 )
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
 func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remove, sslbcknd bool) {
@@ -158,29 +158,29 @@ func random(min, max int) int {
 }
 
 func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
-	socket := strings.Split((*sockExt), ":")
+	socket := strings.Split(*sockExt, ":")
 	if len(socket) > 1 && socket[1] != "" {
 		if port, err := strconv.Atoi(socket[1]); err != nil || port < 1000 || port > 65536 {
 			if !(strings.Contains(protocol, "http") && (port == 80 || port == 443)) {
 				log.Error("Port number in \"external\" should be integer in range of 1000-65536")
 			}
 		}
-		if isFree(protocol, (*sockExt)) {
+		if isFree(protocol, *sockExt) {
 			return true
 		}
 
 		bolt, err := db.New()
 		defer bolt.Close()
 		log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err)
-		if !bolt.PortInMap(protocol, (*sockExt), "", "") && socket[1] != "80" {
+		if !bolt.PortInMap(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
-		} else if bolt.PortInMap(protocol, (*sockExt), domain, sockInt) {
+		} else if bolt.PortInMap(protocol, *sockExt, domain, sockInt) {
 			log.Error("Mapping already exists")
 		}
-		return !bolt.PortInMap(protocol, (*sockExt), domain, "")
+		return !bolt.PortInMap(protocol, *sockExt, domain, "")
 	}
 	for port := strconv.Itoa(random(1000, 65536)); isFree(protocol, socket[0]+":"+port); port = strconv.Itoa(random(1000, 65536)) {
-		(*sockExt) = socket[0] + ":" + port
+		*sockExt = socket[0] + ":" + port
 		return true
 	}
 	return false
