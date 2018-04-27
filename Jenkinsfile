@@ -8,25 +8,29 @@ try {
 	notifyBuild('STARTED')
 	node("deb") {
 		deleteDir()
-
+     
 		stage("Checkout source")
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
+				
+		String date = new Date().format( 'yyyyMMddHHMMSS' )
+		def VER = "6.4.12+${date}"
+		def CWD = pwd()
 		sh """
+			#set +x
+			export LC_ALL=C.UTF-8
+			export LANG=C.UTF-8
 			rm -rf *
-		"""
-
-		sh """
-			CWD=$(mktemp -d)
-			cd "$CWD" || exit 1
+			cd ${CWD} || exit 1
 
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
-			cd agent || exit 1
+			cd agent
 			git checkout --track origin/no-snap && rm -rf .git*
-			cd "$CWD" || exit 1
+			cd ${CWD}|| exit 1
 
 			# Clone debian packaging
+		
 			git clone https://github.com/happyaron/subutai-agent
 
 			# Put debian directory into agent tree
@@ -37,22 +41,23 @@ try {
 		stage("Tweaks for version")
 
 		sh """
-			VER=6.4.12+$(date +%Y%m%d%H%M%S)
-			echo "VERSION is $VER"
-			cd agent && sed -i "s/quilt/native/" debian/source/format
-			dch -v "$VER" -D stable "Test build for $VER" 1>/dev/null 2>/dev/null
+			
+			echo 'VERSION is ${VER}'
+			cd agent && sed -i 's/quilt/native/' debian/source/format
+			dch -v '${VER}' -D stable 'Test build for ${VER}' 1>/dev/null 2>/dev/null
 
 		"""
 
 		stage("Build package")
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
+			cd ${CWD}/agent
 			dpkg-buildpackage -rfakeroot
-			cd "$CWD" || exit 1
+			cd ${CWD} || exit 1
 
 			for i in *.deb; do
-    		echo "$i:";
-    		dpkg -c $i;
+    		echo '\$i:';
+    		dpkg -c \$i;
 			done
 		"""
 		stage("Upload")
@@ -61,10 +66,6 @@ try {
 			touch uploading_agent
 			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
 			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
-		"""
-		stage("Clean Up")
-		sh """
-			cd "$CWD"/.. && rm -rf "$CWD"
 		"""
 	}
 
@@ -100,9 +101,9 @@ def notifyBuild(String buildStatus = 'STARTED', String details = '') {
 	summary = "${subject} (${env.BUILD_URL})${details}"
   }
   // Get token
-  def slackToken = getSlackToken('sysnet-bots-slack-token')
+  def slackToken = getSlackToken('sysnet')
   // Send notifications
-  // slackSend (color: colorCode, message: summary, teamDomain: 'subutai-io', token: "${slackToken}")
+  slackSend (color: colorCode, message: summary, teamDomain: 'optdyn', token: "${slackToken}")
 }
 
 // get slack token from global jenkins credentials store
