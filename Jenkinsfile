@@ -19,7 +19,7 @@ try {
 		sh """
 			set +x
 			rm -rf *
-			CWD=$(mktemp -d)	
+			CWD=\$(mktemp -d)	
 			cd '${CWD}' || exit 1
 
 			# Clone agent code
