@@ -20,6 +20,9 @@ import (
 	"github.com/subutai-io/agent/log"
 
 	"gopkg.in/lxc/go-lxc.v2"
+	"path"
+	"fmt"
+	"crypto/rand"
 )
 
 // All returns list of all containers
@@ -29,11 +32,11 @@ func All() []string {
 
 // IsTemplate checks if Subutai container is template.
 func IsTemplate(name string) bool {
-	return fs.IsSubvolumeReadonly(config.Agent.LxcPrefix + name + "/rootfs/")
+	return fs.DatasetExists(name+"/rootfs") && fs.IsDatasetReadOnly(name+"/rootfs/")
 }
 
 func IsContainer(name string) bool {
-	return fs.IsSubvolumeReadWrite(config.Agent.LxcPrefix + name + "/rootfs/")
+	return fs.DatasetExists(name+"/rootfs") && !fs.IsDatasetReadOnly(name + "/rootfs/")
 }
 
 // Templates returns list of all templates
@@ -56,8 +59,8 @@ func Containers() (containers []string) {
 	return
 }
 
-// ContainerOrTemplateExists checks if container or template exists
-func ContainerOrTemplateExists(name string) bool {
+// LxcInstanceExists checks if container or template exists
+func LxcInstanceExists(name string) bool {
 	for _, item := range All() {
 		if name == item {
 			return true
@@ -66,7 +69,7 @@ func ContainerOrTemplateExists(name string) bool {
 	return false
 }
 
-// State returns container stat in human readable format.
+// State returns container state in human readable format.
 func State(name string) (state string) {
 	if c, err := lxc.NewContainer(name, config.Agent.LxcPrefix); err == nil {
 		defer lxc.Release(c)
@@ -103,7 +106,7 @@ func SetApt(name string) {
 
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
-	if !ContainerOrTemplateExists(name) {
+	if !LxcInstanceExists(name) {
 		return errors.New("Container does not exists")
 	}
 	bolt, err := db.New()
@@ -152,80 +155,28 @@ func Stop(name string, addMetadata bool) error {
 	return nil
 }
 
-// Freeze pause container processes
-func Freeze(name string) error {
+func Restart(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
 	defer lxc.Release(c)
 
-	if err = c.Freeze(); log.Check(log.DebugLevel, "Freezing container "+name, err) {
-		return err
+	if c.State().String() == "RUNNING" {
+		err = c.Reboot()
+	} else {
+		err = c.Start()
 	}
-	AddMetadata(name, map[string]string{"state": State(name)})
-	return nil
-}
 
-// Unfreeze unpause container processes
-func Unfreeze(name string) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
-	}
-	defer lxc.Release(c)
+	log.Check(log.DebugLevel, "Restarting LXC container "+name, err)
 
-	if err := c.Unfreeze(); log.Check(log.DebugLevel, "Unfreezing container "+name, err) {
-		return err
-	}
-	AddMetadata(name, map[string]string{"state": State(name)})
-	return nil
-}
-
-// Dump creates container memory dump on disk
-func Dump(name string, stop bool) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
-	}
-	defer lxc.Release(c)
-
-	options := lxc.CheckpointOptions{
-		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
-		Verbose:   true,
-		Stop:      stop,
-	}
-	if err = c.Checkpoint(options); log.Check(log.DebugLevel, "Creating container checkpoint", err) {
-		return err
-	}
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.ContainerByName(name)
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
-	uid, _ := strconv.Atoi(meta["uid"])
-	log.Check(log.WarnLevel, "Chowning checkpoint",
-		fs.ChownR(config.Agent.LxcPrefix+"/"+name+"/checkpoint", uid, uid))
-	return nil
-}
-
-// DumpRestore restores container memory from dump on disk
-func DumpRestore(name string) error {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	if err != nil {
-		return err
-	}
-	defer lxc.Release(c)
-
-	options := lxc.RestoreOptions{
-		Directory: config.Agent.LxcPrefix + "/" + name + "/checkpoint",
-		Verbose:   true,
-	}
-	return c.Restore(options)
+	return err
 }
 
 // AttachExec executes a command inside Subutai container.
 func AttachExec(name string, command []string, env ...[]string) (output []string, err error) {
-	if !ContainerOrTemplateExists(name) {
+	if !LxcInstanceExists(name) {
 		return output, errors.New("Container does not exist")
 	}
 
@@ -294,7 +245,9 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
-	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+	if fs.DatasetExists(name) {
+		fs.RemoveDataset(name, true)
+	}
 
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
@@ -313,6 +266,7 @@ func DestroyTemplate(name string) {
 
 	defer lxc.Release(c)
 
+	//check just in case
 	if c.State() == lxc.RUNNING {
 		log.Check(log.ErrorLevel, "Stopping container", c.Stop())
 	}
@@ -321,8 +275,9 @@ func DestroyTemplate(name string) {
 
 	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
-	//remove files
-	fs.SubvolumeDestroy(config.Agent.LxcPrefix + name)
+	if fs.DatasetExists(name) {
+		fs.RemoveDataset(name, true)
+	}
 
 	DeleteTemplateInfoFromCache(name)
 }
@@ -331,14 +286,13 @@ func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
 	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.TemplateByName(name)
-	if meta != nil {
-		templateId, found := meta["id"]
-		if found {
-			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
-		}
+	//obtain id of template by ref
+	meta := bolt.TemplateByKey("nameAndOwnerAndVersion", name)
+	if meta != nil && len(meta) > 0 {
+		//take first element only since ref is unique
+		templateId := meta[0]
+		log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
 	}
-	log.Check(log.WarnLevel, "Deleting template index entry", bolt.TemplateDel(name))
 	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
@@ -353,52 +307,42 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 
 // Clone create the duplicate container from the Subutai template.
 func Clone(parent, child string) error {
-	var backend lxc.BackendStore
-	log.Check(log.DebugLevel, "Setting LXC backend to BTRFS", backend.Set("btrfs"))
 
-	c, err := lxc.NewContainer(parent, config.Agent.LxcPrefix)
-	if log.Check(log.DebugLevel, "Creating container object", err) {
-		return err
+	parentParts := strings.Split(parent, ":")
+
+	//create parent dataset
+	fs.CreateDataset(child)
+
+	//create partitions
+	fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
+	fs.CloneSnapshot(parent+"/home@now", child+"/home")
+	fs.CloneSnapshot(parent+"/var@now", child+"/var")
+	fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
+
+	for _, file := range []string{"config", "fstab", "packages"} {
+		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
-	defer lxc.Release(c)
 
-	fs.SubvolumeCreate(config.Agent.LxcPrefix + child)
-	err = c.Clone(child, lxc.CloneOptions{Backend: backend})
-	if log.Check(log.DebugLevel, "Cloning container", err) {
-		return err
-	}
-
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/home", config.Agent.LxcPrefix+child+"/home")
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/opt", config.Agent.LxcPrefix+child+"/opt")
-	fs.SubvolumeClone(config.Agent.LxcPrefix+parent+"/var", config.Agent.LxcPrefix+child+"/var")
-
+	mac := Mac()
 	SetContainerConf(child, [][]string{
-		{"lxc.network.link", ""},
-		{"lxc.network.veth.pair", strings.Replace(GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.hwaddr"), ":", "", -1)},
-		{"lxc.network.script.up", config.Agent.AppPrefix + "bin/create_ovs_interface"},
-		{"subutai.parent", parent},
+		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
+		{"lxc.network.hwaddr", mac},
+		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
+		{"subutai.parent", parentParts[0]},
+		{"subutai.parent.owner", parentParts[1]},
+		{"subutai.parent.version", parentParts[2]},
+		{"lxc.rootfs", config.Agent.LxcPrefix + child + "/rootfs"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
 		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
-		{"lxc.network.mtu", "1300"},
+		{"lxc.rootfs.backend", "zfs"}, //must be in template
+		{"lxc.utsname", child},
 	})
-	return nil
-}
 
-// ResetNet sets default parameters of the network configuration for container.
-// It's used right before converting container into template.
-func ResetNet(name string) {
-	SetContainerConf(name, [][]string{
-		{"lxc.network.type", "veth"},
-		{"lxc.network.flags", "up"},
-		{"lxc.network.link", "lxcbr0"},
-		{"lxc.network.ipv4.gateway", ""},
-		{"lxc.network.veth.pair", ""},
-		{"lxc.network.script.up", ""},
-		{"lxc.network.mtu", ""},
-		{"lxc.network.ipv4", ""},
-		{"#vlan_id", ""},
-	})
+	//create default hostname
+	ioutil.WriteFile(config.Agent.LxcPrefix+child+"/rootfs/etc/hostname", []byte(child), 0644)
+
+	return nil
 }
 
 // QuotaRAM sets the memory quota to the Subutai container.
@@ -494,6 +438,7 @@ func QuotaNet(name string, size ...string) string {
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
+//TODO use the new lxc config type
 func SetContainerConf(container string, conf [][]string) error {
 	confPath := config.Agent.LxcPrefix + container + "/config"
 	newconf := ""
@@ -552,8 +497,6 @@ func SetContainerUID(c string) (string, error) {
 	}
 
 	SetContainerConf(c, [][]string{
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.common.conf"},
-		{"lxc.include", config.Agent.AppPrefix + "share/lxc/config/ubuntu.userns.conf"},
 		{"lxc.id_map", "u 0 " + uid + " 65536"},
 		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})
@@ -592,15 +535,6 @@ func SetDNS(name string) {
 		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
 }
 
-// CriuHax adds container config needed by CRIU
-func CriuHax(name string) {
-	SetContainerConf(name, [][]string{
-		{"lxc.console", "none"},
-		{"lxc.tty", "0"},
-		{"lxc.cgroup.devices.deny", "c 5:1 rwm"},
-	})
-}
-
 func CopyParentReference(name string, owner string, version string) {
 	SetContainerConf(name, [][]string{
 		{"subutai.template.owner", owner},
@@ -635,4 +569,33 @@ func DisableSSHPwd(name string) {
 	output := strings.Join(lines, "\n")
 	err = ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/ssh/sshd_config", []byte(output), 0644)
 	log.Check(log.WarnLevel, "Writing new sshd config", err)
+}
+
+// Mac function generates random mac address for LXC containers
+func Mac() string {
+
+	usedMacs := make(map[string]bool)
+	for _, cont := range Containers() {
+		cfg, err := GetConfig(path.Join(config.Agent.LxcPrefix, cont, "config"))
+		//skip error
+		if err == nil {
+			usedMacs[cfg.GetParam("lxc.network.hwaddr")] = true
+		}
+	}
+
+	buf := make([]byte, 6)
+
+	_, err := rand.Read(buf)
+	log.Check(log.ErrorLevel, "Generating random mac", err)
+
+	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
+	for usedMacs[mac] {
+
+		_, err := rand.Read(buf)
+		log.Check(log.ErrorLevel, "Generating random mac", err)
+
+		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
+	}
+
+	return mac
 }

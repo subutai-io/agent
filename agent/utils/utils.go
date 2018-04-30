@@ -55,7 +55,7 @@ func ResetInfluxDbClient() {
 func createInfluxDbClient() (client.Client, error) {
 
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Influxdb.Server + ":8086",
+		Addr:               "https://" + config.Management.Host + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		Timeout:            time.Second * 60,
@@ -133,7 +133,7 @@ func x509generate() {
 	notAfter := notBefore.Add(3650 * 24 * time.Hour)
 	template := x509.Certificate{
 		SerialNumber:          serialNumber,
-		Subject:               pkix.Name{Organization: []string{"Subutai Social Foundation"}},
+		Subject:               pkix.Name{Organization: []string{"Subutai Foundation"}},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,

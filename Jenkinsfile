@@ -2,18 +2,96 @@
 
 notifyBuildDetails = ""
 agentCommitId = ""
-agentVersion = ""
+
 
 try {
 	notifyBuild('STARTED')
+	node("deb") {
+		deleteDir()
+     
+		stage("Checkout source")
+		
+		notifyBuildDetails = "\nFailed on Stage - Checkout source"
+				
+		String date = new Date().format( 'yyyyMMddHHMMSS' )
+		def agent_version = "6.4.12+${date}"
+		def p2p_version = "6.3.2+${date}"
+		def CWD = pwd()
+		sh """
+			#set +x
+			export LC_ALL=C.UTF-8
+			export LANG=C.UTF-8
+			rm -rf *
+			cd ${CWD} || exit 1
 
-	/* JUST TRIGGER snap build */
-	if (env.BRANCH_NAME == 'dev') {
-		build job: 'snap.subutai-io.pipeline/dev/', propagate: false, wait: false
-	}
-	
-	if (env.BRANCH_NAME == 'master') {
-		build job: 'snap.subutai-io.pipeline/master/', propagate: false, wait: false
+			# Clone agent code
+			git clone https://github.com/subutai-io/agent
+			cd agent
+			git checkout --track origin/no-snap && rm -rf .git*
+			cd ${CWD}|| exit 1
+
+			# Clone debian packaging
+		
+			git clone https://github.com/happyaron/subutai-agent
+
+			# Put debian directory into agent tree
+			cp -r subutai-agent/debian/ agent/
+			echo "Copied debian directory"
+
+			# Clone p2p code
+			git clone https://github.com/subutai-io/p2p
+			cd p2p || exit 1
+			git checkout --track origin/dev && rm -rf .git*
+			cd ${CWD} || exit 1
+
+			# Clone debian packaging
+			git clone https://github.com/happyaron/subutai-p2p
+
+			# Put debian directory into p2p tree
+			cp -r subutai-p2p/debian/ p2p/
+			echo "Copied debian directory"
+
+		"""		
+		stage("Tweaks for version")
+		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
+		sh """
+			
+			echo 'VERSION is ${agent_version}'
+			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
+			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
+			
+			echo "VERSION is ${p2p_version}"
+			cd ${CWD}/p2p && sed -i "s/quilt/native/" debian/source/format
+			dch -v "${p2p_version}" -D stable "Test build for ${p2p_version}" 1>/dev/null 2>/dev/null
+
+		"""
+
+		stage("Build Agent package")
+		notifyBuildDetails = "\nFailed on Stage - Build package"
+		sh """
+			cd ${CWD}/agent
+			dpkg-buildpackage -rfakeroot
+			cd ${CWD}/p2p
+			dpkg-buildpackage -rfakeroot
+			
+			cd ${CWD} || exit 1
+			for i in *.deb; do
+    		echo '\$i:';
+    		dpkg -c \$i;
+			done
+		"""
+		
+		stage("Upload Packages")
+		notifyBuildDetails = "\nFailed on Stage - Upload"
+		sh """
+			cd ${CWD}
+			touch uploading_agent
+			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
+			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
+			touch uploading_p2p
+			scp uploading_p2p dak@deb.subutai.io:incoming/
+			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh p2p
+		"""
 	}
 
 } catch (e) { 
@@ -48,9 +126,9 @@ def notifyBuild(String buildStatus = 'STARTED', String details = '') {
 	summary = "${subject} (${env.BUILD_URL})${details}"
   }
   // Get token
-  def slackToken = getSlackToken('sysnet-bots-slack-token')
+  def slackToken = getSlackToken('sysnet')
   // Send notifications
-  // slackSend (color: colorCode, message: summary, teamDomain: 'subutai-io', token: "${slackToken}")
+  slackSend (color: colorCode, message: summary, teamDomain: 'optdyn', token: "${slackToken}")
 }
 
 // get slack token from global jenkins credentials store

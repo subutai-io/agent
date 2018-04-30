@@ -30,7 +30,7 @@ func ImportPk(k []byte) string {
 		log.Check(log.WarnLevel, "Writing Management server Public key to "+tmpfile.Name(), err)
 		log.Check(log.WarnLevel, "Closing "+tmpfile.Name(), tmpfile.Close())
 
-		out, err := exec.Command("gpg", "--import", tmpfile.Name()).CombinedOutput()
+		out, err := exec.Command("gpg1", "--import", tmpfile.Name()).CombinedOutput()
 		log.Check(log.WarnLevel, "Importing MH Public key from "+tmpfile.Name(), err)
 		log.Check(log.WarnLevel, "Removing temp file", os.Remove(tmpfile.Name()))
 		return string(out)
@@ -41,14 +41,14 @@ func ImportPk(k []byte) string {
 // GetContainerPk returns GPG Public Key for container.
 func GetContainerPk(name string) string {
 	lxcPath := config.Agent.LxcPrefix + name + "/public.pub"
-	stdout, err := exec.Command("/bin/bash", "-c", "gpg --no-default-keyring --keyring "+lxcPath+" --export -a "+name+"@subutai.io").Output()
+	stdout, err := exec.Command("/bin/bash", "-c", "gpg1 --no-default-keyring --keyring "+lxcPath+" --export -a "+name+"@subutai.io").Output()
 	log.Check(log.WarnLevel, "Getting Container public key", err)
 	return string(stdout)
 }
 
 // GetPk returns GPG Public Key from the Resource Host.
 func GetPk(name string) string {
-	stdout, err := exec.Command("gpg", "--export", "-a", name).Output()
+	stdout, err := exec.Command("gpg1", "--export", "-a", name).Output()
 	log.Check(log.WarnLevel, "Getting public key", err)
 	if len(stdout) == 0 {
 		log.Warn("GPG key for RH not found. Creating new.")
@@ -59,7 +59,7 @@ func GetPk(name string) string {
 
 // DecryptWrapper decrypts GPG message.
 func DecryptWrapper(args ...string) string {
-	gpg := "gpg --passphrase " + config.Agent.GpgPassword + " --no-tty"
+	gpg := "gpg1 --passphrase " + config.Agent.GpgPassword + " --no-tty"
 	if len(args) == 3 {
 		gpg = gpg + " --no-default-keyring --keyring " + args[2] + " --secret-keyring " + args[1]
 	}
@@ -79,7 +79,7 @@ func DecryptWrapper(args ...string) string {
 
 // EncryptWrapper encrypts GPG message.
 func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]byte, error) {
-	gpg := "gpg --batch --passphrase " + config.Agent.GpgPassword + " --trust-model always --armor -u " + user + " -r " + recipient + " --sign --encrypt --no-tty"
+	gpg := "gpg1 --batch --passphrase " + config.Agent.GpgPassword + " --trust-model always --armor -u " + user + " -r " + recipient + " --sign --encrypt --no-tty"
 	if len(args) >= 2 {
 		gpg = gpg + " --no-default-keyring --keyring " + args[0] + " --secret-keyring " + args[1]
 	}
@@ -99,7 +99,7 @@ func GenerateKey(name string) {
 	path := config.Agent.LxcPrefix + name
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
-	if !container.ContainerOrTemplateExists(name) {
+	if !container.LxcInstanceExists(name) {
 		err := os.MkdirAll("/root/.gnupg/", 0700)
 		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
 		path = "/root/.gnupg"
@@ -127,17 +127,17 @@ func GenerateKey(name string) {
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
 	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
-		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg", "--batch", "--gen-key", path+"/defaults").Run())
+		log.Check(log.DebugLevel, "Generating key", exec.Command("gpg1", "--batch", "--gen-key", path+"/defaults").Run())
 	}
-	if !container.ContainerOrTemplateExists(name) {
-		out, err := exec.Command("gpg", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
+	if !container.LxcInstanceExists(name) {
+		out, err := exec.Command("gpg1", "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
 			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
 			for _, f := range list {
 				os.Remove(f)
 			}
 		}
-		out, err = exec.Command("gpg", "--import", "/root/.gnupg/public.pub").CombinedOutput()
+		out, err = exec.Command("gpg1", "--import", "/root/.gnupg/public.pub").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
 			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
 			for _, f := range list {
@@ -152,10 +152,10 @@ func GetFingerprint(email string) string {
 	var out []byte
 	var err error
 	if email == config.Agent.GpgUser {
-		out, err = exec.Command("gpg", "--fingerprint", email).Output()
+		out, err = exec.Command("gpg1", "--fingerprint", email).Output()
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
-		out, err = exec.Command("gpg", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		out, err = exec.Command("gpg1", "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
 
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
@@ -238,14 +238,14 @@ func ExchageAndEncrypt(c, t string) {
 
 	getMngKey(c)
 
-	impkey := exec.Command("gpg", "-v", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--import", config.Agent.LxcPrefix+c+"/mgn.key")
+	impkey := exec.Command("gpg1", "-v", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--import", config.Agent.LxcPrefix+c+"/mgn.key")
 	impkey.Stdout = &impout
 	impkey.Stderr = &imperr
 	err := impkey.Run()
 	log.Check(log.FatalLevel, "Importing Management public key to keyring", err)
 
 	id := parseKeyID(imperr.String())
-	expkey := exec.Command("gpg", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--export", "--armor", c+"@subutai.io")
+	expkey := exec.Command("gpg1", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--export", "--armor", c+"@subutai.io")
 	expkey.Stdout = &expout
 	expkey.Stderr = &experr
 	err = expkey.Run()
@@ -253,7 +253,7 @@ func ExchageAndEncrypt(c, t string) {
 
 	writeData(c, t, expout.String(), experr.String())
 
-	err = exec.Command("gpg", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--trust-model", "always", "--armor", "-r", id, "--encrypt", config.Agent.LxcPrefix+c+"/stdin.txt").Run()
+	err = exec.Command("gpg1", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--trust-model", "always", "--armor", "-r", id, "--encrypt", config.Agent.LxcPrefix+c+"/stdin.txt").Run()
 	log.Check(log.FatalLevel, "Encrypting stdin.txt", err)
 
 	sendData(c)

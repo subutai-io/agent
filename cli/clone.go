@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	templateNameNOwnerNVersionRx = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+):(?P<version>\d+\.\d+\.\d+)$`)
-	templateNameNOwnerRx         = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)@(?P<owner>[a-zA-Z0-9._-]+)$`)
+	templateNameNOwnerNVersionRx = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)[@:](?P<owner>[a-zA-Z0-9._-]+):(?P<version>\d+\.\d+\.\d+)$`)
+	templateNameNOwnerRx         = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)[@:](?P<owner>[a-zA-Z0-9._-]+)$`)
 	templateNameRx               = regexp.MustCompile(`^(?P<name>[a-zA-Z0-9._-]+)$`)
 )
 // LxcClone function creates new `child` container from a Subutai `parent` template.
@@ -32,7 +32,7 @@ var (
 func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	child = utils.CleanTemplateName(child)
 
-	if container.ContainerOrTemplateExists(child) {
+	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
 
@@ -46,11 +46,13 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	meta["parent.version"] = t.Version
 	meta["parent.id"] = t.Id
 
-	if !container.IsTemplate(t.Name) {
+	fullRef := strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
+
+	if !container.IsTemplate(fullRef) {
 		LxcImport("id:"+t.Id, cdnToken, false)
 	}
 
-	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(t.Name, child))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child))
 
 	gpg.GenerateKey(child)
 	if len(consoleSecret) != 0 {
@@ -72,7 +74,6 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	//Need to change it in parent templates
 	container.SetApt(child)
 	container.SetDNS(child)
-	container.CriuHax(child)
 	//add subutai.template.owner & subutai.template.version
 	container.CopyParentReference(child, t.Owner[0], t.Version)
 
@@ -104,6 +105,7 @@ func addNetConf(name, addr string) string {
 	}
 
 	container.SetContainerConf(name, [][]string{
+		{"lxc.network.flags", "up"},
 		{"lxc.network.ipv4", ipvlan[0]},
 		{"lxc.network.ipv4.gateway", gateway},
 		{"#vlan_id", ipvlan[1]},

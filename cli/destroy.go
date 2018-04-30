@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"runtime"
 	"github.com/subutai-io/agent/config"
+	"path"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -47,6 +48,10 @@ func LxcDestroy(id string, vlan bool) {
 		}
 		cleanupNet(id)
 	} else if id != "everything" {
+		if container.IsTemplate(id) {
+			log.Error("Pass -t flag to destroy template")
+		}
+
 		bolt, err := db.New()
 		log.Check(log.WarnLevel, "Opening database", err)
 		log.Debug("Obtaining container by name")
@@ -69,19 +74,13 @@ func LxcDestroy(id string, vlan bool) {
 
 			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
 
-		} else if container.IsTemplate(id) {
-
-			container.DestroyTemplate(id)
-		} else {
+		} else if container.IsContainer(id) {
 
 			err = container.DestroyContainer(id)
 
 			log.Check(log.ErrorLevel, "Destroying container", err)
 		}
 
-		if _, found := getTemplateInfoFromCacheByName(id); found {
-			container.DeleteTemplateInfoFromCache(id)
-		}
 	}
 
 	if id == "everything" {
@@ -113,6 +112,10 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	log.Info(msg)
+}
+
+func LxcDestroyTemplate(name string) {
+	container.DestroyTemplate(name)
 }
 
 func cleanupNet(id string) {
@@ -148,7 +151,7 @@ func Prune(what string) {
 	if what == "archives" {
 
 		//remove all template archives
-		wildcardTemplateName := config.Agent.LxcPrefix + "tmpdir/*" +
+		wildcardTemplateName := path.Join(config.Agent.CacheDir, "*") +
 			"-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
 
 		fs.DeleteFilesWildcard(wildcardTemplateName)

@@ -4,11 +4,10 @@ package net
 import (
 	"bufio"
 	"bytes"
-	"net"
 	"os/exec"
 	"strconv"
 	"strings"
-
+	exc "github.com/subutai-io/agent/lib/exec"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -41,30 +40,12 @@ func RateLimit(nic string, rate ...string) string {
 
 // GetIp returns IP address that should be used for host access
 func GetIp() string {
-	var iface string
-	out, err := exec.Command("route").Output()
-	if !log.Check(log.DebugLevel, "Running route command", err) {
-		scanner := bufio.NewScanner(bytes.NewReader(out))
-		for scanner.Scan() {
-			if strings.Contains(scanner.Text(), "default") {
-				line := strings.Fields(scanner.Text())
-				iface = line[len(line)-1]
-				break
-			}
-		}
+
+	out, err := exc.ExecuteWithBash("ip route get 1.1.1.1 | grep -oP 'src \\K\\S+'")
+
+	if log.Check(log.WarnLevel, "Getting RH ip "+out, err) {
+		return ""
 	}
 
-	if len(iface) != 0 {
-		if nic, err := net.InterfaceByName(iface); err == nil {
-			if addrs, err := nic.Addrs(); err == nil && len(addrs) > 0 {
-				if ipnet, ok := addrs[0].(*net.IPNet); ok {
-					if ipnet.IP.To4() != nil {
-						return ipnet.IP.String()
-					}
-				}
-			}
-		}
-	}
-
-	return "null"
+	return strings.TrimSpace(out)
 }

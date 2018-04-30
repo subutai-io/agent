@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	exc "github.com/subutai-io/agent/lib/exec"
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/subutai-io/agent/config"
@@ -47,13 +48,8 @@ type hostStat struct {
 type quotaUsage struct {
 	Container string `json:"container"`
 	CPU       int    `json:"cpu"`
-	Disk struct {
-		Home   int `json:"home"`
-		Opt    int `json:"opt"`
-		Rootfs int `json:"rootfs"`
-		Var    int `json:"var"`
-	} `json:"Disk"`
-	RAM int `json:"ram"`
+	Disk      int
+	RAM       int    `json:"ram"`
 }
 
 func queryDB(cmd string) (res []client.Result, err error) {
@@ -146,23 +142,30 @@ func cpuLoad(h string) interface{} {
 }
 
 func diskLoad() (disktotal, diskused interface{}) {
-	out, _ := exec.Command("df", "-TB1").Output()
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if strings.HasPrefix(line[1], "btrfs") {
-			disktotal, _ = strconv.Atoi(line[3])
-			diskused, _ = strconv.Atoi(line[2])
-			break
+	out, _ := exc.Execute("df", "-TB1")
+
+	var total, used int
+	for _, str := range strings.Split(out, "\n") {
+		f := strings.Fields(str)
+		if len(f) > 3 {
+			if f[0] == "subutai" {
+				total, _ = strconv.Atoi(f[2])
+			}
+			if f[1] == "zfs" {
+				t, _ := strconv.Atoi(f[3])
+				used += t
+			}
 		}
 	}
-	return
+
+	return total, used
 }
 
 func cpuQuotaUsage(h string) int {
 	cpuCurLoad, err := queryDB("SELECT non_negative_derivative(mean(value), 1s) FROM lxc_cpu WHERE time > now() - 1m and hostname =~ /^" + h + "$/ GROUP BY time(10s), type fill(none)")
 	if err != nil {
-		log.Error("No data received for container cpu load")
+		log.Warn("No data received for container cpu load")
+		return 0
 	}
 	sys, err := cpuCurLoad[0].Series[0].Values[0][1].(json.Number).Float64()
 	user, err := cpuCurLoad[0].Series[1].Values[0][1].(json.Number).Float64()
@@ -200,12 +203,12 @@ func ramQuotaUsage(h string) int {
 }
 
 func diskQuotaUsage(path string) int {
-	u, err := strconv.Atoi(fs.Stat(path, "usage", true))
+	u, err := fs.DatasetDiskUsage(path)
 	if err != nil {
 		u = 0
 	}
 
-	l, err := strconv.Atoi(fs.Stat(path, "quota", true))
+	l, err := fs.GetQuota(path)
 	if err != nil {
 		l = 0
 	}
@@ -224,10 +227,7 @@ func quota(h string) string {
 	usage.Container = h
 	usage.CPU = cpuQuotaUsage(h)
 	usage.RAM = ramQuotaUsage(h)
-	usage.Disk.Rootfs = diskQuotaUsage(h + "/rootfs")
-	usage.Disk.Home = diskQuotaUsage(h + "/home")
-	usage.Disk.Opt = diskQuotaUsage(h + "/opt")
-	usage.Disk.Var = diskQuotaUsage(h + "/var")
+	usage.Disk = diskQuotaUsage(h)
 
 	a, err := json.Marshal(usage)
 	if err != nil {
@@ -247,7 +247,7 @@ func sysLoad(h string) string {
 	result.CPU.CoreCount = runtime.NumCPU()
 	result.CPU.Frequency = grep("cpu MHz", "/proc/cpuinfo")
 	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad()
-	result.Disk.Used, result.Disk.Total = diskLoad()
+	result.Disk.Total, result.Disk.Used = diskLoad()
 
 	a, err := json.Marshal(result)
 	if err != nil {
@@ -304,7 +304,9 @@ func Info(command, host string) {
 		defer os.Unsetenv("GNUPGHOME")
 		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
 	} else if command == "du" {
-		fmt.Println(fs.DiskUsage(host))
+		usage, err := fs.DatasetDiskUsage(host)
+		log.Check(log.ErrorLevel, "Checking disk usage", err)
+		fmt.Println(usage)
 	} else if command == "quota" {
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
@@ -319,7 +321,7 @@ func Info(command, host string) {
 
 func getOsName() string {
 
-	out, err := exec.Command("/bin/bash", "-c", "cat /var/lib/snapd/hostfs/etc/*release").Output()
+	out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
 	log.Check(log.ErrorLevel, "Determining OS name", err)
 
