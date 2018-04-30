@@ -36,16 +36,12 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release}
-                        export agent_commit=`git rev-parse HEAD`
-                        rm -rf .git*
+			git checkout --track origin/${release} && rm -rf .git*
 			cd ${CWD}|| exit 1
 
 			git clone https://github.com/subutai-io/p2p
 			cd p2p
-			git checkout --track origin/${release}
-                        export p2p_commit=`git rev-parse HEAD`
-                        rm -rf .git*
+			git checkout --track origin/${release} && rm -rf .git*
 			cd ${CWD}|| exit 1
 
 			# Clone debian packaging
@@ -66,12 +62,12 @@ try {
 			echo 'VERSION is ${agent_version}'
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
                         cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
-			dch -v '${agent_version}' -D stable 'Test build for ${agent_commit}' 1>/dev/null 2>/dev/null
+			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
 			
 			echo 'VERSION is ${p2p_version}'
 			cd ${CWD}/p2p && sed -i 's/quilt/native/' debian/source/format
 			cd ${CWD}/p2p && sed -i 's/eu0.cdn.subutai.io/${dhtHost}/' debian/rules
-			dch -v '${p2p_version}' -D stable 'Test build for ${p2p_commit}' 1>/dev/null 2>/dev/null
+			dch -v '${p2p_version}' -D stable 'Test build for ${p2p_version}' 1>/dev/null 2>/dev/null
 		"""
 
 		stage("Build Agent package")
