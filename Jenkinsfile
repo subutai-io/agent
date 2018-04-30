@@ -37,14 +37,14 @@ try {
 			git clone https://github.com/subutai-io/agent
 			cd agent
 			git checkout --track origin/${release}
-                        agent_commit=`git rev-parse HEAD`
+                        export agent_commit=`git rev-parse HEAD`
                         rm -rf .git*
 			cd ${CWD}|| exit 1
 
 			git clone https://github.com/subutai-io/p2p
 			cd p2p
 			git checkout --track origin/${release}
-                        p2p_commit=`git rev-parse HEAD`
+                        export p2p_commit=`git rev-parse HEAD`
                         rm -rf .git*
 			cd ${CWD}|| exit 1
 
