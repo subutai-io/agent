@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -14,8 +13,8 @@ import (
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
-	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
+	"os"
 )
 
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
@@ -52,7 +51,8 @@ func TunAdd(socket, timeout string) {
 		return
 	}
 
-	prepareKey()
+	log.Check(log.WarnLevel, "Setting key permissions", os.Chmod(config.Agent.DataPrefix+"ssh.pem", 0600))
+
 	args, tunsrv := getArgs(socket)
 
 	log.Debug("Executing command ssh " + strings.Join(args, " "))
@@ -65,6 +65,7 @@ func TunAdd(socket, timeout string) {
 	line, _, err := r.ReadLine()
 	log.Check(log.FatalLevel, "Reading tunnel output pipe", err)
 	for i := 0; err == nil && i < 10; i++ {
+		log.Debug("Ssh tunnel output: \n" + string(line))
 		if strings.Contains(string(line), "Allocated port") {
 			port := strings.Fields(string(line))
 			fmt.Println(tunsrv + ":" + port[2])
@@ -89,13 +90,6 @@ func TunAdd(socket, timeout string) {
 		line, _, err = r.ReadLine()
 	}
 	log.Error("Cannot get tunnel port")
-}
-
-func prepareKey() {
-	if s, err := os.Stat(config.Agent.DataPrefix + "ssh.pem"); err != nil || s.Mode().Perm() != 0600 {
-		fs.Copy(config.Agent.AppPrefix+"etc/ssh.pem", config.Agent.DataPrefix+"ssh.pem")
-		log.Check(log.WarnLevel, "Setting key permissions", os.Chmod(config.Agent.DataPrefix+"ssh.pem", 0600))
-	}
 }
 
 // TunList performs tunnel check and shows "alive" tunnels

@@ -14,7 +14,6 @@ import (
 type agentConfig struct {
 	Debug       bool
 	GpgUser     string
-	AppPrefix   string
 	LxcPrefix   string
 	Dataset     string
 	DataPrefix  string
@@ -56,9 +55,8 @@ const defaultConfig = `
 	gpgPassword = 12345678
 	gpgHome =
 	debug = true
-	appPrefix = /usr/share/subutai/
 	dataPrefix = /var/lib/subutai/
-	lxcPrefix = /var/lib/subutai/lxc/
+	lxcPrefix = /var/lib/lxc/
     dataset = subutai/fs
     cacheDir = /var/cache/subutai
 
