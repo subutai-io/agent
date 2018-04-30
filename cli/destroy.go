@@ -38,10 +38,12 @@ func LxcDestroy(id string, vlan bool) {
 			msg = id + " not found. Please check if a container name is correct."
 		}
 	} else if vlan {
+		var list []string
 		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		list := bolt.ContainerByKey("vlan", id)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			list = bolt.ContainerByKey("vlan", id)
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		}
 		for _, c := range list {
 			msg = "Vlan " + id + " is destroyed"
 			LxcDestroy(c, false)
@@ -52,11 +54,12 @@ func LxcDestroy(id string, vlan bool) {
 			log.Error("Pass -t flag to destroy template")
 		}
 
+		var c = make(map[string]string)
 		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		log.Debug("Obtaining container by name")
-		c := bolt.ContainerByName(id)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			c = bolt.ContainerByName(id)
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		}
 
 		msg = id + " is destroyed"
 
@@ -84,16 +87,21 @@ func LxcDestroy(id string, vlan bool) {
 	}
 
 	if id == "everything" {
+		var list []string
 		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		list := bolt.ContainerList()
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			list = bolt.ContainerList()
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		}
 
 		for _, name := range list {
+			var c = make(map[string]string)
 			bolt, err := db.New()
-			log.Check(log.WarnLevel, "Opening database", err)
-			c := bolt.ContainerByName(name)
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			if !log.Check(log.WarnLevel, "Opening database", err) {
+				c = bolt.ContainerByName(name)
+				log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			}
 
 			LxcDestroy(name, false)
 			if v, ok := c["vlan"]; ok {
@@ -136,13 +144,14 @@ func cleanupNetStat(vlan string) {
 }
 
 func removePortMap(name string) {
+	var portMap []map[string]string
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Debug("Obtaining container port mappings")
-	list := bolt.GetContainerMapping(name)
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		portMap = bolt.GetContainerMapping(name)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 
-	for _, v := range list {
+	for _, v := range portMap {
 		MapPort(v["protocol"], v["internal"], v["external"], "", v["domain"], "", false, true, false)
 	}
 }

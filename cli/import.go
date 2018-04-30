@@ -153,10 +153,12 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 }
 
 func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
+	var meta = make(map[string]string)
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	meta := bolt.TemplateByName(templateId)
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		meta = bolt.TemplateByName(templateId)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
 
 	if meta != nil {
 		templateInfo, found := meta["templateInfo"]
@@ -174,8 +176,7 @@ func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
 }
 
 func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
+
 	var key, value string
 	if name != "" && owner != "" && version != "" {
 		key = "nameAndOwnerAndVersion"
@@ -187,12 +188,17 @@ func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
 		key = "name"
 		value = name
 	}
-	meta := bolt.TemplateByKey(key, value)
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	if meta != nil && len(meta) > 0 {
+	var templates []string
+	bolt, err := db.New()
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		templates = bolt.TemplateByKey(key, value)
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	}
+
+	if templates != nil && len(templates) > 0 {
 		//first found template is returned if several meet the specified criteria
-		return getTemplateInfoFromCacheById(meta[0])
+		return getTemplateInfoFromCacheById(templates[0])
 	}
 
 	return templ{}, false
@@ -595,15 +601,16 @@ func cacheTemplateInfo(t templ) {
 	templateInfo, err := json.Marshal(&t)
 	if err == nil {
 		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		log.Check(log.WarnLevel, "Writing template data to database",
-			bolt.TemplateAdd(t.Id,
-				map[string]string{"templateInfo": string(templateInfo),
-					"name": t.Name,
-					"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
-					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
-				}))
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			defer bolt.Close()
+			log.Check(log.WarnLevel, "Writing template data to database",
+				bolt.TemplateAdd(t.Id,
+					map[string]string{"templateInfo": string(templateInfo),
+						"name": t.Name,
+						"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
+						"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
+					}))
+		}
 	}
 }
 
