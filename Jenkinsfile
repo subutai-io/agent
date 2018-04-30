@@ -3,7 +3,6 @@
 notifyBuildDetails = ""
 agentCommitId = ""
 
-
 try {
 	notifyBuild('STARTED')
 	node("deb") {
@@ -15,8 +14,18 @@ try {
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
 		def agent_version = "6.4.12+${date}"
-		def p2p_version = "6.3.2+${date}"
+		def p2p_version = "6.3.3+${date}"
 		def CWD = pwd()
+
+                switch (env.BRANCH_NAME) {
+                    case ~/master/: cdnHost = "mastercdn.subutai.io"; dhtHost = "eu0.mastercdn.subutai.io"; break;
+                    case ~/dev/: cdnHost = "devcdn.subutai.io"; dhtHost = "eu0.devcdn.subutai.io";  break;
+                    case ~/no-snap/: cdnHost = "devcdn.subutai.io"; dhtHost = "eu0.devcdn.subutai.io";  break;
+                    case ~/sysnet/: cdnHost = "sysnetcdn.subutai.io"; dhtHost = "eu0.sysnetcdn.subutai.io";  break;
+                    default: cdnHost = "cdn.subutai.io"; dhtHost = "eu0.cdn.subutai.io"; 
+                }
+                def release = env.BRANCH_NAME
+
 		sh """
 			#set +x
 			export LC_ALL=C.UTF-8
@@ -27,28 +36,22 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/no-snap && rm -rf .git*
+			git checkout --track origin/${release} && rm -rf .git*
+			cd ${CWD}|| exit 1
+
+			git clone https://github.com/subutai-io/p2p
+			cd p2p
+			git checkout --track origin/${release} && rm -rf .git*
 			cd ${CWD}|| exit 1
 
 			# Clone debian packaging
 		
 			git clone https://github.com/happyaron/subutai-agent
+			git clone https://github.com/happyaron/subutai-p2p
 
 			# Put debian directory into agent tree
 			cp -r subutai-agent/debian/ agent/
-			echo "Copied debian directory"
-
-			# Clone p2p code
-			git clone https://github.com/subutai-io/p2p
-			cd p2p || exit 1
-			git checkout --track origin/dev && rm -rf .git*
-			cd ${CWD} || exit 1
-
-			# Clone debian packaging
-			git clone https://github.com/happyaron/subutai-p2p
-
-			# Put debian directory into p2p tree
-			cp -r subutai-p2p/debian/ p2p/
+			cp -r subutai-p2p/debian/ p2p
 			echo "Copied debian directory"
 
 		"""		
@@ -58,12 +61,13 @@ try {
 			
 			echo 'VERSION is ${agent_version}'
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
+                        cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
 			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
 			
-			echo "VERSION is ${p2p_version}"
-			cd ${CWD}/p2p && sed -i "s/quilt/native/" debian/source/format
-			dch -v "${p2p_version}" -D stable "Test build for ${p2p_version}" 1>/dev/null 2>/dev/null
-
+			echo 'VERSION is ${p2p_version}'
+			cd ${CWD}/p2p && sed -i 's/quilt/native/' debian/source/format
+			cd ${CWD}/p2p && sed -i 's/eu0.cdn.subutai.io/${dhtHost}/' debian/rules
+			dch -v '${p2p_version}' -D stable 'Test build for ${p2p_version}' 1>/dev/null 2>/dev/null
 		"""
 
 		stage("Build Agent package")
@@ -71,13 +75,14 @@ try {
 		sh """
 			cd ${CWD}/agent
 			dpkg-buildpackage -rfakeroot
+
 			cd ${CWD}/p2p
 			dpkg-buildpackage -rfakeroot
 			
 			cd ${CWD} || exit 1
 			for i in *.deb; do
-    		echo '\$i:';
-    		dpkg -c \$i;
+    		            echo '\$i:';
+    		            dpkg -c \$i;
 			done
 		"""
 		
@@ -86,11 +91,8 @@ try {
 		sh """
 			cd ${CWD}
 			touch uploading_agent
-			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/
-			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh agent
-			touch uploading_p2p
-			scp uploading_p2p dak@deb.subutai.io:incoming/
-			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh p2p
+			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/${release}/
+			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
 		"""
 	}
 
