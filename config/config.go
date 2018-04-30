@@ -6,20 +6,18 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strings"
 	"gopkg.in/gcfg.v1"
 
 	"github.com/subutai-io/agent/log"
 )
 
-var version = ""
-
 type agentConfig struct {
 	Debug       bool
 	GpgUser     string
-	AppPrefix   string
 	LxcPrefix   string
+	Dataset     string
 	DataPrefix  string
+	CacheDir    string
 	GpgPassword string
 	GpgHome     string
 }
@@ -34,10 +32,9 @@ type managementConfig struct {
 }
 
 type influxdbConfig struct {
-	Server string
-	Db     string
-	User   string
-	Pass   string
+	Db   string
+	User string
+	Pass string
 }
 type cdnConfig struct {
 	Allowinsecure bool
@@ -45,17 +42,11 @@ type cdnConfig struct {
 	SSLport       string
 	Kurjun        string
 }
-type templateConfig struct {
-	Branch  string
-	Version string
-	Arch    string
-}
 type configFile struct {
 	Agent      agentConfig
 	Management managementConfig
 	Influxdb   influxdbConfig
 	CDN        cdnConfig
-	Template   templateConfig
 }
 
 const defaultConfig = `
@@ -64,9 +55,10 @@ const defaultConfig = `
 	gpgPassword = 12345678
 	gpgHome =
 	debug = true
-	appPrefix = /apps/subutai/current/
-	dataPrefix = /var/lib/apps/subutai/current/
-	lxcPrefix = /var/snap/subutai/common/lxc/
+	dataPrefix = /var/lib/subutai/
+	lxcPrefix = /var/lib/lxc/
+    dataset = subutai/fs
+    cacheDir = /var/cache/subutai
 
 	[management]
 	gpgUser =
@@ -82,15 +74,10 @@ const defaultConfig = `
     allowinsecure = false
 
 	[influxdb]
-	server =
 	user = root
 	pass = root
 	db = metrics
 
-	[template]
-	version = 5.0.0
-	branch =
-	arch = amd64
 `
 
 var (
@@ -103,8 +90,6 @@ var (
 	Influxdb influxdbConfig
 	// CDN url and port
 	CDN cdnConfig
-	// Template describes template configuration options
-	Template templateConfig
 )
 
 func init() {
@@ -112,31 +97,24 @@ func init() {
 
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
-	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, "/apps/subutai/current/etc/agent.gcfg"))
 
-	confpath := "/var/lib/apps/subutai/current/"
+	confpath := "/etc/subutai/agent.conf"
+	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath))
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
-		confpath = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		config.Agent.AppPrefix = "/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		config.Agent.LxcPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/common/lxc/"
-		config.Agent.DataPrefix = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/"
-		config.Template.Branch = strings.TrimPrefix(strings.TrimPrefix(os.Getenv("SNAP_NAME"), "subutai"), "-")
-		config.Template.Version = strings.TrimSuffix(version, "-SNAPSHOT")
-		config.CDN.URL = config.Template.Branch + "cdn.subutai.io"
+		log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath))
 	}
-	log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath+"agent.gcfg"))
-	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath+"agent.gcfg", gcfg.ReadFileInto(&config, confpath+"agent.gcfg"))
+
+	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath, gcfg.ReadFileInto(&config, confpath))
 
 	if config.Agent.GpgUser == "" {
 		config.Agent.GpgUser = "rh@subutai.io"
 	}
 
 	if config.Agent.GpgHome == "" {
-		config.Agent.GpgHome = "/var/snap/" + os.Getenv("SNAP_NAME") + "/current/.gnupg"
+		config.Agent.GpgHome = config.Agent.DataPrefix + ".gnupg"
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb
-	Template = config.Template
 	Management = config.Management
 	CDN = config.CDN
 
@@ -149,7 +127,6 @@ func InitAgentDebug() {
 	if config.Agent.Debug {
 		log.Level(log.DebugLevel)
 	}
-	log.ActivateSyslog("127.0.0.1:1514", "subutai")
 }
 
 // SaveDefaultConfig saves agent configuration file for future changes by user.

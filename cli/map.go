@@ -20,6 +20,9 @@ import (
 	"github.com/nightlyone/lockfile"
 )
 
+var (
+	nginxInc = config.Agent.DataPrefix + "nginx/nginx-includes/"
+)
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
 func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remove, sslbcknd bool) {
 	if list {
@@ -67,7 +70,7 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		}
 
 		// add containers to backend
-		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+		addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
 			"#Add new host here", "	server "+sockInt+";", false)
 
 		// save information to database
@@ -117,13 +120,13 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 		} else {
 			sockInt = sockInt + ":"
 		}
-		addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+		addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
 			"server "+sockInt, " ", true)
 	} else {
 		if bolt.PortMapDelete(protocol, sockExt, domain, "") == 0 {
 			bolt.PortMapDelete(protocol, sockExt, "", "")
 		}
-		os.Remove(config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + sockExt + "-" + domain + ".conf")
+		os.Remove(nginxInc + protocol + "/" + sockExt + "-" + domain + ".conf")
 		if protocol == "https" {
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + sockExt + "-" + domain + ".key")
 			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + sockExt + "-" + domain + ".crt")
@@ -155,29 +158,29 @@ func random(min, max int) int {
 }
 
 func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
-	socket := strings.Split((*sockExt), ":")
+	socket := strings.Split(*sockExt, ":")
 	if len(socket) > 1 && socket[1] != "" {
 		if port, err := strconv.Atoi(socket[1]); err != nil || port < 1000 || port > 65536 {
 			if !(strings.Contains(protocol, "http") && (port == 80 || port == 443)) {
 				log.Error("Port number in \"external\" should be integer in range of 1000-65536")
 			}
 		}
-		if isFree(protocol, (*sockExt)) {
+		if isFree(protocol, *sockExt) {
 			return true
 		}
 
 		bolt, err := db.New()
 		defer bolt.Close()
 		log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err)
-		if !bolt.PortInMap(protocol, (*sockExt), "", "") && socket[1] != "80" {
+		if !bolt.PortInMap(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
-		} else if bolt.PortInMap(protocol, (*sockExt), domain, sockInt) {
+		} else if bolt.PortInMap(protocol, *sockExt, domain, sockInt) {
 			log.Error("Mapping already exists")
 		}
-		return !bolt.PortInMap(protocol, (*sockExt), domain, "")
+		return !bolt.PortInMap(protocol, *sockExt, domain, "")
 	}
 	for port := strconv.Itoa(random(1000, 65536)); isFree(protocol, socket[0]+":"+port); port = strconv.Itoa(random(1000, 65536)) {
-		(*sockExt) = socket[0] + ":" + port
+		*sockExt = socket[0] + ":" + port
 		return true
 	}
 	return false
@@ -185,13 +188,13 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 
 func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
-		os.MkdirAll(config.Agent.DataPrefix+"nginx-includes/"+protocol, 0755))
-	conf := config.Agent.DataPrefix + "nginx-includes/" + protocol + "/" + sockExt + "-" + domain + ".conf"
+		os.MkdirAll(nginxInc+protocol, 0755))
+	conf := nginxInc + protocol + "/" + sockExt + "-" + domain + ".conf"
 
 	switch protocol {
 	case "https":
 		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(config.Agent.DataPrefix+"/web/ssl/", 0755))
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost-ssl.example", conf)
+		fs.Copy(conftmpl+"vhost-ssl.example", conf)
 		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+strings.Split(sockExt, ":")[1]+"$request_uri;  # enforce https", true)
 		addLine(conf, "listen	443;", "	listen "+sockExt+";", true)
 		addLine(conf, "server_name DOMAIN;", "	server_name "+domain+";", true)
@@ -206,12 +209,12 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt", crt, 0644))
 		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key", key, 0644))
 
-		addLine(conf, "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
+		addLine(conf, "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
 			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt;", true)
-		addLine(conf, "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(conf, "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
 			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key;", true)
 	case "http":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/vhost.example", conf)
+		fs.Copy(conftmpl+"vhost.example", conf)
 		addLine(conf, "listen 	80;", "	listen "+sockExt+";", true)
 		addLine(conf, "return 301 http://$host$request_uri;", "	    return 301 http://$host:"+strings.Split(sockExt, ":")[1]+"$request_uri;", true)
 		addLine(conf, "server_name DOMAIN;", "	server_name "+domain+";", true)
@@ -221,10 +224,10 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 			httpRedirect(sockExt, domain)
 		}
 	case "tcp":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
+		fs.Copy(conftmpl+"stream.example", conf)
 		addLine(conf, "listen PORT;", "	listen "+sockExt+";", true)
 	case "udp":
-		fs.Copy(config.Agent.AppPrefix+"etc/nginx/tmpl/stream.example", conf)
+		fs.Copy(conftmpl+"stream.example", conf)
 		addLine(conf, "listen PORT;", "	listen "+sockExt+" udp;", true)
 	}
 	addLine(conf, "server localhost:81;", " ", true)
@@ -273,7 +276,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	}
 	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, sockExt, domain, policy))
 
-	addLine(config.Agent.DataPrefix+"nginx-includes/"+protocol+"/"+sockExt+"-"+domain+".conf",
+	addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
 		replaceString, "	"+policy+"; #policy", replace)
 }
 
@@ -284,7 +287,7 @@ func httpRedirect(sockExt, domain string) {
     	return 301 http://$host:` + strings.Split(sockExt, ":")[1] + `$request_uri;
 }`
 
-	addLine(config.Agent.DataPrefix+"nginx-includes/http/"+sockExt+"-"+domain+".conf",
+	addLine(nginxInc+"http/"+sockExt+"-"+domain+".conf",
 		"#redirect placeholder", redirect, true)
 
 }

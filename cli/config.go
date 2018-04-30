@@ -17,7 +17,7 @@ func LxcConfig(contName, operation, key, value string) {
 	case "add":
 		addValue(contName, key, value)
 	case "del":
-		delValue(contName, key, value)
+		delValue(contName, key)
 	case "":
 		displayConfig(contName)
 	}
@@ -68,7 +68,7 @@ func addValue(containerName, key, value string) {
 }
 
 // delValue removes passed key and value from container's configuration file
-func delValue(containerName, key, value string) {
+func delValue(containerName, key string) {
 	if len(key) == 0 {
 		log.Error("No key provided")
 	}
