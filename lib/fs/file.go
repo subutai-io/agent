@@ -34,15 +34,6 @@ func Tar(folder, file string) {
 	archive.Close()
 }
 
-func ChownR(path string, uid, gid int) error {
-	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
-		if err == nil {
-			err = os.Chown(name, uid, gid)
-		}
-		return err
-	})
-}
-
 func FileExists(name string) bool {
 	_, err := os.Stat(name)
 

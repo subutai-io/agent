@@ -3,10 +3,8 @@ package alert
 
 import (
 	"bufio"
-	"bytes"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -15,6 +13,7 @@ import (
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/config"
 	cont "github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
 )
 
 type values struct {
@@ -22,18 +21,12 @@ type values struct {
 	Quota   int `json:"quota,omitempty"`
 }
 
-type hdd struct {
-	Partition string `json:"partition"`
-	Current   int    `json:"current"`
-	Quota     int    `json:"quota"`
-}
-
 //Load describes container usage stats. If alert active for this container the Management server receives this data.
 type Load struct {
 	Container string  `json:"id,omitempty"`
 	CPU       *values `json:"cpu,omitempty"`
 	RAM       *values `json:"ram,omitempty"`
-	Disk      []hdd   `json:"hdd,omitempty"`
+	Disk      *values `json:"hdd,omitempty"`
 }
 
 var (
@@ -47,30 +40,6 @@ func read(path string) (int, error) {
 		return -1, err
 	}
 	return strconv.Atoi(strings.TrimSpace(string(out)))
-}
-
-func id() (list map[string]string) {
-	list = map[string]string{}
-	out, err := exec.Command("btrfs", "subvolume", "list", config.Agent.LxcPrefix).Output()
-	if err != nil {
-		return
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := strings.Fields(scanner.Text())
-		if len(line) > 8 {
-			list[line[8]] = line[1]
-		}
-	}
-	return
-}
-
-func stat() string {
-	out, err := exec.Command("btrfs", "qgroup", "show", "-re", "--raw", config.Agent.LxcPrefix).Output()
-	if err != nil {
-		return ""
-	}
-	return string(out)
 }
 
 func ramMax() (int, error) {
@@ -163,32 +132,24 @@ func cpuLoad(cont string) []int {
 	return avgload
 }
 
-func diskQuota(mountid, diskMap string) []int {
-	var u, l string
-	for _, line := range strings.Split(diskMap, "\n") {
-		row := strings.Fields(line)
-		if len(row) > 4 {
-			if strings.HasSuffix(row[0], "/"+mountid) {
-				u, l = row[2], row[4]
-			}
-		}
-	}
-
-	used, err := strconv.Atoi(u)
+//returns disk usage in % and quota in GB
+func diskUsage(path string) []int {
+	bytesUsed, err := fs.DatasetDiskUsage(path)
 	if err != nil {
-		used = 0
+		bytesUsed = 0
 	}
 
-	limit, err := strconv.Atoi(l)
+	quota, err := fs.GetQuota(path)
 	if err != nil {
-		limit = 0
+		quota = 0
 	}
 
-	var diskUsage = []int{0, limit / 1024 / 1024 / 1024}
-	if limit != 0 {
-		diskUsage[0] = used * 100 / limit
+	diskUsage := 0
+	if quota != 0 {
+		diskUsage = bytesUsed * 100 / quota
 	}
-	return diskUsage
+
+	return []int{diskUsage, quota / (1024 * 1024 * 1024)}
 }
 
 //Processing works as a daemon, collecting information about containers stats and preparing list of active alerts.
@@ -206,37 +167,30 @@ func Processing() {
 
 func alertLoad() (load map[string]Load) {
 	load = make(map[string]Load)
-	diskMap := stat()
-	diskIDs := id()
 
 	files, err := ioutil.ReadDir("/sys/fs/cgroup/cpu/lxc/")
 	if err != nil {
 		return
 	}
-	for _, cont := range files {
-		if !cont.IsDir() {
+
+	for _, con := range files {
+		if !con.IsDir() {
 			continue
 		}
 
-		cpuValues := cpuLoad(cont.Name())
-		ramValues := ramQuota(cont.Name())
+		cpuValues := cpuLoad(con.Name())
+		ramValues := ramQuota(con.Name())
+		diskValues := diskUsage(con.Name())
 
-		disk := []hdd{}
-		for _, v := range []string{"", "/rootfs", "/opt", "/var", "/home"} {
-			diskValues := diskQuota(diskIDs[cont.Name()+v], diskMap)
-			if len(diskValues) > 1 {
-				disk = append(disk, hdd{Current: diskValues[0], Quota: diskValues[1], Partition: v})
-			}
-		}
-
-		if len(cpuValues) > 1 && len(ramValues) > 1 {
-			load[cont.Name()] = Load{
+		if len(cpuValues) > 1 && len(ramValues) > 1 && len(diskValues) > 1 {
+			load[con.Name()] = Load{
 				CPU:  &values{Current: cpuValues[0], Quota: cpuValues[1]},
 				RAM:  &values{Current: ramValues[0], Quota: ramValues[1]},
-				Disk: disk,
+				Disk: &values{Current: diskValues[0], Quota: diskValues[1]},
 			}
 		}
 	}
+
 	return load
 }
 
@@ -256,14 +210,7 @@ func Current(list []container.Container) []Load {
 			item.RAM = &values{Current: stats[v.Name].RAM.Current, Quota: stats[v.Name].RAM.Quota}
 		}
 
-		for _, value := range stats[v.Name].Disk {
-			threshold, err = strconv.Atoi(cont.GetConfigItem(config.Agent.LxcPrefix+v.Name+"/config", "subutai.alert.disk."+value.Partition))
-			if threshold > 0 && value.Current > threshold && err == nil {
-				item.Disk = append(item.Disk, hdd{Current: value.Current, Quota: value.Quota, Partition: value.Partition})
-			}
-		}
-
-		if item.CPU != nil || item.RAM != nil || len(item.Disk) > 0 {
+		if item.CPU != nil || item.RAM != nil {
 			item.Container = v.ID
 			loadList = append(loadList, item)
 		}
@@ -276,20 +223,7 @@ func Quota(list []container.Container) (output []container.Container) {
 		if c, ok := stats[v.Name]; ok {
 			v.Quota.CPU = c.CPU.Quota
 			v.Quota.RAM = c.RAM.Quota
-			for _, value := range stats[v.Name].Disk {
-				switch value.Partition {
-				case "":
-					v.Quota.Disk = value.Quota
-				case "/rootfs":
-					v.Quota.Root = value.Quota
-				case "/home":
-					v.Quota.Home = value.Quota
-				case "/var":
-					v.Quota.Var = value.Quota
-				case "/opt":
-					v.Quota.Opt = value.Quota
-				}
-			}
+			v.Quota.Disk = stats[v.Name].Disk.Quota
 		}
 		output = append(output, v)
 	}

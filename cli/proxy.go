@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	conftmpl = config.Agent.AppPrefix + "etc/nginx/tmpl/"
-	confinc  = config.Agent.DataPrefix + "nginx-includes/http/"
+	conftmpl =  "/etc/nginx/tmpl/"
+	confinc  = config.Agent.DataPrefix + "nginx/nginx-includes/http/"
 )
 
 // The reverse proxy component in Subutai provides and easy way to assign domain name and forward HTTP(S) traffic to certain environment.
@@ -35,7 +35,7 @@ func ProxyAdd(vlan, domain, node, policy, cert string) {
 		if isVlanExist(vlan) {
 			log.Error("Domain already exists")
 		}
-		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.ContainerOrTemplateExists(crt[0]) {
+		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.LxcInstanceExists(crt[0]) {
 			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
 				crt[0] += "/rootfs"
 			}
@@ -132,9 +132,9 @@ func addDomain(vlan, domain, cert string) {
 			log.Info("Cannot create key file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".key")
 			os.Exit(1)
 		}
-		addLine(confinc+vlan+".conf", "ssl_certificate /var/snap/subutai/current/web/ssl/UNIXDATE.crt;",
+		addLine(confinc+vlan+".conf", "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
 			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate_key /var/snap/subutai/current/web/ssl/UNIXDATE.key;",
+		addLine(confinc+vlan+".conf", "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
 			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
 	} else {
 		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")

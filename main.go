@@ -21,13 +21,7 @@ func init() {
 	if os.Getuid() != 0 {
 		log.Error("Please run as root")
 	}
-	os.Setenv("PATH", "/apps/subutai/current/bin:"+os.Getenv("PATH"))
-	log.ActivateSyslog("127.0.0.1:1514", "cli")
-	if len(os.Args) > 1 {
-		if os.Args[1] == "-d" {
-			log.Level(log.DebugLevel)
-		}
-	}
+	os.Setenv("PATH", "/usr/share/subutai/bin:"+os.Getenv("PATH"))
 }
 
 func main() {
@@ -38,9 +32,6 @@ func main() {
 		if base, err := db.New(); err == nil {
 			if len(config.Management.Host) < 7 {
 				config.Management.Host = base.DiscoveryLoad()
-			}
-			if len(config.Influxdb.Server) < 7 {
-				config.Influxdb.Server = base.DiscoveryLoad()
 			}
 			base.Close()
 		}
@@ -53,24 +44,18 @@ func main() {
 		Name:  "d",
 		Usage: "debug mode"}}
 
+	app.Before = func(c *gcli.Context) error {
+		if c.IsSet("d") {
+			log.Level(log.DebugLevel)
+		}
+		return nil
+	}
+
 	app.Commands = []gcli.Command{{
 		Name: "attach", Usage: "attach to Subutai container",
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
 				cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "backup", Usage: "backup Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "full, f", Usage: "make full backup"},
-			gcli.BoolFlag{Name: "stop, s", Usage: "stop container at the time of backup"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.BackupContainer(c.Args().Get(0), c.Bool("f"), c.Bool("s"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -83,19 +68,6 @@ func main() {
 		Action: func(c *gcli.Context) error {
 			if c.String("j") != "" {
 				cli.Batch(c.String("j"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "checkpoint", Usage: "chekpoint/restore in user space",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "stop, s", Usage: "Stop container during checkpoint"},
-			gcli.BoolFlag{Name: "restore, r", Usage: "Restore checkpoint"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Checkpoint(c.Args().Get(0), c.Bool("r"), c.Bool("s"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -159,27 +131,17 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "demote", Usage: "demote Subutai container",
+		Name: "destroy", Usage: "destroy Subutai container/template",
 		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "ipaddr, i", Usage: "IPv4 address, ie 192.168.1.1/24"},
-			gcli.StringFlag{Name: "vlan, v", Usage: "VLAN tag"},
+			gcli.BoolFlag{Name: "template, t", Usage: "destroy template"},
 		},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDemote(c.Args().Get(0), c.String("i"), c.String("v"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "destroy", Usage: "destroy Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "vlan, v", Usage: "destroy environment by passed vlan"},
-		},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), c.Bool("v"))
+				if c.Bool("t") {
+					cli.LxcDestroyTemplate(c.Args().Get(0))
+				} else {
+					cli.LxcDestroy(c.Args().Get(0), false)
+				}
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -188,6 +150,7 @@ func main() {
 
 		Name: "export", Usage: "export Subutai container",
 		Flags: []gcli.Flag{
+			gcli.StringFlag{Name: "name, n", Usage: "new template name"},
 			gcli.StringFlag{Name: "version, v", Usage: "template version"},
 			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"},
 			gcli.StringFlag{Name: "token, t", Usage: "mandatory CDN token"},
@@ -196,7 +159,7 @@ func main() {
 			gcli.BoolFlag{Name: "local, l", Usage: "export template to local cache"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcExport(c.Args().Get(0), c.String("v"), c.String("s"),
+				cli.LxcExport(c.Args().Get(0), c.String("n"), c.String("v"), c.String("s"),
 					c.String("t"), c.String("d"), c.Bool("p"), c.Bool("l"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
@@ -240,10 +203,9 @@ func main() {
 			gcli.BoolFlag{Name: "container, c", Usage: "containers only"},
 			gcli.BoolFlag{Name: "template, t", Usage: "templates only"},
 			gcli.BoolFlag{Name: "info, i", Usage: "detailed container info"},
-			gcli.BoolFlag{Name: "ancestor, a", Usage: "with ancestors"},
 			gcli.BoolFlag{Name: "parent, p", Usage: "with parent"}},
 		Action: func(c *gcli.Context) error {
-			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("a"), c.Bool("p"))
+			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("p"))
 			return nil
 		}}, {
 
@@ -284,51 +246,6 @@ func main() {
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
 				cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "migrate", Usage: "migrate Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "stage, s", Usage: "migration stage"},
-			gcli.StringFlag{Name: "destination, d", Usage: "peer destination address"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Migrate(c.Args().Get(0), c.String("s"), c.String("d"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "p2p", Usage: "P2P network operations",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "create, c", Usage: "create p2p instance (interfaceName hash key ttl localPeepIPAddr portRange)"},
-			gcli.BoolFlag{Name: "delete, d", Usage: "delete p2p instance by swarm hash"},
-			gcli.BoolFlag{Name: "update, u", Usage: "update p2p instance encryption key (hash newkey ttl)"},
-			gcli.BoolFlag{Name: "interfaces, i", Usage: "list of p2p interfaces"},
-			gcli.BoolFlag{Name: "peers, p", Usage: "list of p2p swarm participants by hash"},
-			gcli.BoolFlag{Name: "status, s", Usage: "status of p2p swarm(s) (optional hash to get particular swarm status)"},
-			gcli.BoolFlag{Name: "version, v", Usage: "print p2p version"}},
-		Action: func(c *gcli.Context) error {
-			switch {
-			case c.Bool("i"):
-				cli.P2PInterfaces()
-			case c.Bool("v"):
-				cli.P2Pversion()
-			default:
-				cli.P2P(c.Bool("c"), c.Bool("d"), c.Bool("u"), c.Bool("s"), c.Bool("p"), os.Args)
-			}
-			return nil
-		}}, {
-
-		Name:  "promote", Usage: "promote Subutai container",
-		Flags: []gcli.Flag{gcli.StringFlag{Name: "source, s", Usage: "set the source for promoting"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcPromote(c.Args().Get(0), c.String("s"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -386,19 +303,6 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "restore", Usage: "restore Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "date, d", Usage: "date of backup snapshot"},
-			gcli.StringFlag{Name: "container, c", Usage: "name of new container"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.RestoreContainer(c.Args().Get(0), c.String("d"), c.String("c"), false)
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
 		Name: "stats", Usage: "statistics from host",
 		Action: func(c *gcli.Context) error {
 			cli.Info(c.Args().Get(0), c.Args().Get(1))
@@ -425,6 +329,16 @@ func main() {
 			return nil
 		}}, {
 
+		Name: "restart", Usage: "restart Subutai container",
+		Action: func(c *gcli.Context) error {
+			if c.Args().Get(0) != "" {
+				cli.LxcRestart(c.Args().Get(0))
+			} else {
+				gcli.ShowSubcommandHelp(c)
+			}
+			return nil
+		}}, {
+
 		Name: "tunnel", Usage: "SSH tunnel management",
 		Subcommands: []gcli.Command{
 			{
@@ -433,7 +347,7 @@ func main() {
 				Flags: []gcli.Flag{
 					gcli.BoolFlag{Name: "global, g", Usage: "create tunnel to global proxy"}},
 				Action: func(c *gcli.Context) error {
-					cli.TunAdd(c.Args().Get(0), c.Args().Get(1), true)
+					cli.TunAdd(c.Args().Get(0), c.Args().Get(1))
 					return nil
 				}}, {
 				Name:  "del",

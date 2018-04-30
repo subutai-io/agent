@@ -92,13 +92,13 @@ func writeLog(hostname, app, severity, pid, message string) {
 
 		bp.AddPoint(point)
 
-		client, err := utils.InfluxDbClient()
+		clnt, err := utils.InfluxDbClient()
 
 		if err == nil {
 
-			defer client.Close()
+			defer clnt.Close()
 
-			client.Write(bp)
+			clnt.Write(bp)
 		}
 	}
 }

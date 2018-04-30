@@ -8,7 +8,7 @@ endif
 ifeq (${GOPATH}, )
 	GOPATH=${HOME}/go
 endif
-LDFLAGS=-ldflags "-r /snap/subutai-dev/current/lib -w -s -X main.version=${VERSION} -X github.com/subutai-io/agent/config.version=${VERSION}"
+LDFLAGS=-ldflags "-w -s -X main.version=${VERSION}"
 
 all:
 	@if [ ! -d "$(GOPATH)/src/github.com/subutai-io/agent" ]; then mkdir -p $(GOPATH)/src/github.com/subutai-io/; ln -s $(shell pwd) $(GOPATH)/src/github.com/subutai-io/agent; fi

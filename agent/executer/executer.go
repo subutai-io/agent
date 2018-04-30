@@ -189,16 +189,16 @@ func outputSender(stdout, stderr chan string, ch chan<- ResponseOptions, respons
 }
 
 func buildCmd(r *RequestOptions) *exec.Cmd {
-	user, err := user.Lookup(r.RunAs)
+	usr, err := user.Lookup(r.RunAs)
 	if log.Check(log.WarnLevel, "User lookup: "+r.RunAs, err) {
 		return nil
 	}
-	uid, err := strconv.Atoi(user.Uid)
-	if log.Check(log.WarnLevel, "UID lookup: "+user.Uid, err) {
+	uid, err := strconv.Atoi(usr.Uid)
+	if log.Check(log.WarnLevel, "UID lookup: "+usr.Uid, err) {
 		return nil
 	}
-	gid, err := strconv.Atoi(user.Gid)
-	if log.Check(log.WarnLevel, "GID lookup: "+user.Gid, err) {
+	gid, err := strconv.Atoi(usr.Gid)
+	if log.Check(log.WarnLevel, "GID lookup: "+usr.Gid, err) {
 		return nil
 	}
 	gid32 := *(*uint32)(unsafe.Pointer(&gid))

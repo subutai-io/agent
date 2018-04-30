@@ -10,11 +10,12 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
-	lxc "gopkg.in/lxc/go-lxc.v2"
+	"gopkg.in/lxc/go-lxc.v2"
+	"sort"
 )
 
 // printHeader prints list headerline
-func printHeader(w io.Writer, c, t, i, a, p bool) {
+func printHeader(w io.Writer, c, t, i, p bool) {
 	var header, line string
 	if i {
 		header = "NAME\tSTATE\tIP\tInterface"
@@ -33,19 +34,15 @@ func printHeader(w io.Writer, c, t, i, a, p bool) {
 		header = header + "\tPARENT"
 		line = line + "\t------"
 	}
-	if a {
-		header = header + "\tANCESTORS"
-		line = line + "\t---------"
-	}
 	fmt.Fprintln(w, header)
 	fmt.Fprintln(w, line)
 }
 
 // printList prints list
-func printList(list []string, c, t, i, a, p bool) {
+func printList(list []string, c, t, i, p bool) {
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 0, 8, 1, '\t', 0)
-	printHeader(w, c, t, i, a, p)
+	printHeader(w, c, t, i, p)
 	for _, item := range list {
 		fmt.Fprintln(w, item)
 	}
@@ -53,8 +50,8 @@ func printList(list []string, c, t, i, a, p bool) {
 }
 
 // LxcList function shows a listing of Subutai instances with information such as IP address, parent template, etc.
-func LxcList(name string, c, t, i, a, p bool) {
-	list := []string{}
+func LxcList(name string, c, t, i, p bool) {
+	var list []string
 	if i {
 		if name == "" {
 			for _, item := range container.Containers() {
@@ -81,36 +78,23 @@ func LxcList(name string, c, t, i, a, p bool) {
 	if p {
 		list = addParent(list)
 	}
-	if a {
-		list = addAncestors(list)
-	}
-	printList(list, c, t, i, a, p)
+	sort.Strings(list)
+	printList(list, c, t, i, p)
 
 }
 
 // addParent adds parent to each template in list
 func addParent(list []string) []string {
 	for i := range list {
-		list[i] = list[i] + "\t" + container.GetParent(strings.Fields(list[i])[0])
-	}
-	return list
-}
-
-// addAncestors adds ancestors to each template in list
-func addAncestors(list []string) []string {
-	for i := range list {
-		child := strings.Fields(list[i])[0]
-		parent := container.GetParent(child)
-		result := ""
-		for child != parent {
-			if result != "" {
-				result = result + "," + parent
-			} else {
-				result = parent
-			}
-			child = parent
+		name := strings.Fields(list[i])[0]
+		parent := container.GetProperty(name, "subutai.parent") + ":" +
+			container.GetProperty(name, "subutai.parent.owner") + ":" +
+			container.GetProperty(name, "subutai.parent.version")
+		if name == parent {
+			list[i] = list[i] + "\t"
+		} else {
+			list[i] = list[i] + "\t" + parent
 		}
-		list[i] = list[i] + "\t" + result
 	}
 	return list
 }

@@ -9,11 +9,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"os/signal"
 	"runtime"
 	"strings"
-	"syscall"
-
 	"sync"
 	"time"
 
@@ -29,7 +26,6 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-	lxc "github.com/subutai-io/agent/lib/container"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -87,34 +83,6 @@ func Start() {
 	go alert.Processing()
 	go logger.SyslogServer()
 	go restoreContainers()
-
-	/**
-	This routine does best effort to stop RUNNING containers on a custom signal (SIGUSR1)
-	received from our custom unit file on system reboot/shutdown
-	It handles SIGTERM in addition to SIGUSR1
-	Signals are awaited in a loop to make sure that they both are processed if sent, regardless of order
-	 */
-	go func() {
-		s := make(chan os.Signal, 2)
-		signal.Notify(s, syscall.SIGUSR1, syscall.SIGTERM)
-
-		for i := 1; i <= 2; i++ {
-			sig := <-s
-
-			canRestoreContainers = false
-
-			switch sig {
-
-			case syscall.SIGUSR1, syscall.SIGTERM:
-				//stop containers
-				for _, containerName := range lxc.Containers() {
-					if lxc.State(containerName) == "RUNNING" {
-						lxc.Stop(containerName, false)
-					}
-				}
-			}
-		}
-	}()
 
 	for {
 		if sendHeartbeat() {
