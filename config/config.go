@@ -98,7 +98,7 @@ func init() {
 	err := gcfg.ReadStringInto(&config, defaultConfig)
 	log.Check(log.InfoLevel, "Loading default config ", err)
 
-	confpath := "/var/lib/subutai/agent.gcfg"
+	confpath := "/etc/subutai/agent.conf"
 	log.Check(log.DebugLevel, "Opening Agent default configuration file", gcfg.ReadFileInto(&config, confpath))
 	if _, err := os.Stat(confpath); os.IsNotExist(err) {
 		log.Check(log.ErrorLevel, "Saving default configuration file", SaveDefaultConfig(confpath))
