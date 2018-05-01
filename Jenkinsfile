@@ -15,14 +15,32 @@ try {
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
 		def agent_version = "6.4.12+${date}"
 		def p2p_version = "6.3.3+${date}"
+        def p2p_log_level = "INFO"
 		def CWD = pwd()
 
                 switch (env.BRANCH_NAME) {
-                    case ~/master/: cdnHost = "mastercdn.subutai.io"; dhtHost = "eu0.mastercdn.subutai.io"; break;
-                    case ~/dev/: cdnHost = "devcdn.subutai.io"; dhtHost = "eu0.devcdn.subutai.io";  break;
-                    case ~/no-snap/: cdnHost = "devcdn.subutai.io"; dhtHost = "eu0.devcdn.subutai.io";  break;
-                    case ~/sysnet/: cdnHost = "sysnetcdn.subutai.io"; dhtHost = "eu0.sysnetcdn.subutai.io";  break;
-                    default: cdnHost = "cdn.subutai.io"; dhtHost = "eu0.cdn.subutai.io"; 
+                    case ~/master/: 
+                        cdnHost = "mastercdn.subutai.io"; 
+                        dhtHost = "eu0.mastercdn.subutai.io"; 
+                        p2p_log_level = "DEBUG";
+                        break;
+                    case ~/dev/: 
+                        cdnHost = "devcdn.subutai.io"; 
+                        dhtHost = "eu0.devcdn.subutai.io";  
+                        p2p_log_level = "DEBUG";
+                        break;
+                    case ~/no-snap/: 
+                        cdnHost = "devcdn.subutai.io"; 
+                        dhtHost = "eu0.devcdn.subutai.io";  
+                        break;
+                    case ~/sysnet/: 
+                        cdnHost = "sysnetcdn.subutai.io"; 
+                        dhtHost = "eu0.sysnetcdn.subutai.io";  
+                        p2p_log_level = "TRACE";
+                        break;
+                    default: 
+                        cdnHost = "cdn.subutai.io"; 
+                        dhtHost = "eu0.cdn.subutai.io"; 
                 }
                 def release = env.BRANCH_NAME
 
@@ -67,6 +85,7 @@ try {
 			echo 'VERSION is ${p2p_version}'
 			cd ${CWD}/p2p && sed -i 's/quilt/native/' debian/source/format
 			cd ${CWD}/p2p && sed -i 's/eu0.cdn.subutai.io/${dhtHost}/' debian/rules
+			cd ${CWD}/p2p && sed -i 's/INFO/${p2p_log_level}/' debian/rules
 			dch -v '${p2p_version}' -D stable 'Test build for ${p2p_version}' 1>/dev/null 2>/dev/null
 		"""
 
