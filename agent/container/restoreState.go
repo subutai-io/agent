@@ -25,10 +25,7 @@ func compat() {
 func StateRestore(canRestore *bool) {
 	compat()
 
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	active := bolt.ContainerByKey("state", "RUNNING")
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	active := getRunningContainers()
 
 	for _, v := range active {
 		if !*canRestore {
@@ -50,4 +47,15 @@ func StateRestore(canRestore *bool) {
 			}
 		}
 	}
+}
+
+func getRunningContainers() []string {
+	bolt, err := db.New()
+
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		return bolt.ContainerByKey("state", "RUNNING")
+	}
+
+	return []string{}
 }

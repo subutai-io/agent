@@ -13,6 +13,9 @@ import (
 	"github.com/subutai-io/agent/log"
 
 	gcli "github.com/urfave/cli"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/exec"
+	"strings"
 )
 
 var version = "unknown"
@@ -21,7 +24,52 @@ func init() {
 	if os.Getuid() != 0 {
 		log.Error("Please run as root")
 	}
-	os.Setenv("PATH", "/usr/share/subutai/bin:"+os.Getenv("PATH"))
+
+	checkGPG()
+}
+
+func checkGPG() {
+	out, err := exec.Execute("gpg1", "--version")
+	if err != nil {
+		out, err = exec.Execute("gpg", "--version")
+
+		if err != nil {
+			log.Fatal("GPG not found " + out)
+		} else {
+			lines := strings.Split(out, "\n")
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+				version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+				if strings.HasPrefix(version, "1.4") {
+					gpg.GPG = "gpg"
+				} else {
+					log.Fatal("GPG version " + version + " is not compatible with subutai")
+				}
+			} else {
+				log.Fatal("Failed to determine GPG version " + out)
+			}
+		}
+	} else {
+		lines := strings.Split(out, "\n")
+		if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+			version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+			if strings.HasPrefix(version, "1.4") {
+				gpg.GPG = "gpg1"
+			} else {
+				log.Fatal("GPG version " + version + " is not compatible with subutai")
+			}
+		} else {
+			log.Fatal("Failed to determine GPG version " + out)
+		}
+	}
+}
+
+func initDb() {
+	if base, err := db.New(); err == nil {
+		defer base.Close()
+		if len(config.Management.Host) < 7 {
+			config.Management.Host = base.DiscoveryLoad()
+		}
+	}
 }
 
 func main() {
@@ -29,12 +77,7 @@ func main() {
 	app.Name = "Subutai"
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
-		if base, err := db.New(); err == nil {
-			if len(config.Management.Host) < 7 {
-				config.Management.Host = base.DiscoveryLoad()
-			}
-			base.Close()
-		}
+		initDb()
 	}
 
 	app.Version = version

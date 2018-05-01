@@ -26,9 +26,11 @@ func New() (*Instance, error) {
 		return nil, err
 	}
 
-	if initdb(boltDB) != nil {
+	if err = initdb(boltDB); err != nil {
+		boltDB.Close()
 		return nil, err
 	}
+
 	return &Instance{db: boltDB}, nil
 }
 
