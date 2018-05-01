@@ -46,9 +46,10 @@ func LxcQuota(name, res, size, threshold string) {
 	}
 	if len(res) > 0 && len(size) > 0 {
 		bolt, err := db.New()
-		log.Check(log.WarnLevel, "Opening database", err)
-		log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerQuota(name, res, size))
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		if !log.Check(log.WarnLevel, "Opening database", err) {
+			log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerQuota(name, res, size))
+			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+		}
 	}
 
 	if quota == "none" {

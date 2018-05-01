@@ -175,7 +175,6 @@ func netStat(bp client.BatchPoints) {
 }
 
 func zfsStat(bp client.BatchPoints) {
-	all := container.All()
 	output, err := exc.Execute("zfs", "list", "-r")
 	if log.Check(log.DebugLevel, "Getting zfs stats", err) {
 		return
@@ -186,7 +185,7 @@ func zfsStat(bp client.BatchPoints) {
 	var usageMap = make(map[string]string)
 	for _, line := range lines {
 
-		if strings.HasPrefix(line, "subutai") {
+		if strings.HasPrefix(line, config.Agent.Dataset) {
 			fields := strings.Fields(line)
 			if len(fields) > 1 {
 				usageMap[fields[0]] = fields[1]
@@ -195,7 +194,7 @@ func zfsStat(bp client.BatchPoints) {
 
 	}
 
-	for _, cont := range all {
+	for _, cont := range container.All() {
 		for key, val := range usageMap {
 			if key == path.Join(config.Agent.Dataset, cont) {
 				value, _ := fs.ConvertToBytes(val)

@@ -81,9 +81,10 @@ func TunAdd(socket, timeout string) {
 				tunnel["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
 			}
 			bolt, err := db.New()
-			log.Check(log.WarnLevel, "Opening database", err)
-			log.Check(log.WarnLevel, "Adding new tunnel entry", bolt.AddTunEntry(tunnel))
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			if !log.Check(log.WarnLevel, "Opening database", err) {
+				log.Check(log.WarnLevel, "Adding new tunnel entry", bolt.AddTunEntry(tunnel))
+				log.Check(log.WarnLevel, "Closing database", bolt.Close())
+			}
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -95,34 +96,36 @@ func TunAdd(socket, timeout string) {
 // TunList performs tunnel check and shows "alive" tunnels
 func TunList() {
 	TunCheck()
-	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	list := bolt.GetTunList()
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	for _, item := range list {
-		fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
+	var list []map[string]string
+	bolt, err := db.New()
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		list = bolt.GetTunList()
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+
+		for _, item := range list {
+			fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
+		}
 	}
 }
 
 // TunDel removes tunnel entry from list and kills running tunnel process
 func TunDel(socket string, pid ...string) {
+	var list []map[string]string
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	list := bolt.GetTunList()
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		list = bolt.GetTunList()
 
-	for _, item := range list {
-		if item["local"] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && item["pid"] == pid[0])) {
-			bolt, err := db.New()
-			log.Check(log.WarnLevel, "Opening database", err)
-			log.Check(log.WarnLevel, "Deleting tunnel entry", bolt.DelTunEntry(item["pid"]))
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
-			f, err := ioutil.ReadFile("/proc/" + item["pid"] + "/cmdline")
-			if err == nil && strings.Contains(string(f), item["local"]) {
-				pid, err := strconv.Atoi(item["pid"])
-				log.Check(log.FatalLevel, "Converting pid to int", err)
-				log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(pid, 15))
+		for _, item := range list {
+			if item["local"] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && item["pid"] == pid[0])) {
+				log.Check(log.WarnLevel, "Deleting tunnel entry", bolt.DelTunEntry(item["pid"]))
+				f, err := ioutil.ReadFile("/proc/" + item["pid"] + "/cmdline")
+				if err == nil && strings.Contains(string(f), item["local"]) {
+					pid, err := strconv.Atoi(item["pid"])
+					log.Check(log.FatalLevel, "Converting pid to int", err)
+					log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(pid, 15))
+				}
 			}
 		}
 	}
@@ -130,23 +133,25 @@ func TunDel(socket string, pid ...string) {
 
 // TunCheck reads list, checks tunnel ttl, its state and then adds or removes required tunnels
 func TunCheck() {
+	var list []map[string]string
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	list := bolt.GetTunList()
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		list = bolt.GetTunList()
+		log.Check(log.WarnLevel, "Closing database", bolt.Close())
 
-	for _, item := range list {
-		ttl, err := strconv.Atoi(item["ttl"])
-		log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
-		if ttl <= int(time.Now().Unix()) && ttl != -1 {
-			TunDel(item["local"], item["pid"])
-		} else if !tunOpen(item["remote"], item["local"]) {
-			TunDel(item["local"], item["pid"])
-			newttl := ""
-			if ttl-int(time.Now().Unix()) > 0 {
-				newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
+		for _, item := range list {
+			ttl, err := strconv.Atoi(item["ttl"])
+			log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
+			if ttl <= int(time.Now().Unix()) && ttl != -1 {
+				TunDel(item["local"], item["pid"])
+			} else if !tunOpen(item["remote"], item["local"]) {
+				TunDel(item["local"], item["pid"])
+				newttl := ""
+				if ttl-int(time.Now().Unix()) > 0 {
+					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
+				}
+				TunAdd(item["local"], newttl)
 			}
-			TunAdd(item["local"], newttl)
 		}
 	}
 }
