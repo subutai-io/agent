@@ -26,6 +26,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 //Response covers heartbeat date because of format required by Management server.
@@ -60,7 +61,7 @@ var (
 
 func initAgent() {
 	// move .gnupg dir to app home
-	err := os.Setenv("GNUPGHOME", config.Agent.DataPrefix+".gnupg")
+	err := os.Setenv("GNUPGHOME", path.Join(config.Agent.DataPrefix, ".gnupg"))
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 
 	instanceType = utils.InstanceType()

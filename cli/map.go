@@ -18,10 +18,11 @@ import (
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/nightlyone/lockfile"
+	"path"
 )
 
 var (
-	nginxInc = config.Agent.DataPrefix + "nginx/nginx-includes/"
+	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
 func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remove, sslbcknd bool) {
@@ -70,7 +71,7 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		}
 
 		// add containers to backend
-		addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
+		addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 			"#Add new host here", "	server "+sockInt+";", false)
 
 		// save information to database
@@ -119,16 +120,16 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 		} else {
 			sockInt = sockInt + ":"
 		}
-		addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
+		addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 			"server "+sockInt, " ", true)
 	} else {
 		if bolt.PortMapDelete(protocol, sockExt, domain, "") == 0 {
 			bolt.PortMapDelete(protocol, sockExt, "", "")
 		}
-		os.Remove(nginxInc + protocol + "/" + sockExt + "-" + domain + ".conf")
+		os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
 		if protocol == "https" {
-			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + sockExt + "-" + domain + ".key")
-			os.Remove(config.Agent.DataPrefix + "web/ssl/https-" + sockExt + "-" + domain + ".crt")
+			os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"))
+			os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"))
 		}
 	}
 }
@@ -189,12 +190,12 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 
 func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
-		os.MkdirAll(nginxInc+protocol, 0755))
-	conf := nginxInc + protocol + "/" + sockExt + "-" + domain + ".conf"
+		os.MkdirAll(path.Join(nginxInc, protocol), 0755))
+	conf := path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf")
 
 	switch protocol {
 	case "https":
-		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(config.Agent.DataPrefix+"/web/ssl/", 0755))
+		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(webSslPath, 0755))
 		fs.Copy(conftmpl+"vhost-ssl.example", conf)
 		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+strings.Split(sockExt, ":")[1]+"$request_uri;  # enforce https", true)
 		addLine(conf, "listen	443;", "	listen "+sockExt+";", true)
@@ -207,13 +208,13 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+" {", true)
 
 		crt, key := gpg.ParsePem(cert)
-		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt", crt, 0644))
-		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key", key, 0644))
+		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"), crt, 0644))
+		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"), key, 0644))
 
-		addLine(conf, "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
-			"ssl_certificate "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".crt;", true)
-		addLine(conf, "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
-			"ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/https-"+sockExt+"-"+domain+".key;", true)
+		addLine(conf, "ssl_certificate "+path.Join(webSslPath, "UNIXDATE.crt;"),
+			"ssl_certificate "+path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt;"), true)
+		addLine(conf, "ssl_certificate_key "+path.Join(webSslPath, "UNIXDATE.key;"),
+			"ssl_certificate_key "+path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key;"), true)
 	case "http":
 		fs.Copy(conftmpl+"vhost.example", conf)
 		addLine(conf, "listen 	80;", "	listen "+sockExt+";", true)
@@ -278,7 +279,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	}
 	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, sockExt, domain, policy))
 
-	addLine(nginxInc+protocol+"/"+sockExt+"-"+domain+".conf",
+	addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 		replaceString, "	"+policy+"; #policy", replace)
 }
 
@@ -289,7 +290,7 @@ func httpRedirect(sockExt, domain string) {
     	return 301 http://$host:` + strings.Split(sockExt, ":")[1] + `$request_uri;
 }`
 
-	addLine(nginxInc+"http/"+sockExt+"-"+domain+".conf",
+	addLine(path.Join(nginxInc, "http", sockExt+"-"+domain+".conf"),
 		"#redirect placeholder", redirect, true)
 
 }
