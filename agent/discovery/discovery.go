@@ -3,7 +3,6 @@ package discovery
 import (
 	"fmt"
 	"io/ioutil"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +63,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 func ImportManagementKey() {
 	if pk := getKey(); pk != nil {
 		gpg.ImportPk(pk)
-		config.Management.GpgUser = extractKeyID(pk)
+		config.Management.GpgUser = gpg.ExtractKeyID(pk)
 	}
 }
 
@@ -147,8 +146,8 @@ func save(ip string) {
 	if err != nil {
 		return
 	}
+	defer base.Close()
 	base.DiscoverySave(ip)
-	base.Close()
 
 	config.Management.Host = ip
 
@@ -175,25 +174,4 @@ func getKey() []byte {
 
 	log.Warn("Failed to fetch PK from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
 	return nil
-}
-
-func extractKeyID(k []byte) string {
-	command := exec.Command("gpg1")
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return ""
-	}
-
-	_, err = stdin.Write(k)
-	log.Check(log.DebugLevel, "Writing to stdin pipe", err)
-	log.Check(log.DebugLevel, "Closing stdin pipe", stdin.Close())
-	out, err := command.Output()
-	log.Check(log.WarnLevel, "Extracting ID from Key", err)
-
-	if line := strings.Fields(string(out)); len(line) > 1 {
-		if key := strings.Split(line[1], "/"); len(key) > 1 {
-			return key[1]
-		}
-	}
-	return ""
 }

@@ -91,7 +91,9 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 
 func mapList(protocol string) (list []string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening portmap database to get list", err)
+	if !log.Check(log.ErrorLevel, "Opening portmap database to get list", err) {
+		defer bolt.Close()
+	}
 	switch protocol {
 	case "tcp", "udp", "http", "https":
 		list = bolt.PortmapList(protocol)
@@ -100,18 +102,15 @@ func mapList(protocol string) (list []string) {
 			list = append(list, bolt.PortmapList(v)...)
 		}
 	}
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 	return
 }
 
 func mapRemove(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err)
-	defer bolt.Close()
-	// Commenting this section out to insure config deletion even if db doesn't have it
-	// if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
-	// 	return
-	// }
+	if !log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err) {
+		defer bolt.Close()
+	}
+
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
 	if sockInt != "" && bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 {
@@ -170,8 +169,10 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 		}
 
 		bolt, err := db.New()
-		defer bolt.Close()
-		log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err)
+		if !log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err) {
+			defer bolt.Close()
+		}
+
 		if !bolt.PortInMap(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
 		} else if bolt.PortInMap(protocol, *sockExt, domain, sockInt) {
@@ -239,8 +240,9 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + strings.Replace(sockExt, ":", "-", -1) + "-" + domain + " {"
 	replace := false
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening portmap database to check if port is mapped", err)
-	defer bolt.Close()
+	if !log.Check(log.ErrorLevel, "Opening portmap database to check if port is mapped", err) {
+		defer bolt.Close()
+	}
 	if !bolt.PortInMap(protocol, sockExt, domain, "") {
 		log.Error("Port is not mapped")
 	}
@@ -294,18 +296,21 @@ func httpRedirect(sockExt, domain string) {
 
 func saveMapToDB(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening database to save portmap", err)
-	if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
-		log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, sockExt, domain, sockInt))
+	if !log.Check(log.ErrorLevel, "Opening database to save portmap", err) {
+		defer bolt.Close()
+		if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
+			log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, sockExt, domain, sockInt))
+		}
 	}
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 
 func containerMapToDB(protocol, sockExt, domain, sockInt string) {
 	bolt, err := db.New()
-	log.Check(log.ErrorLevel, "Opening database to add portmap to container", err)
+	if !log.Check(log.ErrorLevel, "Opening database to add portmap to container", err) {
+		defer bolt.Close()
+	}
+
 	for _, name := range bolt.ContainerByKey("ip", strings.Split(sockInt, ":")[0]) {
 		bolt.ContainerMapping(name, protocol, sockExt, domain, sockInt)
 	}
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }

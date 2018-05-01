@@ -88,8 +88,11 @@ func Active(details bool) []Container {
 	var contArr []Container
 
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	defer bolt.Close()
+	if ! log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+	} else {
+		return contArr
+	}
 
 	for _, c := range cont.Containers() {
 		hostname, err := ioutil.ReadFile(config.Agent.LxcPrefix + c + "/rootfs/etc/hostname")

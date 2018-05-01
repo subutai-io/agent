@@ -189,7 +189,8 @@ func ConvertToBytes(input string) (int, error) {
 			multiplier = 1024 * 1024 * 1024 * 1024
 		case 'P':
 			multiplier = 1024 * 1024 * 1024 * 1024 * 1024
-
+		case 'E':
+			multiplier = 1024 * 1024 * 1024 * 1024 * 1024 * 1024
 		}
 
 	}
