@@ -57,7 +57,7 @@ func ResetInfluxDbClient() {
 func createInfluxDbClient() (client.Client, error) {
 
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Management.Host + ":8086",
+		Addr:               "https://" + path.Join(config.Management.Host) + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		Timeout:            time.Second * 60,

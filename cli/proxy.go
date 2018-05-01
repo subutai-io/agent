@@ -41,7 +41,7 @@ func ProxyAdd(vlan, domain, node, policy, cert string) {
 			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
 				crt[0] += "/rootfs"
 			}
-			cert = config.Agent.LxcPrefix + crt[0] + strings.Join(crt[1:], ":")
+			cert = path.Join(config.Agent.LxcPrefix, crt[0], strings.Join(crt[1:], ":"))
 		}
 		addDomain(vlan, domain, cert)
 		switch policy {

@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 	"time"
+	"path"
 )
 
 var (
@@ -44,7 +45,7 @@ func ImportPk(k []byte) string {
 
 // GetContainerPk returns GPG Public Key for container.
 func GetContainerPk(name string) string {
-	lxcPath := config.Agent.LxcPrefix + name + "/public.pub"
+	lxcPath := path.Join(config.Agent.LxcPrefix, name, "public.pub")
 	stdout, err := exec.Command("/bin/bash", "-c", GPG+" --no-default-keyring --keyring "+lxcPath+" --export -a "+name+"@subutai.io").Output()
 	log.Check(log.WarnLevel, "Getting Container public key", err)
 	return string(stdout)
@@ -100,7 +101,7 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]b
 // GenerateKey generates GPG-key for Subutai Agent.
 // This key used for encrypting messages for Subutai Agent.
 func GenerateKey(name string) {
-	path := config.Agent.LxcPrefix + name
+	path := path.Join(config.Agent.LxcPrefix , name)
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
 	if !container.LxcInstanceExists(name) {
@@ -110,7 +111,6 @@ func GenerateKey(name string) {
 		email = name
 		pass = config.Agent.GpgPassword
 	}
-	// err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/defaults", ident, 0644)
 	conf, err := os.Create(path + "/defaults")
 	if log.Check(log.FatalLevel, "Writing default key ident", err) {
 		return
@@ -159,7 +159,7 @@ func GetFingerprint(email string) string {
 		out, err = exec.Command(GPG, "--fingerprint", email).Output()
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
-		out, err = exec.Command(GPG, "--fingerprint", "--keyring", config.Agent.LxcPrefix+email+"/public.pub", email).Output()
+		out, err = exec.Command(GPG, "--fingerprint", "--keyring", path.Join(config.Agent.LxcPrefix,email,"public.pub"), email).Output()
 
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
@@ -177,13 +177,13 @@ func GetFingerprint(email string) string {
 
 func getMngKey(c string) {
 	client := utils.GetClient(config.Management.Allowinsecure, 5)
-	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
 	defer utils.Close(resp)
 
 	if body, err := ioutil.ReadAll(resp.Body); err == nil {
-		err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/mgn.key", body, 0644)
+		err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix,c,"mgn.key"), body, 0644)
 		log.Check(log.FatalLevel, "Writing Management public key", err)
 	}
 }
@@ -208,24 +208,24 @@ func parseKeyID(s string) string {
 }
 
 func writeData(c, t, n, m string) {
-	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
-	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
+	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix,c,"stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix,c,"stdin.txt.asc")))
+	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix,c,"stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix,c,"stdin.txt")))
 
 	token := []byte(t + "\n" + GetFingerprint(c) + "\n" + n + m)
-	err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/stdin.txt", token, 0644)
+	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix,c,"stdin.txt"), token, 0644)
 	log.Check(log.FatalLevel, "Writing Management public key", err)
 }
 
 func sendData(c string) {
-	asc, err := os.Open(config.Agent.LxcPrefix + c + "/stdin.txt.asc")
+	asc, err := os.Open(path.Join(config.Agent.LxcPrefix,c,"stdin.txt.asc"))
 	log.Check(log.FatalLevel, "Reading encrypted stdin.txt.asc", err)
 	defer asc.Close()
 
 	client := utils.TLSConfig()
 	client.Timeout = time.Second * 15
-	resp, err := client.Post("https://"+config.Management.Host+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
-	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt.asc", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt.asc"))
-	log.Check(log.DebugLevel, "Removing "+config.Agent.LxcPrefix+c+"/stdin.txt", os.Remove(config.Agent.LxcPrefix+c+"/stdin.txt"))
+	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
+	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix,c,"stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix,c,"stdin.txt.asc")))
+	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix,c,"stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix,c,"stdin.txt")))
 	log.Check(log.FatalLevel, "Sending registration request to management", err)
 	defer utils.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
@@ -242,14 +242,14 @@ func ExchageAndEncrypt(c, t string) {
 
 	getMngKey(c)
 
-	impkey := exec.Command(GPG, "-v", "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--import", config.Agent.LxcPrefix+c+"/mgn.key")
+	impkey := exec.Command(GPG, "-v", "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix,c,"public.pub"), "--import", path.Join(config.Agent.LxcPrefix,c,"mgn.key"))
 	impkey.Stdout = &impout
 	impkey.Stderr = &imperr
 	err := impkey.Run()
 	log.Check(log.FatalLevel, "Importing Management public key to keyring", err)
 
 	id := parseKeyID(imperr.String())
-	expkey := exec.Command(GPG, "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--export", "--armor", c+"@subutai.io")
+	expkey := exec.Command(GPG, "--no-default-keyring", "--keyring",path.Join(config.Agent.LxcPrefix,c,"public.pub") , "--export", "--armor", c+"@subutai.io")
 	expkey.Stdout = &expout
 	expkey.Stderr = &experr
 	err = expkey.Run()
@@ -257,7 +257,7 @@ func ExchageAndEncrypt(c, t string) {
 
 	writeData(c, t, expout.String(), experr.String())
 
-	err = exec.Command(GPG, "--no-default-keyring", "--keyring", config.Agent.LxcPrefix+c+"/public.pub", "--trust-model", "always", "--armor", "-r", id, "--encrypt", config.Agent.LxcPrefix+c+"/stdin.txt").Run()
+	err = exec.Command(GPG, "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix,c,"public.pub"), "--trust-model", "always", "--armor", "-r", id, "--encrypt", path.Join(config.Agent.LxcPrefix,c,"stdin.txt")).Run()
 	log.Check(log.FatalLevel, "Encrypting stdin.txt", err)
 
 	sendData(c)

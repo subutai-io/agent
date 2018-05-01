@@ -4,7 +4,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
@@ -82,7 +81,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 
 	LxcStart(child)
 
-	meta["interface"] = container.GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.veth.pair")
+	meta["interface"] = container.GetProperty(child, "lxc.network.veth.pair")
 
 	bolt, err := db.New()
 	if ! log.Check(log.WarnLevel, "Opening database", err) {

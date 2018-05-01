@@ -111,7 +111,7 @@ func restoreContainers() {
 }
 
 func checkSS() (status bool) {
-	resp, err := client.Get("https://" + config.Management.Host + ":8443/rest/v1/peer/inited")
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8443/rest/v1/peer/inited")
 	if err == nil {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusOK {
@@ -141,7 +141,7 @@ func connectionMonitor() {
 }
 
 func doCheckConnection() {
-	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/check/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/check/" + fingerprint)
 	if err == nil {
 		defer utils.Close(resp)
 	}
@@ -190,7 +190,7 @@ func sendHeartbeat() bool {
 		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
-		resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 			defer utils.Close(resp)
 
@@ -221,11 +221,12 @@ func execute(rsp executer.EncRequest) {
 			}
 		}
 
-		pub = config.Agent.LxcPrefix + contName + "/public.pub"
-		keyring = config.Agent.LxcPrefix + contName + "/secret.sec"
+		pub = path.Join(config.Agent.LxcPrefix, contName, "public.pub")
+		keyring = path.Join(config.Agent.LxcPrefix, contName, "secret.sec")
 		log.Info("Getting public keyring", "keyring", keyring)
 		md = gpg.DecryptWrapper(rsp.Request, keyring, pub)
 	}
+
 	if log.Check(log.WarnLevel, "Decrypting request", json.Unmarshal([]byte(md), &req.Request)) {
 		return
 	}
@@ -263,7 +264,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := client.PostForm("https://"+config.Management.Host+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -281,7 +282,7 @@ func sendResponse(msg []byte, deadline time.Time) {
 func command() {
 	var rsp []executer.EncRequest
 
-	resp, err := client.Get("https://" + config.Management.Host + ":8444/rest/v1/agent/requests/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/requests/" + fingerprint)
 
 	if err == nil {
 		defer utils.Close(resp)

@@ -87,7 +87,7 @@ func SetApt(name string) {
 	if root != "master" {
 		return
 	}
-	gateway := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4.gateway")
+	gateway := GetProperty(name, "lxc.network.ipv4.gateway")
 	if len(gateway) == 0 {
 		gateway = "10.10.10.254"
 	}
@@ -95,11 +95,11 @@ func SetApt(name string) {
 		"deb http://" + gateway + "/apt/main trusty-updates main restricted universe multiverse\n" +
 		"deb http://" + gateway + "/apt/security trusty-security main restricted universe multiverse\n")
 	log.Check(log.DebugLevel, "Writing apt source repo list",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list", repo, 0644))
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list"), repo, 0644))
 
 	kurjun := []byte("deb http://" + path.Join(config.CDN.URL) + ":8080/kurjun/rest/apt /\n")
 	log.Check(log.DebugLevel, "Writing apt source kurjun list",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/apt/sources.list.d/subutai-repo.list", kurjun, 0644))
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list.d/subutai-repo.list"), kurjun, 0644))
 }
 
 // AddMetadata adds container information to database
@@ -300,10 +300,10 @@ func DeleteTemplateInfoFromCache(name string) {
 
 // GetParent return a parent of the Subutai container.
 func GetParent(name string) string {
-	return GetConfigItem(config.Agent.LxcPrefix+name+"/config", "subutai.parent")
+	return GetProperty(name, "subutai.parent")
 }
 func GetProperty(templateOrContainerName string, propertyName string) string {
-	return GetConfigItem(config.Agent.LxcPrefix+templateOrContainerName+"/config", propertyName)
+	return GetConfigItem(path.Join(config.Agent.LxcPrefix, templateOrContainerName, "config"), propertyName)
 }
 
 // Clone create the duplicate container from the Subutai template.
@@ -332,16 +332,16 @@ func Clone(parent, child string) error {
 		{"subutai.parent", parentParts[0]},
 		{"subutai.parent.owner", parentParts[1]},
 		{"subutai.parent.version", parentParts[2]},
-		{"lxc.rootfs", config.Agent.LxcPrefix + child + "/rootfs"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/home home none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/opt opt none bind,rw 0 0"},
-		{"lxc.mount.entry", config.Agent.LxcPrefix + child + "/var var none bind,rw 0 0"},
+		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, child, "rootfs")},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "home") + " home none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "opt") + " opt none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "var") + " var none bind,rw 0 0"},
 		{"lxc.rootfs.backend", "zfs"}, //must be in template
 		{"lxc.utsname", child},
 	})
 
 	//create default hostname
-	ioutil.WriteFile(config.Agent.LxcPrefix+child+"/rootfs/etc/hostname", []byte(child), 0644)
+	ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, child, "/rootfs/etc/hostname"), []byte(child), 0644)
 
 	return nil
 }
@@ -441,7 +441,7 @@ func QuotaNet(name string, size ...string) string {
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
 //TODO use the new lxc config type
 func SetContainerConf(container string, conf [][]string) error {
-	confPath := config.Agent.LxcPrefix + container + "/config"
+	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
 	newconf := ""
 
 	file, err := os.Open(confPath)
@@ -513,38 +513,38 @@ func SetContainerUID(c string) (string, error) {
 		{"lxc.id_map", "g 0 " + uid + " 65536"},
 	})
 
-	s, err := os.Stat(config.Agent.LxcPrefix + c + "/rootfs")
+	s, err := os.Stat(path.Join(config.Agent.LxcPrefix, c, "rootfs"))
 	if log.Check(log.DebugLevel, "Reading container rootfs stat", err) {
 		return uid, err
 	}
 
 	parentuid := strconv.Itoa(int(s.Sys().(*syscall.Stat_t).Uid))
 	log.Check(log.DebugLevel, "uidmapshift rootfs",
-		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/rootfs/", parentuid, uid, "65536").Run())
+		exec.Command("uidmapshift", "-b", path.Join(config.Agent.LxcPrefix, c, "rootfs"), parentuid, uid, "65536").Run())
 	log.Check(log.DebugLevel, "uidmapshift home",
-		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/home/", parentuid, uid, "65536").Run())
+		exec.Command("uidmapshift", "-b", path.Join(config.Agent.LxcPrefix, c, "home"), parentuid, uid, "65536").Run())
 	log.Check(log.DebugLevel, "uidmapshift opt",
-		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/opt/", parentuid, uid, "65536").Run())
+		exec.Command("uidmapshift", "-b", path.Join(config.Agent.LxcPrefix, c, "opt"), parentuid, uid, "65536").Run())
 	log.Check(log.DebugLevel, "uidmapshift var",
-		exec.Command("uidmapshift", "-b", config.Agent.LxcPrefix+c+"/var/", parentuid, uid, "65536").Run())
+		exec.Command("uidmapshift", "-b", path.Join(config.Agent.LxcPrefix, c, "var"), parentuid, uid, "65536").Run())
 
-	return uid, os.Chmod(config.Agent.LxcPrefix+c, 0755)
+	return uid, os.Chmod(path.Join(config.Agent.LxcPrefix, c), 0755)
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
 func SetDNS(name string) {
-	dns := GetConfigItem(config.Agent.LxcPrefix+name+"/config", "lxc.network.ipv4.gateway")
+	dns := GetProperty(name, "lxc.network.ipv4.gateway")
 	if len(dns) == 0 {
 		dns = "10.10.10.254"
 	}
 
 	resolv := []byte("domain\tintra.lan\nsearch\tintra.lan\nnameserver\t" + dns + "\n")
 	log.Check(log.DebugLevel, "Writing resolv.conf.orig",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/original", resolv, 0644))
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/resolvconf/resolv.conf.d/original"), resolv, 0644))
 	log.Check(log.DebugLevel, "Writing resolv.conf.tail",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolvconf/resolv.conf.d/tail", resolv, 0644))
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/resolvconf/resolv.conf.d/tail"), resolv, 0644))
 	log.Check(log.DebugLevel, "Writing resolv.conf",
-		ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/resolv.conf", resolv, 0644))
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/resolv.conf"), resolv, 0644))
 }
 
 func CopyParentReference(name string, owner string, version string) {
@@ -556,17 +556,17 @@ func CopyParentReference(name string, owner string, version string) {
 
 // SetStaticNet sets static IP-address for the Subutai container.
 func SetStaticNet(name string) {
-	data, err := ioutil.ReadFile(config.Agent.LxcPrefix + name + "/rootfs/etc/network/interfaces")
+	data, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/network/interfaces"))
 	log.Check(log.WarnLevel, "Opening /etc/network/interfaces", err)
 
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/network/interfaces",
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/network/interfaces"),
 		[]byte(strings.Replace(string(data), "dhcp", "manual", 1)), 0644)
 	log.Check(log.WarnLevel, "Setting internal eth0 interface to manual", err)
 }
 
 // DisableSSHPwd disabling SSH password access to the Subutai container.
 func DisableSSHPwd(name string) {
-	input, err := ioutil.ReadFile(config.Agent.LxcPrefix + name + "/rootfs/etc/ssh/sshd_config")
+	input, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/ssh/sshd_config"))
 	if log.Check(log.DebugLevel, "Opening sshd config", err) {
 		return
 	}
@@ -579,7 +579,7 @@ func DisableSSHPwd(name string) {
 		}
 	}
 	output := strings.Join(lines, "\n")
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+name+"/rootfs/etc/ssh/sshd_config", []byte(output), 0644)
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/ssh/sshd_config"), []byte(output), 0644)
 	log.Check(log.WarnLevel, "Writing new sshd config", err)
 }
 
