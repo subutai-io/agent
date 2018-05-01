@@ -110,9 +110,10 @@ func AddMetadata(name string, meta map[string]string) error {
 		return errors.New("Container does not exists")
 	}
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if ! log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
+	}
 	return nil
 }
 
@@ -250,10 +251,11 @@ func DestroyContainer(name string) error {
 	}
 
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Deleting container metadata entry", bolt.ContainerDel(name))
-	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		log.Check(log.WarnLevel, "Deleting container metadata entry", bolt.ContainerDel(name))
+		log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
+	}
 
 	return nil
 }
@@ -285,16 +287,17 @@ func DestroyTemplate(name string) {
 func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	//obtain id of template by ref
-	meta := bolt.TemplateByKey("nameAndOwnerAndVersion", name)
-	if meta != nil && len(meta) > 0 {
-		//take first element only since ref is unique
-		templateId := meta[0]
-		log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
+	if !log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		//obtain id of template by ref
+		meta := bolt.TemplateByKey("nameAndOwnerAndVersion", name)
+		if meta != nil && len(meta) > 0 {
+			//take first element only since ref is unique
+			templateId := meta[0]
+			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
+		}
+		log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	}
-	log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
 }
 
 // GetParent return a parent of the Subutai container.
@@ -487,13 +490,24 @@ func GetConfigItem(path, item string) string {
 	return ""
 }
 
+func getUIdFromDB(c string) (string, error) {
+	var uid string
+	bolt, err := db.New()
+	if err == nil {
+		defer bolt.Close()
+		uid = bolt.GetUuidEntry(c)
+		return uid, nil
+	}
+
+	return "", err
+}
+
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) (string, error) {
-	uid := "65536"
-	if bolt, err := db.New(); err == nil {
-		uid = bolt.GetUuidEntry(c)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	uid, err := getUIdFromDB(c)
+	if err != nil {
+		uid = "65536"
 	}
 
 	SetContainerConf(c, [][]string{

@@ -85,9 +85,10 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	meta["interface"] = container.GetConfigItem(config.Agent.LxcPrefix+child+"/config", "lxc.network.veth.pair")
 
 	bolt, err := db.New()
-	log.Check(log.WarnLevel, "Opening database", err)
-	log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(child, meta))
-	log.Check(log.WarnLevel, "Closing database", bolt.Close())
+	if ! log.Check(log.WarnLevel, "Opening database", err) {
+		defer bolt.Close()
+		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(child, meta))
+	}
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }

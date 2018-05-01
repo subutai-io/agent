@@ -24,17 +24,21 @@ func init() {
 	os.Setenv("PATH", "/usr/share/subutai/bin:"+os.Getenv("PATH"))
 }
 
+func initDb() {
+	if base, err := db.New(); err == nil {
+		defer base.Close()
+		if len(config.Management.Host) < 7 {
+			config.Management.Host = base.DiscoveryLoad()
+		}
+	}
+}
+
 func main() {
 	app := gcli.NewApp()
 	app.Name = "Subutai"
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
-		if base, err := db.New(); err == nil {
-			if len(config.Management.Host) < 7 {
-				config.Management.Host = base.DiscoveryLoad()
-			}
-			base.Close()
-		}
+		initDb()
 	}
 
 	app.Version = version

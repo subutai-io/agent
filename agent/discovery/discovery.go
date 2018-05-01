@@ -147,8 +147,8 @@ func save(ip string) {
 	if err != nil {
 		return
 	}
+	defer base.Close()
 	base.DiscoverySave(ip)
-	base.Close()
 
 	config.Management.Host = ip
 
