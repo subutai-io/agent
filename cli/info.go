@@ -24,6 +24,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"path"
 )
 
 type hostStat struct {
@@ -142,23 +143,21 @@ func cpuLoad(h string) interface{} {
 }
 
 func diskLoad() (disktotal, diskused interface{}) {
-	out, _ := exc.Execute("df", "-TB1")
+	out, err := exc.Execute("zfs", "list", path.Join(config.Agent.Dataset))
+	log.Check(log.ErrorLevel, "Gettings zfs list "+out, err)
 
-	var total, used int
-	for _, str := range strings.Split(out, "\n") {
-		f := strings.Fields(str)
-		if len(f) > 3 {
-			if f[0] == "subutai" {
-				total, _ = strconv.Atoi(f[2])
-			}
-			if f[1] == "zfs" {
-				t, _ := strconv.Atoi(f[3])
-				used += t
-			}
+	line := strings.Split(out, "\n")
+
+	if len(line) > 1 {
+		fields := strings.Fields(line[1])
+
+		if len(fields) > 2 {
+			diskused, _ = fs.ConvertToBytes(fields[1])
+			disktotal, _ = fs.ConvertToBytes(fields[2])
 		}
 	}
 
-	return total, used
+	return
 }
 
 func cpuQuotaUsage(h string) int {
