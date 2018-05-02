@@ -23,6 +23,7 @@ import (
 	"path"
 	"fmt"
 	"crypto/rand"
+	"time"
 )
 
 // All returns list of all containers
@@ -236,14 +237,10 @@ func DestroyContainer(name string) error {
 
 	defer lxc.Release(c)
 
-	if c.State() == lxc.RUNNING {
-		if err = c.Stop(); log.Check(log.DebugLevel, "Stopping container", err) {
-			return err
-		}
-	}
-
 	log.Info("Destroying container " + name)
 
+	log.Check(log.DebugLevel, "Stopping lxc", c.Stop())
+	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*15))
 	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
 
 	if fs.DatasetExists(name) {
