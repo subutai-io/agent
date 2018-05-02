@@ -196,7 +196,7 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 	switch protocol {
 	case "https":
 		log.Check(log.ErrorLevel, "Creating certificate dirs", os.MkdirAll(webSslPath, 0755))
-		fs.Copy(conftmpl+"vhost-ssl.example", conf)
+		fs.Copy(path.Join(conftmpl, "vhost-ssl.example"), conf)
 		addLine(conf, "return 301 https://$host$request_uri;  # enforce https", "	    return 301 https://$host:"+strings.Split(sockExt, ":")[1]+"$request_uri;  # enforce https", true)
 		addLine(conf, "listen	443;", "	listen "+sockExt+";", true)
 		addLine(conf, "server_name DOMAIN;", "	server_name "+domain+";", true)
@@ -216,7 +216,7 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		addLine(conf, "ssl_certificate_key "+path.Join(webSslPath, "UNIXDATE.key;"),
 			"ssl_certificate_key "+path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key;"), true)
 	case "http":
-		fs.Copy(conftmpl+"vhost.example", conf)
+		fs.Copy(path.Join(conftmpl, "vhost.example"), conf)
 		addLine(conf, "listen 	80;", "	listen "+sockExt+";", true)
 		addLine(conf, "return 301 http://$host$request_uri;", "	    return 301 http://$host:"+strings.Split(sockExt, ":")[1]+"$request_uri;", true)
 		addLine(conf, "server_name DOMAIN;", "	server_name "+domain+";", true)
@@ -226,10 +226,10 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 			httpRedirect(sockExt, domain)
 		}
 	case "tcp":
-		fs.Copy(conftmpl+"stream.example", conf)
+		fs.Copy(path.Join(conftmpl, "stream.example"), conf)
 		addLine(conf, "listen PORT;", "	listen "+sockExt+";", true)
 	case "udp":
-		fs.Copy(conftmpl+"stream.example", conf)
+		fs.Copy(path.Join(conftmpl, "stream.example"), conf)
 		addLine(conf, "listen PORT;", "	listen "+sockExt+" udp;", true)
 	}
 	addLine(conf, "server localhost:81;", " ", true)

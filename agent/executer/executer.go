@@ -124,7 +124,7 @@ func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
 	case <-done:
 		wg.Wait()
 		response.ExitCode = "0"
-		if req.IsDaemon != 1 {
+		if req.IsDaemon != 1 && cmd.ProcessState != nil {
 			response.ExitCode = strconv.Itoa(cmd.ProcessState.Sys().(syscall.WaitStatus).ExitStatus())
 		}
 		outCh <- response
