@@ -14,11 +14,13 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 var (
-	conftmpl =  "/etc/nginx/tmpl/"
-	confinc  = config.Agent.DataPrefix + "nginx/nginx-includes/http/"
+	conftmpl   = "/etc/nginx/tmpl"
+	confinc    = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes/http")
+	webSslPath = path.Join(config.Agent.DataPrefix, "/web/ssl")
 )
 
 // The reverse proxy component in Subutai provides and easy way to assign domain name and forward HTTP(S) traffic to certain environment.
@@ -39,7 +41,7 @@ func ProxyAdd(vlan, domain, node, policy, cert string) {
 			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
 				crt[0] += "/rootfs"
 			}
-			cert = config.Agent.LxcPrefix + crt[0] + strings.Join(crt[1:], ":")
+			cert = path.Join(config.Agent.LxcPrefix, crt[0], strings.Join(crt[1:], ":"))
 		}
 		addDomain(vlan, domain, cert)
 		switch policy {
@@ -110,52 +112,58 @@ func addDomain(vlan, domain, cert string) {
 			log.Info("Cannot create nginx-include directory " + confinc)
 		}
 	}
+	vlanConf := path.Join(confinc, vlan+".conf")
 	if cert != "" && gpg.ValidatePem(cert) {
 		currentDT := strconv.Itoa(int(time.Now().Unix()))
 
-		if _, err := os.Stat(config.Agent.DataPrefix + "/web/ssl/"); os.IsNotExist(err) {
-			err := os.MkdirAll(config.Agent.DataPrefix+"/web/ssl/", 0755)
+		if _, err := os.Stat(webSslPath); os.IsNotExist(err) {
+			err := os.MkdirAll(webSslPath, 0755)
 			if err != nil {
-				log.Info("Cannot create ssl directory " + config.Agent.DataPrefix + "/web/ssl/")
+				log.Info("Cannot create ssl directory " + webSslPath)
 				os.Exit(1)
 			}
 		}
-		fs.Copy(conftmpl+"vhost-ssl.example", confinc+vlan+".conf")
+
+		fs.Copy(path.Join(conftmpl, "vhost-ssl.example"), vlanConf)
 		crt, key := gpg.ParsePem(cert)
-		err := ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt", crt, 0644)
+		err := ioutil.WriteFile(path.Join(webSslPath, currentDT+".crt"), crt, 0644)
 		if err != nil {
-			log.Info("Cannot create crt file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".crt")
+			log.Info("Cannot create crt file " + path.Join(webSslPath, currentDT+".crt"))
 			os.Exit(1)
 		}
-		err = ioutil.WriteFile(config.Agent.DataPrefix+"web/ssl/"+currentDT+".key", key, 0644)
+		err = ioutil.WriteFile(path.Join(webSslPath, currentDT+".key"), key, 0644)
 		if err != nil {
-			log.Info("Cannot create key file " + config.Agent.DataPrefix + "web/ssl/" + currentDT + ".key")
+			log.Info("Cannot create key file " + path.Join(webSslPath, currentDT+".key"))
 			os.Exit(1)
 		}
-		addLine(confinc+vlan+".conf", "ssl_certificate "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.crt;",
-			"	ssl_certificate "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".crt;", true)
-		addLine(confinc+vlan+".conf", "ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/UNIXDATE.key;",
-			"	ssl_certificate_key "+config.Agent.DataPrefix+"web/ssl/"+currentDT+".key;", true)
+		addLine(vlanConf, "ssl_certificate "+path.Join(webSslPath, "UNIXDATE.crt;"),
+			"	ssl_certificate "+path.Join(webSslPath, currentDT+".crt;"), true)
+		addLine(vlanConf, "ssl_certificate_key "+path.Join(webSslPath, "UNIXDATE.key;"),
+			"	ssl_certificate_key "+path.Join(webSslPath, currentDT+".key;"), true)
 	} else {
-		fs.Copy(conftmpl+"vhost.example", confinc+vlan+".conf")
+		fs.Copy(path.Join(conftmpl, "vhost.example"), vlanConf)
 	}
-	addLine(confinc+vlan+".conf", "upstream DOMAIN-upstream {", "upstream "+domain+"-upstream {", true)
-	addLine(confinc+vlan+".conf", "server_name DOMAIN;", "	server_name "+domain+";", true)
-	addLine(confinc+vlan+".conf", "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://"+domain+"-upstream/;", true)
+	addLine(vlanConf, "upstream DOMAIN-upstream {", "upstream "+domain+"-upstream {", true)
+	addLine(vlanConf, "server_name DOMAIN;", "	server_name "+domain+";", true)
+	addLine(vlanConf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://"+domain+"-upstream/;", true)
 }
 
 // addNode adds configuration lines to domain configuration
 func addNode(vlan, node string) {
-	delLine(confinc+vlan+".conf", "server localhost:81;")
-	addLine(confinc+vlan+".conf", "#Add new host here", "	server "+node+"; #$node", false)
+	vlanConf := path.Join(confinc, vlan+".conf")
+
+	delLine(vlanConf, "server localhost:81;")
+	addLine(vlanConf, "#Add new host here", "	server "+node+"; #$node", false)
 }
 
 // delDomain removes domain configuration file and all related stuff
 func delDomain(vlan string) {
+	vlanConf := path.Join(confinc, vlan+".conf")
+
 	// get and remove cert files
-	f, err := ioutil.ReadFile(confinc + vlan + ".conf")
+	f, err := ioutil.ReadFile(vlanConf)
 	if err != nil {
-		log.Fatal("Cannot read nginx virtualhost file:" + confinc + vlan + ".conf")
+		log.Fatal("Cannot read nginx virtualhost file:" + vlanConf)
 	}
 	lines := strings.Split(string(f), "\n")
 	for _, v := range lines {
@@ -167,21 +175,23 @@ func delDomain(vlan string) {
 		}
 	}
 
-	os.Remove(confinc + vlan + ".conf")
+	os.Remove(vlanConf)
 }
 
 // delNode removes node configuration entries from domain config
 func delNode(vlan, node string) {
-	delLine(confinc+vlan+".conf", "server "+node+"; #$node")
-	delLine(confinc+vlan+".conf", "server "+node+": #$node")
+	vlanConf := path.Join(confinc, vlan+".conf")
+
+	delLine(vlanConf, "server "+node+"; #$node")
+	delLine(vlanConf, "server "+node+": #$node")
 	if nodeCount(vlan) == 0 {
-		addLine(confinc+vlan+".conf", "#Add new host here", "   server localhost:81;", false)
+		addLine(vlanConf, "#Add new host here", "   server localhost:81;", false)
 	}
 }
 
 // getDomain returns domain name assigned to specified vlan
 func getDomain(vlan string) string {
-	f, err := ioutil.ReadFile(confinc + vlan + ".conf")
+	f, err := ioutil.ReadFile(path.Join(confinc, vlan+".conf"))
 	if err != nil {
 		return ""
 	}
@@ -199,7 +209,7 @@ func getDomain(vlan string) string {
 
 // isVlanExist is true is domain was configured on specified vlan and false if not
 func isVlanExist(vlan string) bool {
-	if _, err := os.Stat(confinc + vlan + ".conf"); err == nil {
+	if _, err := os.Stat(path.Join(confinc, vlan+".conf")); err == nil {
 		return true
 	}
 	return false
@@ -207,13 +217,14 @@ func isVlanExist(vlan string) bool {
 
 // isNodeExist is true if specified node belongs to vlan, otherwise it is false
 func isNodeExist(vlan, node string) bool {
-	return addLine(confinc+vlan+".conf", "server "+node+";", "", false)
+	return addLine(path.Join(confinc, vlan+".conf"), "server "+node+";", "", false)
 }
 
 // nodeCount returns the number of nodes assigned to domain on specified vlan
 func nodeCount(vlan string) int {
-	f, err := ioutil.ReadFile(confinc + vlan + ".conf")
-	if !log.Check(log.DebugLevel, "Cannot read file "+confinc+vlan+".conf", err) {
+	vlanConf := path.Join(confinc, vlan+".conf")
+	f, err := ioutil.ReadFile(vlanConf)
+	if !log.Check(log.DebugLevel, "Cannot read file "+vlanConf, err) {
 		return strings.Count(string(f), "#$node")
 	}
 	return 0
@@ -221,9 +232,10 @@ func nodeCount(vlan string) int {
 
 // setPolicy configures load balance policy for domain on specified vlan
 func setPolicy(vlan, policy string) {
-	delLine(confinc+vlan+".conf", "ip_hash;")
-	delLine(confinc+vlan+".conf", "least_time header;")
-	addLine(confinc+vlan+".conf", "#Add new host here", "	"+policy, false)
+	vlanConf := path.Join(confinc, vlan+".conf")
+	delLine(vlanConf, "ip_hash;")
+	delLine(vlanConf, "least_time header;")
+	addLine(vlanConf, "#Add new host here", "	"+policy, false)
 }
 
 // addLine adds, removes, replaces and checks if line exists in specified file

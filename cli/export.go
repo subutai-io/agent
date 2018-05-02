@@ -18,7 +18,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
-	"github.com/subutai-io/agent/lib/exec"
 	"path"
 )
 
@@ -73,8 +72,8 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	}
 
 	//cleanup files
-	cleanupFS(config.Agent.LxcPrefix+name+"/var/log/", 0775)
-	cleanupFS(config.Agent.LxcPrefix+name+"/var/cache", 0775)
+	cleanupFS(path.Join(config.Agent.LxcPrefix, name, "/var/log"), 0775)
+	cleanupFS(path.Join(config.Agent.LxcPrefix, name, "/var/cache"), 0775)
 
 	var dst string
 	if newname != "" {
@@ -98,7 +97,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	}
 
 	//copy config files
-	src := config.Agent.LxcPrefix + name
+	src := path.Join(config.Agent.LxcPrefix, name)
 	fs.Copy(src+"/fstab", dst+"/fstab")
 	fs.Copy(src+"/config", dst+"/config")
 
@@ -112,7 +111,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		{"lxc.network.ipv4"},
 		{"lxc.network.veth.pair"},
 		{"lxc.network.hwaddr"},
-		{"#vlan_id"}, //todo review
+		{"#vlan_id"},
 	}
 
 	if len(description) != 0 {
@@ -124,10 +123,10 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	if newname != "" {
 		templateConf = append(templateConf, []string{"subutai.template", newname})
 		templateConf = append(templateConf, []string{"lxc.utsname", newname})
-		templateConf = append(templateConf, []string{"lxc.rootfs", config.Agent.LxcPrefix + newname + "/rootfs"})
-		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/home home none bind,rw 0 0"})
-		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/var var none bind,rw 0 0"})
-		templateConf = append(templateConf, []string{"lxc.mount.entry", config.Agent.LxcPrefix + newname + "/opt opt none bind,rw 0 0"})
+		templateConf = append(templateConf, []string{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, newname, "rootfs")})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "home") + " home none bind,rw 0 0"})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "var") + " var none bind,rw 0 0"})
+		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "opt") + " opt none bind,rw 0 0"})
 
 	} else {
 		templateConf = append(templateConf, []string{"subutai.template", name})
@@ -139,13 +138,6 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
 		fs.Copy(src+"/icon.png", dst+"/icon.png")
 	}
-
-	//create diffs
-	os.MkdirAll(dst+"/diff", 0755)
-	execDiff(config.Agent.LxcPrefix+parentRef+"/rootfs", config.Agent.LxcPrefix+name+"/rootfs", dst+"/diff/rootfs.diff")
-	execDiff(config.Agent.LxcPrefix+parentRef+"/home", config.Agent.LxcPrefix+name+"/home", dst+"/diff/home.diff")
-	execDiff(config.Agent.LxcPrefix+parentRef+"/opt", config.Agent.LxcPrefix+name+"/opt", dst+"/diff/opt.diff")
-	execDiff(config.Agent.LxcPrefix+parentRef+"/var", config.Agent.LxcPrefix+name+"/var", dst+"/diff/var.diff")
 
 	// check: write package list to packages
 	if container.State(name) != "RUNNING" {
@@ -309,13 +301,6 @@ func updateTemplateConfig(path string, params [][]string) error {
 	cfg.SetParams(params)
 
 	return cfg.Save()
-}
-
-// execDiff executes `diff` command for specified directories and writes command output
-func execDiff(dir1, dir2, output string) {
-	out, _ := exec.Execute("diff", "-Nur", dir1, dir2)
-	err := ioutil.WriteFile(output, []byte(out), 0600)
-	log.Check(log.FatalLevel, "Writing diff to file"+output, err)
 }
 
 // clearFile writes an empty byte array to specified file

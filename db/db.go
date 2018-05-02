@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
+	"path"
 )
 
 var (
@@ -21,7 +22,7 @@ type Instance struct {
 }
 
 func New() (*Instance, error) {
-	boltDB, err := bolt.Open(config.Agent.DataPrefix+"agent.db", 0600, nil)
+	boltDB, err := bolt.Open(path.Join(config.Agent.DataPrefix, "agent.db"), 0600, nil)
 	if err != nil {
 		return nil, err
 	}

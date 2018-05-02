@@ -134,7 +134,7 @@ func netStat(bp client.BatchPoints) {
 	files, err := ioutil.ReadDir(config.Agent.LxcPrefix)
 	if err == nil {
 		for _, f := range files {
-			lxcnic[container.GetConfigItem(config.Agent.LxcPrefix+f.Name()+"/config", "lxc.network.veth.pair")] = f.Name()
+			lxcnic[container.GetProperty(f.Name(), "lxc.network.veth.pair")] = f.Name()
 		}
 	}
 

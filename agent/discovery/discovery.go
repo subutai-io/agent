@@ -15,6 +15,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"path"
 )
 
 type handler struct {
@@ -156,7 +157,7 @@ func save(ip string) {
 
 func getKey() []byte {
 	client := utils.GetClient(config.Management.Allowinsecure, 5)
-	resp, err := client.Get("https://" + config.Management.Host + ":" + config.Management.Port + config.Management.RestPublicKey)
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {
 		defer utils.Close(resp)

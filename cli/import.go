@@ -589,9 +589,9 @@ func updateContainerConfig(templateName string) error {
 
 	cfg.SetParams([][]string{
 		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/home home none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/opt opt none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName) + "/var var none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "home") + " home none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "opt") + " opt none bind,rw 0 0"},
+		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "var") + " var none bind,rw 0 0"},
 	})
 
 	return cfg.Save()

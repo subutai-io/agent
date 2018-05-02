@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
@@ -77,7 +76,7 @@ func getQuotaThreshold(name, resource string) string {
 	if resource == "cpu" || resource == "ram" {
 		res = "subutai.alert." + resource
 	}
-	if size := container.GetConfigItem(config.Agent.LxcPrefix+name+"/config", res); len(size) > 0 {
+	if size := container.GetProperty(name, res); len(size) > 0 {
 		return size
 	}
 	return "0"
