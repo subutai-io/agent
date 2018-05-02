@@ -8,14 +8,15 @@ import (
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 // temporary function to provide backward compatibility with old approach
 // Need to remove it in next release
 func compat() {
 	for _, name := range container.Containers() {
-		if _, err := os.Stat(config.Agent.LxcPrefix + name + "/.start"); !os.IsNotExist(err) {
-			os.Remove(config.Agent.LxcPrefix + name + "/.start")
+		if _, err := os.Stat(path.Join(config.Agent.LxcPrefix, name, ".start")); !os.IsNotExist(err) {
+			os.Remove(path.Join(config.Agent.LxcPrefix, name, ".start"))
 			container.AddMetadata(name, map[string]string{"state": "RUNNING"})
 		}
 	}

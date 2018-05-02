@@ -9,6 +9,7 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 type agentConfig struct {
@@ -111,14 +112,14 @@ func init() {
 	}
 
 	if config.Agent.GpgHome == "" {
-		config.Agent.GpgHome = config.Agent.DataPrefix + ".gnupg"
+		config.Agent.GpgHome = path.Join(config.Agent.DataPrefix, ".gnupg")
 	}
 	Agent = config.Agent
 	Influxdb = config.Influxdb
 	Management = config.Management
 	CDN = config.CDN
 
-	CDN.Kurjun = "https://" + CDN.URL + ":" + CDN.SSLport + "/kurjun/rest"
+	CDN.Kurjun = "https://" + path.Join(CDN.URL) + ":" + CDN.SSLport + "/kurjun/rest"
 
 }
 

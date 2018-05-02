@@ -21,10 +21,12 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"path"
 )
 
 var (
 	influxDbClient client.Client
+	sslPath        = path.Join(config.Agent.DataPrefix, "ssl")
 )
 
 // Iface describes network interfaces of the Resource Host.
@@ -55,7 +57,7 @@ func ResetInfluxDbClient() {
 func createInfluxDbClient() (client.Client, error) {
 
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + config.Management.Host + ":8086",
+		Addr:               "https://" + path.Join(config.Management.Host) + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		Timeout:            time.Second * 60,
@@ -75,7 +77,7 @@ func Close(resp *http.Response) {
 
 // PublicCert returns Public SSL certificate for Resource Host
 func PublicCert() string {
-	pemCerts, err := ioutil.ReadFile(config.Agent.DataPrefix + "ssl/cert.pem")
+	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
 		return ""
 	}
@@ -147,9 +149,9 @@ func x509generate() {
 		return
 	}
 
-	log.Check(log.DebugLevel, "Creating directory for SSL certificates", os.MkdirAll(config.Agent.DataPrefix+"ssl", 0700))
+	log.Check(log.DebugLevel, "Creating directory for SSL certificates", os.MkdirAll(sslPath, 0700))
 
-	certOut, err := os.Create(config.Agent.DataPrefix + "ssl/cert.pem")
+	certOut, err := os.Create(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Opening cert.pem for writing", err) {
 		return
 	}
@@ -157,7 +159,7 @@ func x509generate() {
 	log.Check(log.DebugLevel, "Encoding certificate", err)
 	log.Check(log.DebugLevel, "Closing certificate", certOut.Close())
 
-	keyOut, err := os.OpenFile(config.Agent.DataPrefix+"ssl/key.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	keyOut, err := os.OpenFile(path.Join(sslPath, "key.pem"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if log.Check(log.WarnLevel, "Opening key.pem for writing", err) {
 		return
 	}
@@ -168,11 +170,12 @@ func x509generate() {
 }
 
 func newTLSConfig() *tls.Config {
-	clientCert, err := ioutil.ReadFile(config.Agent.DataPrefix + "ssl/cert.pem")
+
+	clientCert, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
 		return nil
 	}
-	privateKey, err := ioutil.ReadFile(config.Agent.DataPrefix + "ssl/key.pem")
+	privateKey, err := ioutil.ReadFile(path.Join(sslPath, "key.pem"))
 	if log.Check(log.WarnLevel, "Checking key.pem file", err) {
 		return nil
 	}
@@ -241,7 +244,7 @@ func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(n
 // CheckCDN checks if the Kurjun node available.
 func CheckCDN() {
 
-	address := config.CDN.URL + ":" + config.CDN.SSLport
+	address := path.Join(config.CDN.URL) + ":" + config.CDN.SSLport
 	_, err := net.DialTimeout("tcp", address, time.Duration(5)*time.Second)
 
 	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", address, time.Duration(5)*time.Second) {
@@ -260,8 +263,6 @@ func CleanTemplateName(name string) string {
 	}
 	return reg.ReplaceAllString(name, "")
 }
-
-
 
 func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]string) {
 
