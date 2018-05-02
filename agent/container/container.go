@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/db"
 	"github.com/wunderlist/ttlcache"
 	"time"
+	"path"
 )
 
 var (
@@ -54,7 +55,7 @@ func init() {
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.
 func Credentials(name, container string) (uid int, gid int) {
-	path := config.Agent.LxcPrefix + container + "/rootfs/etc/passwd"
+	path := path.Join(config.Agent.LxcPrefix, container, "/rootfs/etc/passwd")
 	u, g := parsePasswd(path, name)
 	uid, err := strconv.Atoi(u)
 	log.Check(log.DebugLevel, "Parsing user UID from container", err)
@@ -95,11 +96,11 @@ func Active(details bool) []Container {
 	}
 
 	for _, c := range cont.Containers() {
-		hostname, err := ioutil.ReadFile(config.Agent.LxcPrefix + c + "/rootfs/etc/hostname")
+		hostname, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hostname"))
 		if err != nil {
 			continue
 		}
-		configpath := config.Agent.LxcPrefix + c + "/config"
+		configpath := path.Join(config.Agent.LxcPrefix, c, "config")
 
 		meta := bolt.ContainerByName(c)
 

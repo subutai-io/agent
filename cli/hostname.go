@@ -10,6 +10,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 // LxcHostname command changes container configs to apply a new name for the container. Used for internal SS purposes.
@@ -19,10 +20,10 @@ func LxcHostname(c, name string) {
 		return
 	}
 
-	err := ioutil.WriteFile(config.Agent.LxcPrefix+c+"/rootfs/etc/hostname", []byte(name), 0644)
+	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hostname"), []byte(name), 0644)
 	log.Check(log.FatalLevel, "Replacing /etc/hostname for "+c, err)
 
-	file, err := os.Open(config.Agent.LxcPrefix + c + "/rootfs/etc/hosts")
+	file, err := os.Open(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hosts"))
 	log.Check(log.FatalLevel, "Reading /etc/hosts for "+c, err)
 	defer file.Close()
 	scanner := bufio.NewScanner(bufio.NewReader(file))
@@ -35,7 +36,7 @@ func LxcHostname(c, name string) {
 			hosts = hosts + scanner.Text() + "\n"
 		}
 	}
-	err = ioutil.WriteFile(config.Agent.LxcPrefix+c+"/rootfs/etc/hosts", []byte(hosts), 0644)
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hosts"), []byte(hosts), 0644)
 	log.Check(log.FatalLevel, "Fixing /etc/hosts for "+c, err)
 
 	if container.State(c) == "RUNNING" {

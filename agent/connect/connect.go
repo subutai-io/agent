@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 type rHost struct {
@@ -49,7 +50,7 @@ func Request(user, pass string) {
 
 	client := utils.GetClient(config.Management.Allowinsecure, 15)
 	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
-	resp, err := client.Post("https://"+config.Management.Host+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
+	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {

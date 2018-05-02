@@ -8,6 +8,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 // LxcConfig function allows read and write container's configuration file through command line.
@@ -25,7 +26,7 @@ func LxcConfig(contName, operation, key, value string) {
 
 // displayConfig prints container configuration file
 func displayConfig(containerName string) {
-	fp, err := ioutil.ReadFile(config.Agent.LxcPrefix + containerName + "/config")
+	fp, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, containerName, "config"))
 	log.Check(log.FatalLevel, "Reading config", err)
 	// log.Info("Config:")
 	log.Info("\n" + string(fp) + "\n")
@@ -39,7 +40,7 @@ func addValue(containerName, key, value string) {
 	if len(value) == 0 {
 		log.Error("no value provided")
 	}
-	f := config.Agent.LxcPrefix + containerName + "/config"
+	f := path.Join(config.Agent.LxcPrefix, containerName, "config")
 	if container.GetConfigItem(f, key) == "" { // add it.
 
 		fp, err := os.OpenFile(f, os.O_WRONLY|os.O_APPEND, 0644)
@@ -72,7 +73,7 @@ func delValue(containerName, key string) {
 	if len(key) == 0 {
 		log.Error("No key provided")
 	}
-	f := config.Agent.LxcPrefix + containerName + "/config"
+	f := path.Join(config.Agent.LxcPrefix, containerName, "config")
 	if container.GetConfigItem(f, key) == "" {
 		log.Error("No such item found")
 	} else {

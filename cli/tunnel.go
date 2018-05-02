@@ -15,6 +15,7 @@ import (
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 	"os"
+	"path"
 )
 
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
@@ -51,7 +52,7 @@ func TunAdd(socket, timeout string) {
 		return
 	}
 
-	log.Check(log.WarnLevel, "Setting key permissions", os.Chmod(config.Agent.DataPrefix+"ssh.pem", 0600))
+	log.Check(log.WarnLevel, "Setting key permissions", os.Chmod(path.Join(config.Agent.DataPrefix, "ssh.pem"), 0600))
 
 	args, tunsrv := getArgs(socket)
 
@@ -160,10 +161,10 @@ func TunCheck() {
 func getArgs(socket string) ([]string, string) {
 	var tunsrv string
 	var args []string
-	cdn, err := net.LookupIP("ssh." + config.CDN.URL)
+	cdn, err := net.LookupIP("ssh." + path.Join(config.CDN.URL))
 	log.Check(log.ErrorLevel, "Resolving nearest tunnel node address", err)
 	tunsrv = cdn[0].String()
-	args = []string{"-i", config.Agent.DataPrefix + "ssh.pem", "-N", "-p", "8022", "-R", "0:" + socket, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
+	args = []string{"-i", path.Join(config.Agent.DataPrefix, "ssh.pem"), "-N", "-p", "8022", "-R", "0:" + socket, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "tunnel@" + tunsrv}
 	return args, tunsrv
 }
 
