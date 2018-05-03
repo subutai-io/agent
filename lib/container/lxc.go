@@ -237,13 +237,9 @@ func DestroyContainer(name string) error {
 
 	log.Info("Destroying container " + name)
 
-	log.Check(log.DebugLevel, "Stopping lxc", c.Stop())
-	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*15))
-	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
+	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*120))
 
-	if fs.DatasetExists(name) {
-		fs.RemoveDataset(name, true)
-	}
+	fs.RemoveDataset(name, true)
 
 	bolt, err := db.New()
 	if !log.Check(log.WarnLevel, "Opening database", err) {
@@ -256,25 +252,13 @@ func DestroyContainer(name string) error {
 }
 
 func DestroyTemplate(name string) {
-
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-
-	log.Check(log.ErrorLevel, "Creating container object", err)
-
-	defer lxc.Release(c)
-
-	//check just in case
-	if c.State() == lxc.RUNNING {
-		log.Check(log.ErrorLevel, "Stopping container", c.Stop())
+	if !IsTemplate(name) {
+		log.Error("Template " + name + " not found")
 	}
 
 	log.Info("Destroying template " + name)
 
-	log.Check(log.DebugLevel, "Destroying lxc", c.Destroy())
-
-	if fs.DatasetExists(name) {
-		fs.RemoveDataset(name, true)
-	}
+	fs.RemoveDataset(name, true)
 
 	DeleteTemplateInfoFromCache(name)
 }
