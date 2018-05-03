@@ -235,11 +235,13 @@ func DestroyContainer(name string) error {
 
 	defer lxc.Release(c)
 
-	log.Info("Destroying container " + name)
-
 	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*120))
 
-	fs.RemoveDataset(name, true)
+	for i := 1; i <= 3 && fs.RemoveDataset(name, true) != nil; i++ {
+		time.Sleep(time.Second * 3)
+	}
+
+	log.Check(log.ErrorLevel, "Removing container", err)
 
 	bolt, err := db.New()
 	if !log.Check(log.WarnLevel, "Opening database", err) {
@@ -256,9 +258,9 @@ func DestroyTemplate(name string) {
 		log.Error("Template " + name + " not found")
 	}
 
-	log.Info("Destroying template " + name)
+	err := fs.RemoveDataset(name, true)
 
-	fs.RemoveDataset(name, true)
+	log.Check(log.ErrorLevel, "Removing template", err)
 
 	DeleteTemplateInfoFromCache(name)
 }
