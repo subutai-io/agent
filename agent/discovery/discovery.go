@@ -16,6 +16,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"path"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 type handler struct {
@@ -73,20 +74,20 @@ func ImportManagementKey() {
 func Monitor() {
 	for {
 		if container.State("management") == "RUNNING" {
-			go server()
+			go common.RunNRecover(server)
 			save("10.10.10.1")
 		} else {
-			go client()
+			go common.RunNRecover(client)
 		}
 		time.Sleep(30 * time.Second)
 	}
 }
 
-func server() error {
+func server() {
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
-		go s.Start()
 		defer s.Stop()
+		go s.Start()
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP server on " + address)
 		s.AdvertiseServer(gossdp.AdvertisableServer{
@@ -98,26 +99,28 @@ func server() error {
 		for len(fingerprint()) > 0 {
 			time.Sleep(30 * time.Second)
 		}
+	} else {
+		log.Warn(err)
 	}
-	return err
 }
 
-func client() error {
+func client() {
 	if len(config.Management.Host) > 6 {
-		return nil
+		return
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
 	if err == nil {
-		go c.Start()
 		defer c.Stop()
+		go c.Start()
 
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
 		err = c.ListenFor(address)
 		time.Sleep(2 * time.Second)
+	} else {
+		log.Warn(err)
 	}
-	return err
 }
 
 func fingerprint() string {

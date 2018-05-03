@@ -510,6 +510,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		}
 	}
 
+	//!important used by Console
 	log.Info("Unpacking template " + t.Name)
 	log.Debug(path.Join(config.Agent.CacheDir, t.File) + " to " + templateRef)
 	tgz := extractor.NewTgz()

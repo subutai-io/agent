@@ -69,14 +69,41 @@ func initAgent() {
 	client = utils.TLSConfig()
 }
 
+//HTTP server >>>>
+var mux map[string]func(http.ResponseWriter, *http.Request)
+
+type myHandler struct{}
+
+func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h, ok := mux[r.URL.String()]; ok {
+		h(w, r)
+		return
+	}
+
+	w.WriteHeader(http.StatusForbidden)
+}
+
+func setupHttpServer() {
+	srv := &http.Server{
+		Addr:         ":7070",
+		ReadTimeout:  1 * time.Minute,
+		WriteTimeout: 1 * time.Minute,
+		Handler:      &myHandler{},
+	}
+	mux = make(map[string]func(http.ResponseWriter, *http.Request))
+	mux["/trigger"] = triggerHandler
+	mux["/ping"] = pingHandler
+	mux["/heartbeat"] = heartbeatHandler
+	go srv.ListenAndServe()
+}
+
+//<<<HTTP server
+
 //Start starting Subutai Agent daemon, all required goroutines and keep working during all life cycle.
 func Start() {
 	initAgent()
 
-	http.HandleFunc("/trigger", trigger)
-	http.HandleFunc("/ping", ping)
-	http.HandleFunc("/heartbeat", heartbeatCall)
-	go http.ListenAndServe(":7070", nil)
+	setupHttpServer()
 
 	go discovery.Monitor()
 	go monitor.Collect()
@@ -305,7 +332,7 @@ func command() {
 	}
 }
 
-func ping(rw http.ResponseWriter, request *http.Request) {
+func pingHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusOK)
 	} else {
@@ -313,7 +340,7 @@ func ping(rw http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func trigger(rw http.ResponseWriter, request *http.Request) {
+func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodPost && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusAccepted)
 		go command()
@@ -322,11 +349,11 @@ func trigger(rw http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func heartbeatCall(rw http.ResponseWriter, request *http.Request) {
+func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusOK)
 		lastHeartbeat = []byte{}
-		sendHeartbeat()
+		go sendHeartbeat()
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}
