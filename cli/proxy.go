@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	conftmpl   = "/etc/nginx/tmpl"
+	conftmpl   = "/etc/subutai/nginx/tmpl"
 	confinc    = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes/http")
 	webSslPath = path.Join(config.Agent.DataPrefix, "/web/ssl")
 )
@@ -100,7 +100,7 @@ func ProxyCheck(vlan, node string, domain bool) {
 
 // restart reloads nginx process
 func restart() {
-	out, err := exec.Command("nginx", "-s", "reload").CombinedOutput()
+	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
 	log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
 
