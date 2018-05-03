@@ -142,7 +142,7 @@ func cpuLoad(h string) interface{} {
 	return 100 - cpuUsage
 }
 
-func diskLoad() (disktotal, diskused interface{}) {
+func diskLoad() (diskavail, diskused int) {
 	out, err := exc.Execute("zfs", "list", path.Join(config.Agent.Dataset))
 	log.Check(log.ErrorLevel, "Gettings zfs list "+out, err)
 
@@ -153,7 +153,7 @@ func diskLoad() (disktotal, diskused interface{}) {
 
 		if len(fields) > 2 {
 			diskused, _ = fs.ConvertToBytes(fields[1])
-			disktotal, _ = fs.ConvertToBytes(fields[2])
+			diskavail, _ = fs.ConvertToBytes(fields[2])
 		}
 	}
 
@@ -246,7 +246,9 @@ func sysLoad(h string) string {
 	result.CPU.CoreCount = runtime.NumCPU()
 	result.CPU.Frequency = grep("cpu MHz", "/proc/cpuinfo")
 	result.RAM.Free, result.RAM.Total, result.RAM.Cached = ramLoad()
-	result.Disk.Total, result.Disk.Used = diskLoad()
+	diskAvail, diskUsed := diskLoad()
+	result.Disk.Total = diskUsed + diskAvail
+	result.Disk.Used = diskUsed
 
 	a, err := json.Marshal(result)
 	if err != nil {
