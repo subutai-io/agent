@@ -237,8 +237,8 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*120))
 
-	for i := 1; i <= 3 && fs.RemoveDataset(name, true) != nil; i++ {
-		time.Sleep(time.Second * 3)
+	for i := 1; fs.RemoveDataset(name, true) != nil && i < 3; i++ {
+		time.Sleep(time.Second * time.Duration(i*5))
 	}
 
 	log.Check(log.ErrorLevel, "Removing container", err)
