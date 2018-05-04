@@ -50,14 +50,18 @@ func DatasetExists(dataset string) bool {
 // Removes dataset or snapshot.
 // Parameter "recursive" allows to remove all children.
 // If snapshot is to be removed, "dataset" parameter must be in form "dataset@snapshotName"
-func RemoveDataset(dataset string, recursive bool) {
+func RemoveDataset(dataset string, recursive bool) error {
 	args := []string{"destroy"}
 	if recursive {
 		args = append(args, "-r")
 	}
 	args = append(args, path.Join(zfsRootDataset, dataset))
 	out, err := exec.Execute("zfs", args...)
-	log.Check(log.ErrorLevel, "Removing zfs dataset/snapshot "+dataset+" "+out, err)
+	log.Check(log.WarnLevel, "Removing zfs dataset/snapshot "+dataset+" "+out, err)
+	if err != nil {
+		return errors.New("Removing zfs dataset/snapshot " + dataset + " " + out)
+	}
+	return nil
 }
 
 // Creates dataset
