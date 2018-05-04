@@ -1,0 +1,9 @@
+upstream PROTO-PORT {
+  	#Add new host here
+    	server localhost:81;
+}
+
+server {
+        listen PORT;
+        proxy_pass PROTO-PORT;
+}

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#DEBHELPER#
+
+# FIXME: disabling system nginx for the moment
+systemctl stop nginx.service
+systemctl disable nginx.service

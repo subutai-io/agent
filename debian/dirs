@@ -1,0 +1,8 @@
+usr/share/subutai/etc/
+var/lib/subutai/nginx/nginx-includes/https
+var/lib/subutai/web/ssl
+var/lib/subutai/nginx/run
+var/lib/subutai/nginx/log
+var/lib/subutai/nginx/cache
+var/lib/subutai/nginx/conf.d
+var/lib/subutai/nginx/proxy_cache
