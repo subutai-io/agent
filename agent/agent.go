@@ -19,7 +19,6 @@ import (
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/agent/discovery"
 	"github.com/subutai-io/agent/agent/executer"
-	"github.com/subutai-io/agent/agent/logger"
 	"github.com/subutai-io/agent/agent/monitor"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
@@ -109,7 +108,6 @@ func Start() {
 	go monitor.Collect()
 	go connectionMonitor()
 	go alert.Processing()
-	go logger.SyslogServer()
 	go restoreContainers()
 
 	for {
