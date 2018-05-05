@@ -21,6 +21,7 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/lib/fs"
 	"path"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 var (
@@ -38,7 +39,7 @@ func Collect() {
 
 	for {
 
-		doCollect()
+		common.RunNRecover(doCollect)
 
 		time.Sleep(time.Second * 30)
 	}
