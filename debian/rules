@@ -25,7 +25,6 @@ override_dh_auto_install:
 	mkdir -p debian/subutai/var/lib/subutai/
 	mkdir -p debian/subutai/usr/lib/subutai/libexec
 	mkdir -p debian/subutai/lib/systemd/system
-	cp -r debian/tree/nginx debian/subutai/etc/subutai/
 	cp debian/tree/agent.conf debian/subutai/etc/subutai/
 	cp debian/tree/ssh.pem debian/subutai/var/lib/subutai/
 	cp debian/tree/libexec/* debian/subutai/usr/lib/subutai/libexec/
