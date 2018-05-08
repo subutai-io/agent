@@ -1,0 +1,11 @@
+subutai-agent (6.4.12+201804260+nosnap-0) unstable; urgency=medium
+
+  * New version
+
+ -- Aron Xu <aron@debian.org>  Tue, 24 Apr 2018 14:37:41 +0800
+
+subutai-agent (6.4.12+20180420+nosnap-0) unstable; urgency=medium
+
+  * Initial release.
+
+ -- Aron Xu <happyaron.xu@gmail.com>  Sat, 31 Mar 2018 17:03:46 +0800

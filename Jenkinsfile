@@ -46,20 +46,10 @@ try {
 			cd agent
 			git checkout --track origin/${release} && rm -rf .git*
 			cd ${CWD}|| exit 1
-
-			# Clone debian packaging
-		
-			git clone https://github.com/happyaron/subutai-agent
-
-			# Put debian directory into agent tree
-			cp -r subutai-agent/debian/ agent/
-			echo "Copied debian directory"
-
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
-			
 			echo 'VERSION is ${agent_version}'
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
                         cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
