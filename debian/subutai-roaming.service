@@ -1,0 +1,10 @@
+[Unit]
+Description=Subutai Roaming Service
+Requires=subutai-ovs.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/subutai/libexec/roaming
+
+[Install]
+WantedBy=multi-user.target

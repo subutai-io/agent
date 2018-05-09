@@ -1,0 +1,73 @@
+#!/bin/bash
+set -e
+
+LXC_CONF=/etc/lxc/lxc.conf
+LXC_MNT=/var/lib/lxc
+
+setup_fs() {
+/sbin/modprobe zfs
+if ! [ $? -eq 0 ]; then
+    echo "Please check ZFS installation."
+    return 1
+fi
+
+if $flag_pool; then
+    pool=$fs
+else
+    pool=subutai
+    if $flag_force; then
+	zpool create -f $pool $fs
+    else
+	zpool create $pool $fs
+    fi
+fi
+
+zfs create -o mountpoint="$LXC_MNT" ${pool}/fs
+}
+
+setup_lxc() {
+if [ -f $LXC_CONF ]; then
+    TMP_CONF=$(grep lxc.lxcpath $LXC_CONF 2>/dev/null)
+    if ! [ -z $TMP_CONF ]; then
+        if [ $(echo $TMP_CONF|cut -d'=' -f2) != "$LXC_MNT" ]; then
+            echo "Please change lxc.lxcpath in $LXC_CONF to $LXC_MNT!"
+            return 1
+        else
+            return 0
+        fi
+    fi
+    echo "lxc.lxcpath=$LXC_MNT" >> $LXC_CONF
+else
+    echo "$LXC_CONF does not exist!"
+    return 1
+fi
+}
+
+if [ -z $1 ]; then
+    echo "Usage: $0 /dev/sd[X]"
+    return
+fi
+
+n=1
+while [ $# -gt 0 ]; do
+    case $1 in
+        -*) break;;
+        *) eval "arg_$n=\$1"; n=$(( $n + 1 )) ;;
+    esac
+    shift
+done
+
+flag_force=false
+flag_pool=false
+while getopts ":fp" opt; do
+    case $opt in
+        f) flag_force=true;;
+        p) flag_pool=true;;
+    esac
+    shift
+done
+
+fs=$arg_1$1
+
+setup_fs
+setup_lxc

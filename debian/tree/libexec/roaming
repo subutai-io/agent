@@ -1,0 +1,74 @@
+#!/bin/bash
+function renew_ips(){
+
+    #source variables
+    source /etc/environment
+
+
+    #obtain IP or renew lease for bridged interface
+    if [ ! -z "$SUBUTAI_BRIDGE_IFACE" ]; then
+
+        timeout 15 dhclient $SUBUTAI_BRIDGE_IFACE
+    
+        #in case of error -> renew IP
+        if [ "$?" != "0" ]; then
+
+            dhclient -r $SUBUTAI_BRIDGE_IFACE
+
+            /bin/ip addr flush dev $SUBUTAI_BRIDGE_IFACE
+
+            timeout 15 dhclient $SUBUTAI_BRIDGE_IFACE
+
+        else
+
+            #check if default route is on primary interface, refresh otherwise
+            if [ "$(ip route list exact 0/0 | grep -c $SUBUTAI_BRIDGE_IFACE)" == "0" ]; then
+
+                ip route del 0/0
+
+                timeout 15 dhclient $SUBUTAI_BRIDGE_IFACE
+
+            #check if default route works, refresh otherwise
+            else
+
+                ping -c3 -w10 8.8.8.8 &>/dev/null
+
+                if [ "$?" != "0" ]; then
+
+                    ip route del 0/0
+
+                    timeout 15 dhclient $SUBUTAI_BRIDGE_IFACE
+
+                fi
+            fi
+        fi
+    
+
+        #obtain IPs or renew lease for private interface
+        if [ ! -z "$SUBUTAI_HOST_IFACE" ]; then
+
+            timeout 10 dhclient $SUBUTAI_HOST_IFACE
+
+        fi
+
+        #obtain IPs or renew lease for NAT interface
+        if [ ! -z "$SUBUTAI_NAT_IFACE" ]; then
+
+            timeout 10 dhclient $SUBUTAI_NAT_IFACE
+        fi
+
+
+        #kill dhclient for this round
+        pkill dhclient
+
+    fi
+}
+
+
+#check if we are in a virtual machine
+if [ -n "$(grep ^flags.*\ hypervisor /proc/cpuinfo)" ]; then
+	while true; do
+        renew_ips;
+        sleep 20
+	done
+fi
