@@ -1,0 +1,12 @@
+[Unit]
+Description=Subutai Daemon
+Requires=cgmanager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/subutai daemon
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+Alias=subutai-agent.service

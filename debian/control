@@ -1,0 +1,48 @@
+Source: subutai-agent
+Section: utils
+Priority: optional
+Maintainer: Aron Xu <happyaron.xu@gmail.com>
+Build-Depends: debhelper (>= 10),
+               dh-golang,
+               golang-any,
+               golang-cloudfoundry-archiver-dev,
+               golang-github-boltdb-bolt-dev,
+               golang-github-fromkeith-gossdp-dev,
+               golang-github-influxdb-influxdb-dev,
+               golang-github-jhoonb-archivex-dev,
+               golang-github-mcuadros-go-version-dev,
+               golang-github-nightlyone-lockfile-dev,
+               golang-github-pkg-errors-dev,
+               golang-github-sirupsen-logrus-dev,
+               golang-github-snapcore-snapd-dev,
+               golang-github-tmc-scp-dev,
+               golang-github-urfave-cli-dev,
+               golang-github-wunderlist-ttlcache-dev,
+               golang-gopkg-cheggaaa-pb.v1-dev,
+               golang-gopkg-gcfg.v1-dev,
+               golang-gopkg-lxc-go-lxc.v2-dev,
+               golang-gopkg-macaroon.v1-dev,
+               golang-gopkg-mcuadros-go-syslog.v2-dev,
+               golang-gopkg-retry.v1-dev,
+               golang-gopkg-tomb.v2-dev,
+               golang-gopkg-warnings.v0-dev
+Standards-Version: 4.1.3
+Homepage: http://github.com/subutai-io/agent
+XS-Go-Import-Path: github.com/subutai-io/agent
+
+Package: subutai
+Architecture: any
+Depends: cgmanager,
+         gnupg1 | gnupg (< 2.0.0~),
+         lxc,
+         nsexec,
+         rng-tools,
+         subutai-nginx,
+         subutai-ovs,
+         subutai-p2p,
+         zfsutils-linux,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Conflicts: uidmap
+Description: intelligent P2P cloud computing
+ project allows users to build their private networks.
