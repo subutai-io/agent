@@ -77,7 +77,6 @@ func Monitor() {
 	for {
 		if container.State("management") == "RUNNING" {
 			go common.RunNRecover(server)
-			save("10.10.10.1")
 		} else {
 			go common.RunNRecover(client)
 		}
@@ -85,7 +84,21 @@ func Monitor() {
 	}
 }
 
+var ssdpServerRunning bool
+
 func server() {
+	if ssdpServerRunning {
+		return
+	}
+
+	ssdpServerRunning = true
+
+	defer func() {
+		ssdpServerRunning = false
+	}()
+
+	save("10.10.10.1")
+
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
 		defer s.Stop()
