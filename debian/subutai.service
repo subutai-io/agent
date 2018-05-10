@@ -6,6 +6,7 @@ Requires=cgmanager.service
 Type=simple
 ExecStart=/usr/bin/subutai daemon
 KillMode=process
+Restart=on-abnormal
 
 [Install]
 WantedBy=multi-user.target
