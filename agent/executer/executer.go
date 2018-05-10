@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 // EncRequest describes encrypted JSON request from Management server.
@@ -180,12 +181,23 @@ func outputSender(stdout, stderr chan string, ch chan<- ResponseOptions, respons
 			alive = true
 		}
 		if len(response.StdOut) > 50000 || len(response.StdErr) > 50000 || alive {
-			ch <- *response
+			ok := send(ch, response)
 			response.StdErr, response.StdOut = "", ""
 			response.ResponseNumber++
+			if !ok {
+				break
+			}
 		}
 	}
 	ticker.Stop()
+}
+
+func send(ch chan<- ResponseOptions, response *ResponseOptions) bool {
+	defer common.Recover()
+
+	ch <- *response
+
+	return true
 }
 
 func buildCmd(r *RequestOptions) *exec.Cmd {
