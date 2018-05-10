@@ -31,12 +31,17 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 
-	//config.Management.Fingerprint or config.Management.Host properties determine discovery
+	managementHostIp := config.Management.Host
+	if managementHostIp == "10.10.10.1" {
+		managementHostIp = ""
+	}
+
+	//config.Management.Fingerprint or managementHostIp properties determine discovery
 	////if both properties are set in config
-	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(config.Management.Host) != "" {
+	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(managementHostIp) != "" {
 		//if both properties match then connect
 		if strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) &&
-			strings.EqualFold(strings.TrimSpace(message.Location), strings.TrimSpace(config.Management.Host)) {
+			strings.EqualFold(strings.TrimSpace(message.Location), strings.TrimSpace(managementHostIp)) {
 
 			save(message.Location)
 		}
@@ -47,13 +52,13 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 		save(message.Location)
 	} else
 	//if mgmt host is set and matches then connect
-	if strings.TrimSpace(config.Management.Host) != "" &&
-		strings.EqualFold(strings.TrimSpace(config.Management.Host), strings.TrimSpace(message.Location)) {
+	if strings.TrimSpace(managementHostIp) != "" &&
+		strings.EqualFold(strings.TrimSpace(managementHostIp), strings.TrimSpace(message.Location)) {
 
 		save(message.Location)
 	} else
 	//if both properties are not set then connect to first found
-	if strings.TrimSpace(config.Management.Fingerprint) == "" && strings.TrimSpace(config.Management.Host) == "" {
+	if strings.TrimSpace(config.Management.Fingerprint) == "" && strings.TrimSpace(managementHostIp) == "" {
 		save(message.Location)
 	}
 }
@@ -74,7 +79,6 @@ func Monitor() {
 			go common.RunNRecover(server)
 			save("10.10.10.1")
 		} else {
-			config.Management.Host = ""
 			go common.RunNRecover(client)
 		}
 		time.Sleep(30 * time.Second)
@@ -85,16 +89,16 @@ func server() {
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
 		defer s.Stop()
-		go s.Start()
+		go common.RunNRecover(s.Start)
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP server on " + address)
 		s.AdvertiseServer(gossdp.AdvertisableServer{
 			ServiceType: address,
-			DeviceUuid:  fingerprint(),
+			DeviceUuid:  fingerprint(config.Management.Host),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
 		})
-		for len(fingerprint()) > 0 {
+		for len(fingerprint(config.Management.Host)) > 0 {
 			time.Sleep(30 * time.Second)
 		}
 	} else {
@@ -103,14 +107,14 @@ func server() {
 }
 
 func client() {
-	if len(strings.TrimSpace(config.Management.Host)) > 0 {
+	if len(strings.TrimSpace(config.Management.Host)) > 0 && len(fingerprint(config.Management.Host)) > 0 {
 		return
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
 	if err == nil {
 		defer c.Stop()
-		go c.Start()
+		go common.RunNRecover(c.Start)
 
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
@@ -121,9 +125,9 @@ func client() {
 	}
 }
 
-func fingerprint() string {
+func fingerprint(ip string) string {
 	client := utils.GetClient(config.Management.Allowinsecure, 5)
-	resp, err := client.Get("https://10.10.10.1:8443/rest/v1/security/keyman/getpublickeyfingerprint")
+	resp, err := client.Get("https://" + ip + ":8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
 		defer utils.Close(resp)
 	}
@@ -154,8 +158,6 @@ func save(ip string) {
 	base.DiscoverySave(ip)
 
 	config.Management.Host = ip
-
-	utils.ResetInfluxDbClient()
 }
 
 func getKey() []byte {
