@@ -28,12 +28,9 @@ func (h handler) Warnf(f string, args ...interface{})  { log.Debug("SSDP: " + fm
 func (h handler) Errorf(f string, args ...interface{}) { log.Debug("SSDP: " + fmt.Sprintf(f, args)) }
 
 func (h handler) Response(message gossdp.ResponseMessage) {
-	//if strings.TrimSpace(config.Management.Fingerprint) == "" ||
-	//	strings.EqualFold(strings.TrimSpace(config.Management.Fingerprint), strings.TrimSpace(message.DeviceId)) {
-	//	save(message.Location)
-	//}
 
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
+
 	//config.Management.Fingerprint or config.Management.Host properties determine discovery
 	////if both properties are set in config
 	if strings.TrimSpace(config.Management.Fingerprint) != "" && strings.TrimSpace(config.Management.Host) != "" {
@@ -77,6 +74,7 @@ func Monitor() {
 			go common.RunNRecover(server)
 			save("10.10.10.1")
 		} else {
+			config.Management.Host = ""
 			go common.RunNRecover(client)
 		}
 		time.Sleep(30 * time.Second)
@@ -105,7 +103,7 @@ func server() {
 }
 
 func client() {
-	if len(config.Management.Host) > 6 {
+	if len(strings.TrimSpace(config.Management.Host)) > 0 {
 		return
 	}
 
@@ -117,7 +115,7 @@ func client() {
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
 		err = c.ListenFor(address)
-		time.Sleep(2 * time.Second)
+		time.Sleep(10 * time.Second)
 	} else {
 		log.Warn(err)
 	}
@@ -146,6 +144,8 @@ func fingerprint() string {
 }
 
 func save(ip string) {
+	log.Debug("Saving management host IP " + ip)
+
 	base, err := db.New()
 	if err != nil {
 		return
