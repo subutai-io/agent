@@ -543,6 +543,11 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	//!important used by Console
 	log.Info("Installing template " + t.Name)
 
+	//delete dataset if already exists
+	if fs.DatasetExists(templateRef) {
+		fs.RemoveDataset(templateRef, true)
+	}
+
 	template.Install(templateRef)
 
 	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
