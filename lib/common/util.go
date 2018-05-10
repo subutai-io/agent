@@ -32,3 +32,9 @@ func RunNRecover(g func()) {
 func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
+
+func Recover() {
+	if r := recover(); r != nil {
+		log.Warn("Recovered from ", r)
+	}
+}
