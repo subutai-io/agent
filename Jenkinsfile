@@ -43,7 +43,7 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release}
+			git checkout --track origin/${release} || exit 1
                         export agent_version="$(git describe --abbrev=0 --tags)+${date}"
                         rm -rf .git*
 			cd ${CWD}|| exit 1
