@@ -13,7 +13,8 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
-		def agent_version = "7.0.0+${date}"
+                def git_tag = "git describe --abbrev=0 --tags".execute();
+		def agent_version = git_tag.in.text + '+' + date;
 		def CWD = pwd()
 
                 switch (env.BRANCH_NAME) {
