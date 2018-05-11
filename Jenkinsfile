@@ -44,14 +44,13 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release} 
-
-                        export agent_version="$(git describe --abbrev=0 --tags)+$(date +%Y%m%d%H%M%S)"
-
-                        rm -rf .git* && cd ${CWD}|| exit 1
+			git checkout --track origin/${release}
+			cd ${CWD}|| exit 1
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
+                def proc = "git describe --abbrev=0 --tags".execute()
+                def agent_version = proc.in.text + '+' + date
 		sh """
 			echo 'VERSION is ${agent_version}'
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
