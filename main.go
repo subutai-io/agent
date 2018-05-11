@@ -66,7 +66,7 @@ func checkGPG() {
 func initDb() {
 	if base, err := db.New(); err == nil {
 		defer base.Close()
-		if len(config.Management.Host) < 7 {
+		if len(strings.TrimSpace(config.Management.Host)) == 0 {
 			config.Management.Host = base.DiscoveryLoad()
 		}
 	}
