@@ -7,6 +7,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 	"github.com/snapcore/snapd/snap"
+	"strings"
 )
 
 func init() {
@@ -37,10 +38,10 @@ func Update(name string, check bool) {
 
 func updateRH(check bool) {
 
-	_, err := exec.Command("apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5").CombinedOutput()
-	log.Check(log.FatalLevel, "Updating apt index", err)
-	output, err := exec.Command("apt-get", "-qq", "dist-upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s").CombinedOutput()
-	log.Check(log.FatalLevel, "Checking for available update", err)
+	output, err := exec.Command("apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5").CombinedOutput()
+	log.Check(log.FatalLevel, "Updating apt index "+string(output), err)
+	output, err = exec.Command("apt-get", "-qq", "dist-upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s").CombinedOutput()
+	log.Check(log.FatalLevel, "Checking for available update "+string(output), err)
 	if len(output) == 0 {
 		log.Info("No update is available")
 		os.Exit(1)
@@ -64,10 +65,10 @@ func updateContainer(name string, check bool) {
 	if !container.LxcInstanceExists(name) {
 		log.Error("no such instance \"" + name + "\"")
 	}
-	_, err := container.AttachExec(name, []string{"apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})
-	log.Check(log.FatalLevel, "Updating apt index", err)
-	output, err := container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s"})
-	log.Check(log.FatalLevel, "Checking for available update", err)
+	output, err := container.AttachExec(name, []string{"apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5"})
+	log.Check(log.FatalLevel, "Updating apt index "+strings.Join(output, "\n"), err)
+	output, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s"})
+	log.Check(log.FatalLevel, "Checking for available update "+strings.Join(output, "\n"), err)
 	if len(output) == 0 {
 		log.Info("No update is available")
 		os.Exit(1)
@@ -75,9 +76,9 @@ func updateContainer(name string, check bool) {
 		log.Info("Update is available")
 		os.Exit(0)
 	}
-	_, err = container.AttachExec(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.FatalLevel, "Configuring dpkg", err)
-	_, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
+	output, err = container.AttachExec(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
+	log.Check(log.FatalLevel, "Configuring dpkg "+strings.Join(output, "\n"), err)
+	output, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
 		[]string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.FatalLevel, "Updating container", err)
+	log.Check(log.FatalLevel, "Updating container "+strings.Join(output, "\n"), err)
 }
