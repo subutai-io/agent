@@ -47,13 +47,14 @@ try {
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
-                def proc = "git describe --abbrev=0 --tags".execute()
-                def agent_version = proc.in.text + '+' + date
 		sh """
-			echo 'VERSION is ${agent_version}'
+                        cd ${CWD}/agent || exit 1
+                        agent_version=\$(git describe --abbrev=0 --tags)+${date}
+			echo "VERSION is \$agent_version"
+
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
                         cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
-			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
+			dch -v "\$agent_version" -D stable "Test build for \$agent_version" 1>/dev/null 2>/dev/null
 		"""
 
 		stage("Build Agent package")
