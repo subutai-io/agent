@@ -13,7 +13,6 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
-		def agent_version = "7.0.0+${date}"
 		def CWD = pwd()
 
                 switch (env.BRANCH_NAME) {
