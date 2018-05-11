@@ -39,7 +39,7 @@ func updateRH(check bool) {
 
 	_, err := exec.Command("apt-get", "-qq", "update", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5").CombinedOutput()
 	log.Check(log.FatalLevel, "Updating apt index", err)
-	output, err := exec.Command("apt-get", "-qq", "upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s").CombinedOutput()
+	output, err := exec.Command("apt-get", "-qq", "dist-upgrade", "-y", "--force-yes", "-o", "Acquire::http::Timeout=5", "-s").CombinedOutput()
 	log.Check(log.FatalLevel, "Checking for available update", err)
 	if len(output) == 0 {
 		log.Info("No update is available")
@@ -54,7 +54,7 @@ func updateRH(check bool) {
 	output, err = cmd.CombinedOutput()
 	log.Check(log.WarnLevel, "Configuring dpkg "+string(output), err)
 
-	cmd = exec.Command("apt-get", "-qq", "upgrade", "-y", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
+	cmd = exec.Command("apt-get", "-qq", "dist-upgrade", "-y", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
 	cmd.Env = []string{"DEBIAN_FRONTEND=noninteractive", "PATH=" + os.Getenv("PATH")}
 	output, err = cmd.CombinedOutput()
 	log.Check(log.FatalLevel, "Updating host "+string(output), err)
