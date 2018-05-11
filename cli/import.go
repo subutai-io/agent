@@ -61,6 +61,7 @@ func init() {
 	}
 }
 
+//TODO add only non empty params to URL
 // getTemplateInfoById retrieves template name from global repository by passed id string
 func getTemplateInfoById(t *templ, id string, token string) {
 	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
@@ -300,6 +301,7 @@ func downloadWithRetry(t templ, token string, retry int) bool {
 	return false
 }
 
+//TODO add only non empty params to URL
 // download gets template archive from global repository
 func download(t templ, token string) (bool, error) {
 
@@ -318,7 +320,7 @@ func download(t templ, token string) (bool, error) {
 
 	response, err := client.Get(url)
 	if err != nil {
-		log.Debug("Failed to connect to Kurjun ", err)
+		log.Debug("Failed to connect to CDN ", err)
 		return false, err
 	}
 	defer utils.Close(response)
