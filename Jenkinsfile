@@ -44,7 +44,6 @@ try {
 			git clone https://github.com/subutai-io/agent
 			cd agent
 			git checkout --track origin/${release}
-			cd ${CWD}|| exit 1
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
