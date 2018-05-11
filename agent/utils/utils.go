@@ -25,8 +25,7 @@ import (
 )
 
 var (
-	influxDbClient client.Client
-	sslPath        = path.Join(config.Agent.DataPrefix, "ssl")
+	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
 )
 
 // Iface describes network interfaces of the Resource Host.
@@ -37,25 +36,6 @@ type Iface struct {
 
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
-
-	if influxDbClient == nil {
-		influxDbClient, err = createInfluxDbClient()
-	}
-
-	clnt = influxDbClient
-
-	return
-}
-
-func ResetInfluxDbClient() {
-	if influxDbClient != nil {
-		influxDbClient.Close()
-		influxDbClient = nil
-	}
-}
-
-func createInfluxDbClient() (client.Client, error) {
-
 	return client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://" + path.Join(config.Management.Host) + ":8086",
 		Username:           config.Influxdb.User,
@@ -63,7 +43,6 @@ func createInfluxDbClient() (client.Client, error) {
 		Timeout:            time.Second * 60,
 		InsecureSkipVerify: true,
 	})
-
 }
 
 // <--- InfluxDb
