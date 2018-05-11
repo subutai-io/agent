@@ -13,6 +13,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
+		def agent_version = "7.0.0+${date}"
 		def CWD = pwd()
 
                 switch (env.BRANCH_NAME) {
@@ -43,10 +44,11 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release} || exit 1
-                        export agent_version="$(git describe --abbrev=0 --tags)+${date}"
-                        rm -rf .git*
-			cd ${CWD}|| exit 1
+			git checkout --track origin/${release} 
+
+                        export agent_version="$(git describe --abbrev=0 --tags)+$(date +%Y%m%d%H%M%S)"
+
+                        rm -rf .git* && cd ${CWD}|| exit 1
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
