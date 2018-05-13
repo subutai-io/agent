@@ -43,7 +43,7 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release}
+			git checkout ${release}
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
