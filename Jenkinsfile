@@ -13,7 +13,6 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
-		def agent_version = "7.0.0+${date}"
 		def CWD = pwd()
 
                 switch (env.BRANCH_NAME) {
@@ -44,16 +43,18 @@ try {
 			# Clone agent code
 			git clone https://github.com/subutai-io/agent
 			cd agent
-			git checkout --track origin/${release} && rm -rf .git*
-			cd ${CWD}|| exit 1
+			git checkout --track origin/${release}
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
-			echo 'VERSION is ${agent_version}'
+                        cd ${CWD}/agent || exit 1
+                        agent_version=\$(git describe --abbrev=0 --tags)+${date}
+			echo "VERSION is \$agent_version"
+
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
                         cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
-			dch -v '${agent_version}' -D stable 'Test build for ${agent_version}' 1>/dev/null 2>/dev/null
+			dch -v "\$agent_version" -D stable "Test build for \$agent_version" 1>/dev/null 2>/dev/null
 		"""
 
 		stage("Build Agent package")
