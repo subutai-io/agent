@@ -14,7 +14,7 @@ func DelIface(iface string) {
 	log.Debug("Removing interface " + iface)
 	exec.Command("ovs-vsctl", "--if-exists", "del-br", iface).Run()
 	exec.Command("ovs-vsctl", "--if-exists", "del-port", iface).Run()
-	exec.Command("ifconfig", iface, "down").Run()
+	exec.Command("ip", "set", "dev", iface, "down").Run()
 }
 
 func ValidSocket(socket string) bool {
