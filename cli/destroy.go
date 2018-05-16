@@ -169,13 +169,18 @@ func Prune(what string) {
 
 		var templatesInUse []string
 
-		//collect all used templates
-		for _, c := range container.Containers() {
-			parent := strings.TrimSpace(container.GetParent(c))
-			for parent != c && parent != "" {
+		//collect all templates that have children
+		for _, c := range container.All() {
+			self := strings.TrimSpace(container.GetProperty(c, "subutai.template")) + ":" +
+				strings.TrimSpace(container.GetProperty(c, "subutai.template.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(c, "subutai.template.version"))
+
+			parent := strings.TrimSpace(container.GetProperty(c, "subutai.parent")) + ":" +
+				strings.TrimSpace(container.GetProperty(c, "subutai.parent.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(c, "subutai.parent.version"))
+
+			if self != parent || container.IsContainer(c) {
 				templatesInUse = append(templatesInUse, parent)
-				c = parent
-				parent = strings.TrimSpace(container.GetParent(c))
 			}
 		}
 

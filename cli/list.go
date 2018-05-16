@@ -87,9 +87,9 @@ func LxcList(name string, c, t, i, p bool) {
 func addParent(list []string) []string {
 	for i := range list {
 		name := strings.Fields(list[i])[0]
-		parent := container.GetProperty(name, "subutai.parent") + ":" +
-			container.GetProperty(name, "subutai.parent.owner") + ":" +
-			container.GetProperty(name, "subutai.parent.version")
+		parent := strings.TrimSpace(container.GetProperty(name, "subutai.parent")) + ":" +
+			strings.TrimSpace(container.GetProperty(name, "subutai.parent.owner")) + ":" +
+			strings.TrimSpace(container.GetProperty(name, "subutai.parent.version"))
 		if name == parent {
 			list[i] = list[i] + "\t"
 		} else {
