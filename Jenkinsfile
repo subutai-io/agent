@@ -49,7 +49,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
                         cd ${CWD}/agent || exit 1
-                        agent_version=\$(git describe --abbrev=0 --tags)+${date}
+                        agent_version=\$(git describe --abbrev=0 --tags)+\$(date +%Y%m%d%H%M%S)
 			echo "VERSION is \$agent_version"
 
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
