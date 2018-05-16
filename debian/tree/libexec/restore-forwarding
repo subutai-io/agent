@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# this script restores forwarding rules for port 22 (SSH) of containers
+# for various reasons these rules might disappear during normal operation of peer (no reboot!)
+# NOTE after peer reboot these rules are restored by containers' "lxc.network.script.up" script so no need to make them persistent
+
+function checkNRestore(){
+
+    MISSING_IPS=()
+
+    # iterate over IPs of running containers
+    for containerIp in `subutai list -i | grep eth0 | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+
+        MISSING=1
+
+        # iterate over existing forwarding rules to figure out which are missing
+        for ruleIp in `iptables -L -t nat | grep DNAT | tr -s [:blank:] | cut -d' ' -f8 | cut -d':' -f 2` ; do
+
+            if [ "$containerIp" == "$ruleIp" ]; then
+
+                MISSING=0
+
+                break
+            fi
+
+        done
+
+         if [ "$MISSING" == 1 ]; then
+
+            MISSING_IPS+=($containerIp)
+
+         fi
+    done
+
+    # restore forwarding rules
+    for ipaddr in "${MISSING_IPS[@]}" ; do
+
+        port=$(expr 10000 + `echo $ipaddr | cut -d'.' -f4`)
+
+        vlan=$(subutai list -i | grep $ipaddr | cut -f1 | awk -F'-' '{print $(NF-1)}')
+
+        iptables -t nat -A PREROUTING -i p2p$vlan -p tcp -m tcp --dport $port -j DNAT --to-destination $ipaddr:22
+
+    done
+
+}
+
+
+while true; do
+
+    checkNRestore;
+
+    sleep 30
+
+done
