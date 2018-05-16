@@ -44,10 +44,10 @@ func updateRH(check bool) {
 	log.Check(log.FatalLevel, "Checking for available update "+string(output), err)
 	if len(output) == 0 {
 		log.Info("No update is available")
-		os.Exit(1)
+		return
 	} else if check {
 		log.Info("Update is available")
-		os.Exit(0)
+		return
 	}
 
 	cmd := exec.Command("dpkg", "--configure", "-a")
@@ -71,10 +71,10 @@ func updateContainer(name string, check bool) {
 	log.Check(log.FatalLevel, "Checking for available update "+strings.Join(output, "\n"), err)
 	if len(output) == 0 {
 		log.Info("No update is available")
-		os.Exit(1)
+		return
 	} else if check {
 		log.Info("Update is available")
-		os.Exit(0)
+		return
 	}
 	output, err = container.AttachExec(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
 	log.Check(log.FatalLevel, "Configuring dpkg "+strings.Join(output, "\n"), err)
