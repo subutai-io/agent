@@ -91,30 +91,26 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 }
 
 func mapList(protocol string) (list []string) {
-	bolt, err := db.New()
-	if !log.Check(log.ErrorLevel, "Opening portmap database to get list", err) {
-		defer bolt.Close()
-	}
 	switch protocol {
 	case "tcp", "udp", "http", "https":
-		list = bolt.PortmapList(protocol)
+		l, err := db.INSTANCE.PortmapList(protocol)
+		log.Check(log.ErrorLevel, "Reading port mappings from db", err)
+		list = l
 	default:
 		for _, v := range []string{"tcp", "udp", "http", "https"} {
-			list = append(list, bolt.PortmapList(v)...)
+			l, err := db.INSTANCE.PortmapList(v)
+			if !log.Check(log.ErrorLevel, "Reading port mappings from db", err) {
+				list = append(list, l...)
+			}
 		}
 	}
 	return
 }
 
 func mapRemove(protocol, sockExt, domain, sockInt string) {
-	bolt, err := db.New()
-	if !log.Check(log.ErrorLevel, "Opening portmap database to remove mapping", err) {
-		defer bolt.Close()
-	}
-
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
-	if sockInt != "" && bolt.PortMapDelete(protocol, sockExt, domain, sockInt) > 0 {
+	if sockInt != "" && deletePortMap(protocol, sockExt, domain, sockInt) > 0 {
 		if strings.Contains(sockInt, ":") {
 			sockInt = sockInt + ";"
 		} else {
@@ -123,8 +119,8 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 		addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 			"server "+sockInt, " ", true)
 	} else {
-		if bolt.PortMapDelete(protocol, sockExt, domain, "") == 0 {
-			bolt.PortMapDelete(protocol, sockExt, "", "")
+		if deletePortMap(protocol, sockExt, domain, "") == 0 {
+			deletePortMap(protocol, sockExt, "", "")
 		}
 		os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
 		if protocol == "https" {
@@ -169,17 +165,12 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 			return true
 		}
 
-		bolt, err := db.New()
-		if !log.Check(log.ErrorLevel, "Opening portmap database to read existing mappings", err) {
-			defer bolt.Close()
-		}
-
-		if !bolt.PortInMap(protocol, *sockExt, "", "") && socket[1] != "80" {
+		if !checkPort(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
-		} else if bolt.PortInMap(protocol, *sockExt, domain, sockInt) {
+		} else if checkPort(protocol, *sockExt, domain, sockInt) {
 			log.Error("Mapping already exists")
 		}
-		return !bolt.PortInMap(protocol, *sockExt, domain, "")
+		return !checkPort(protocol, *sockExt, domain, "")
 	}
 	for port := strconv.Itoa(random(1000, 65536)); isFree(protocol, socket[0]+":"+port); port = strconv.Itoa(random(1000, 65536)) {
 		*sockExt = socket[0] + ":" + port
@@ -240,11 +231,8 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 func balanceMethod(protocol, sockExt, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + strings.Replace(sockExt, ":", "-", -1) + "-" + domain + " {"
 	replace := false
-	bolt, err := db.New()
-	if !log.Check(log.ErrorLevel, "Opening portmap database to check if port is mapped", err) {
-		defer bolt.Close()
-	}
-	if !bolt.PortInMap(protocol, sockExt, domain, "") {
+
+	if !checkPort(protocol, sockExt, domain, "") {
 		log.Error("Port is not mapped")
 	}
 	switch policy {
@@ -271,13 +259,16 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 		return
 	}
 
-	if p := bolt.GetMapMethod(protocol, sockExt, domain); len(p) != 0 && p != policy {
+	p, err := db.INSTANCE.GetMapMethod(protocol, sockExt, domain)
+	log.Check(log.ErrorLevel, "Reading port mapping from db", err)
+
+	if len(p) != 0 && p != policy {
 		replaceString = "; #policy"
 		replace = true
 	} else if p == policy {
 		return
 	}
-	log.Check(log.WarnLevel, "Saving map method", bolt.SetMapMethod(protocol, sockExt, domain, policy))
+	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetMapMethod(protocol, sockExt, domain, policy))
 
 	addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 		replaceString, "	"+policy+"; #policy", replace)
@@ -296,22 +287,27 @@ func httpRedirect(sockExt, domain string) {
 }
 
 func saveMapToDB(protocol, sockExt, domain, sockInt string) {
-	bolt, err := db.New()
-	if !log.Check(log.ErrorLevel, "Opening database to save portmap", err) {
-		defer bolt.Close()
-		if !bolt.PortInMap(protocol, sockExt, domain, sockInt) {
-			log.Check(log.WarnLevel, "Saving port map to database", bolt.PortMapSet(protocol, sockExt, domain, sockInt))
-		}
+	if !checkPort(protocol, sockExt, domain, sockInt) {
+		log.Check(log.ErrorLevel, "Saving port map to database", db.INSTANCE.PortMapSet(protocol, sockExt, domain, sockInt))
 	}
 }
 
 func containerMapToDB(protocol, sockExt, domain, sockInt string) {
-	bolt, err := db.New()
-	if !log.Check(log.ErrorLevel, "Opening database to add portmap to container", err) {
-		defer bolt.Close()
+	list, err := db.INSTANCE.ContainerByKey("ip", strings.Split(sockInt, ":")[0])
+	log.Check(log.ErrorLevel, "Reading container metadata from db", err)
+	for _, name := range list {
+		log.Check(log.ErrorLevel, "Saving port mapping to db", db.INSTANCE.ContainerMapping(name, protocol, sockExt, domain, sockInt))
 	}
+}
 
-	for _, name := range bolt.ContainerByKey("ip", strings.Split(sockInt, ":")[0]) {
-		bolt.ContainerMapping(name, protocol, sockExt, domain, sockInt)
-	}
+func checkPort(protocol, external, domain, internal string) bool {
+	res, err := db.INSTANCE.PortInMap(protocol, external, domain, internal)
+	log.Check(log.ErrorLevel, "Checking port mapping in db", err)
+	return res
+}
+
+func deletePortMap(protocol, sockExt, domain, sockInt string) int {
+	left, err := db.INSTANCE.PortMapDelete(protocol, sockExt, domain, sockInt)
+	log.Check(log.ErrorLevel, "Removing port mapping from db", err)
+	return left
 }

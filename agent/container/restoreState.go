@@ -51,11 +51,10 @@ func StateRestore(canRestore *bool) {
 }
 
 func getRunningContainers() []string {
-	bolt, err := db.New()
+	list, err := db.INSTANCE.ContainerByKey("state", "RUNNING")
 
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		return bolt.ContainerByKey("state", "RUNNING")
+	if !log.Check(log.WarnLevel, "Getting list of running containers", err) {
+		return list
 	}
 
 	return []string{}
