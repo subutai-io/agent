@@ -1,0 +1,10 @@
+[Unit]
+Description=Subutai Port Forward Service
+Requires=subutai-ovs.service
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/subutai/libexec/restore-forwarding
+
+[Install]
+WantedBy=multi-user.target
