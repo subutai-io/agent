@@ -84,10 +84,11 @@ func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func setupHttpServer() {
 	srv := &http.Server{
-		Addr:         ":7070",
-		ReadTimeout:  1 * time.Minute,
-		WriteTimeout: 1 * time.Minute,
-		Handler:      &myHandler{},
+		Addr:              ":7070",
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		Handler:           &myHandler{},
 	}
 	mux = make(map[string]func(http.ResponseWriter, *http.Request))
 	mux["/trigger"] = triggerHandler

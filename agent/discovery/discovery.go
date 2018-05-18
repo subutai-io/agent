@@ -163,12 +163,7 @@ func fingerprint(ip string) string {
 func save(ip string) {
 	log.Debug("Saving management host IP " + ip)
 
-	base, err := db.New()
-	if err != nil {
-		return
-	}
-	defer base.Close()
-	base.DiscoverySave(ip)
+	db.INSTANCE.DiscoverySave(ip)
 
 	config.Management.Host = ip
 }

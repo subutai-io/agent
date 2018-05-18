@@ -55,8 +55,8 @@ func init() {
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.
 func Credentials(name, container string) (uid int, gid int) {
-	path := path.Join(config.Agent.LxcPrefix, container, "/rootfs/etc/passwd")
-	u, g := parsePasswd(path, name)
+	thePath := path.Join(config.Agent.LxcPrefix, container, "/rootfs/etc/passwd")
+	u, g := parsePasswd(thePath, name)
 	uid, err := strconv.Atoi(u)
 	log.Check(log.DebugLevel, "Parsing user UID from container", err)
 	gid, err = strconv.Atoi(g)
@@ -88,13 +88,6 @@ func parsePasswd(path, name string) (uid string, gid string) {
 func Active(details bool) []Container {
 	var contArr []Container
 
-	bolt, err := db.New()
-	if ! log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-	} else {
-		return contArr
-	}
-
 	for _, c := range cont.Containers() {
 		hostname, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hostname"))
 		if err != nil {
@@ -102,47 +95,49 @@ func Active(details bool) []Container {
 		}
 		configpath := path.Join(config.Agent.LxcPrefix, c, "config")
 
-		meta := bolt.ContainerByName(c)
+		if meta, err := db.INSTANCE.ContainerByName(c); err == nil {
 
-		vlan := meta["vlan"]
-		envId := meta["environment"]
-		ip := meta["ip"]
+			vlan := meta["vlan"]
+			envId := meta["environment"]
+			ip := meta["ip"]
 
-		container := Container{
-			//ID:       gpg.GetFingerprint(c),
-			//Arch: strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
-			//Parent: cont.GetConfigItem(configpath, "subutai.parent"),
-			//Interfaces: interfaces(c, ""),
-			Name:     c,
-			Hostname: strings.TrimSpace(string(hostname)),
-			Status:   cont.State(c),
-			Vlan:     vlan,
-			EnvId:    envId,
+			container := Container{
+				//ID:       gpg.GetFingerprint(c),
+				//Arch: strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
+				//Parent: cont.GetConfigItem(configpath, "subutai.parent"),
+				//Interfaces: interfaces(c, ""),
+				Name:     c,
+				Hostname: strings.TrimSpace(string(hostname)),
+				Status:   cont.State(c),
+				Vlan:     vlan,
+				EnvId:    envId,
+			}
+
+			container.Interfaces = interfaces(c, ip)
+
+			//cacheable properties>>>
+
+			container.ID = getFromCacheOrCalculate(c+"_fingerprint", func() string {
+				return gpg.GetFingerprint(c)
+			})
+
+			container.Arch = getFromCacheOrCalculate(c+"_arch", func() string {
+				return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
+			})
+
+			container.Parent = getFromCacheOrCalculate(c+"_parent", func() string {
+				return cont.GetConfigItem(configpath, "subutai.parent")
+			})
+
+			//<<<cacheable properties
+
+			if details {
+				container.Pk = gpg.GetContainerPk(c)
+			}
+
+			contArr = append(contArr, container)
+
 		}
-
-		container.Interfaces = interfaces(c, ip)
-
-		//cacheable properties>>>
-
-		container.ID = getFromCacheOrCalculate(c+"_fingerprint", func() string {
-			return gpg.GetFingerprint(c)
-		})
-
-		container.Arch = getFromCacheOrCalculate(c+"_arch", func() string {
-			return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
-		})
-
-		container.Parent = getFromCacheOrCalculate(c+"_parent", func() string {
-			return cont.GetConfigItem(configpath, "subutai.parent")
-		})
-
-		//<<<cacheable properties
-
-		if details {
-			container.Pk = gpg.GetContainerPk(c)
-		}
-
-		contArr = append(contArr, container)
 	}
 	return contArr
 }
