@@ -32,13 +32,6 @@ func SetDatasetReadOnly(dataset string) {
 	log.Check(log.FatalLevel, "Setting zfs dataset "+dataset+" readonly "+out, err)
 }
 
-// Sets dataset read-write
-// e.g. SetDatasetReadWrite("debian-stretch")
-func SetDatasetReadWrite(dataset string) {
-	out, err := exec.Execute("zfs", "set", "readonly=off", path.Join(zfsRootDataset, dataset))
-	log.Check(log.FatalLevel, "Setting zfs dataset "+dataset+" read-write "+out, err)
-}
-
 // Checks if dataset exists
 // e.g. DatasetExists("foo")
 func DatasetExists(dataset string) bool {

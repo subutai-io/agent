@@ -3,11 +3,11 @@ package template
 import (
 	"os/exec"
 
-	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/db"
 )
 
 // MngInit performs initial operations for SS Management deployment
@@ -32,11 +32,7 @@ func MngInit(templateRef string) {
 	log.Check(log.WarnLevel, "Exposing port 8086",
 		exec.Command("subutai", "map", "tcp", "-i", "10.10.10.1:8086", "-e", "8086").Run())
 
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd("management", map[string]string{"ip": "10.10.10.1"}))
-	}
+	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd("management", map[string]string{"ip": "10.10.10.1"}))
 
 	log.Info("********************")
 	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")
