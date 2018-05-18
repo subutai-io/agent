@@ -83,11 +83,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 
 	meta["interface"] = container.GetProperty(child, "lxc.network.veth.pair")
 
-	bolt, err := db.New()
-	if ! log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(child, meta))
-	}
+	log.Check(log.WarnLevel, "Writing container metadata to database", db.INSTANCE.ContainerAdd(child, meta))
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
@@ -117,18 +113,10 @@ func addNetConf(name, addr string) string {
 
 func getEnvGw(vlan string) (gw string) {
 
-	bolt, err := db.New()
-	if err == nil {
-		defer bolt.Close()
-	} else {
-		log.Warn("Failed to open db", err)
-		return
-	}
-
-	list := bolt.ContainerByKey("vlan", vlan)
+	list, _ := db.INSTANCE.ContainerByKey("vlan", vlan)
 
 	if len(list) > 0 {
-		meta := bolt.ContainerByName(list[0])
+		meta, _ := db.INSTANCE.ContainerByName(list[0])
 		gw = meta["gw"]
 	}
 

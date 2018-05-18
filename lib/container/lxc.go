@@ -24,7 +24,10 @@ import (
 	"fmt"
 	"crypto/rand"
 	"time"
+	"hash/crc32"
 )
+
+var crc32Table = crc32.MakeTable(0xD5828281)
 
 // All returns list of all containers
 func All() []string {
@@ -108,11 +111,7 @@ func AddMetadata(name string, meta map[string]string) error {
 	if !LxcInstanceExists(name) {
 		return errors.New("Container does not exists")
 	}
-	bolt, err := db.New()
-	if ! log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		log.Check(log.WarnLevel, "Writing container data to database", bolt.ContainerAdd(name, meta))
-	}
+	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(name, meta))
 	return nil
 }
 
@@ -243,12 +242,7 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.ErrorLevel, "Removing container", err)
 
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		log.Check(log.WarnLevel, "Deleting container metadata entry", bolt.ContainerDel(name))
-		log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
-	}
+	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.ContainerDel(name))
 
 	return nil
 }
@@ -267,17 +261,14 @@ func DestroyTemplate(name string) {
 
 func DeleteTemplateInfoFromCache(name string) {
 	//remove metadata from db
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		//obtain id of template by ref
-		meta := bolt.TemplateByKey("nameAndOwnerAndVersion", name)
+	//obtain id of template by ref
+	meta, err := db.INSTANCE.TemplateByKey("nameAndOwnerAndVersion", name)
+	if !log.Check(log.WarnLevel, "Checking template metadata", err) {
 		if meta != nil && len(meta) > 0 {
 			//take first element only since ref is unique
 			templateId := meta[0]
-			log.Check(log.WarnLevel, "Deleting template metadata entry", bolt.TemplateDel(templateId))
+			log.Check(log.WarnLevel, "Deleting template metadata entry", db.INSTANCE.TemplateDel(templateId))
 		}
-		log.Check(log.WarnLevel, "Deleting uuid entry", bolt.DelUuidEntry(name))
 	}
 }
 
@@ -471,25 +462,16 @@ func GetConfigItem(path, item string) string {
 	return ""
 }
 
-func getUIdFromDB(c string) (string, error) {
-	var uid string
-	bolt, err := db.New()
-	if err == nil {
-		defer bolt.Close()
-		uid = bolt.GetUuidEntry(c)
-		return uid, nil
-	}
-
-	return "", err
+func GetContainerUID(container string) string {
+	sum := crc32.Checksum([]byte(container), crc32Table)
+	uid := 65536 + 65536*(sum%100)
+	return strconv.FormatUint(uint64(uid), 10)
 }
 
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
 func SetContainerUID(c string) (string, error) {
-	uid, err := getUIdFromDB(c)
-	if err != nil {
-		uid = "65536"
-	}
+	uid := GetContainerUID(c)
 
 	SetContainerConf(c, [][]string{
 		{"lxc.id_map", "u 0 " + uid + " 65536"},

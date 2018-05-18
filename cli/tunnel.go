@@ -43,11 +43,7 @@ func TunAdd(socket, timeout string) {
 		} else {
 			item["ttl"] = "-1"
 		}
-		localDB, err := db.New()
-		if !log.Check(log.WarnLevel, "Opening database", err) {
-			log.Check(log.WarnLevel, "Updating tunnel entry", localDB.AddTunEntry(item))
-			log.Check(log.WarnLevel, "Closing database", localDB.Close())
-		}
+		log.Check(log.ErrorLevel, "Updating tunnel entry", db.INSTANCE.AddTunEntry(item))
 		fmt.Println(item["remote"])
 		return
 	}
@@ -81,11 +77,7 @@ func TunAdd(socket, timeout string) {
 				log.Check(log.ErrorLevel, "Converting timeout to int", err)
 				tunnel["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
 			}
-			bolt, err := db.New()
-			if !log.Check(log.WarnLevel, "Opening database", err) {
-				log.Check(log.WarnLevel, "Adding new tunnel entry", bolt.AddTunEntry(tunnel))
-				log.Check(log.WarnLevel, "Closing database", bolt.Close())
-			}
+			log.Check(log.WarnLevel, "Adding new tunnel entry", db.INSTANCE.AddTunEntry(tunnel))
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -98,12 +90,8 @@ func TunAdd(socket, timeout string) {
 func TunList() {
 	TunCheck()
 
-	var list []map[string]string
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		list = bolt.GetTunList()
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
 			fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
 		}
@@ -112,15 +100,11 @@ func TunList() {
 
 // TunDel removes tunnel entry from list and kills running tunnel process
 func TunDel(socket string, pid ...string) {
-	var list []map[string]string
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		defer bolt.Close()
-		list = bolt.GetTunList()
-
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
 			if item["local"] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && item["pid"] == pid[0])) {
-				log.Check(log.WarnLevel, "Deleting tunnel entry", bolt.DelTunEntry(item["pid"]))
+				log.Check(log.WarnLevel, "Deleting tunnel entry", db.INSTANCE.DelTunEntry(item["pid"]))
 				f, err := ioutil.ReadFile("/proc/" + item["pid"] + "/cmdline")
 				if err == nil && strings.Contains(string(f), item["local"]) {
 					pid, err := strconv.Atoi(item["pid"])
@@ -134,12 +118,8 @@ func TunDel(socket string, pid ...string) {
 
 // TunCheck reads list, checks tunnel ttl, its state and then adds or removes required tunnels
 func TunCheck() {
-	var list []map[string]string
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		list = bolt.GetTunList()
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
 			ttl, err := strconv.Atoi(item["ttl"])
 			log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
@@ -181,11 +161,8 @@ func tunOpen(remote, local string) bool {
 }
 
 func getTunnel(socket string) map[string]string {
-	localDB, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		list := localDB.GetTunList()
-		log.Check(log.WarnLevel, "Closing database", localDB.Close())
-
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
 			if item["local"] == socket {
 				return item

@@ -101,17 +101,17 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]b
 // GenerateKey generates GPG-key for Subutai Agent.
 // This key used for encrypting messages for Subutai Agent.
 func GenerateKey(name string) {
-	path := path.Join(config.Agent.LxcPrefix , name)
+	thePath := path.Join(config.Agent.LxcPrefix , name)
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
 	if !container.LxcInstanceExists(name) {
 		err := os.MkdirAll("/root/.gnupg/", 0700)
 		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
-		path = "/root/.gnupg"
+		thePath = "/root/.gnupg"
 		email = name
 		pass = config.Agent.GpgPassword
 	}
-	conf, err := os.Create(path + "/defaults")
+	conf, err := os.Create(thePath + "/defaults")
 	if log.Check(log.FatalLevel, "Writing default key ident", err) {
 		return
 	}
@@ -123,15 +123,15 @@ func GenerateKey(name string) {
 		"Name-Email: " + email + "\n" +
 		"Expire-Date: 0\n" +
 		"Passphrase: " + pass + "\n" +
-		"%pubring " + path + "/public.pub\n" +
-		"%secring " + path + "/secret.sec\n" +
+		"%pubring " + thePath + "/public.pub\n" +
+		"%secring " + thePath + "/secret.sec\n" +
 		"%commit\n" +
 		"%echo Done\n")
 	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
-	if _, err := os.Stat(path + "/secret.sec"); os.IsNotExist(err) {
-		log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", path+"/defaults").Run())
+	if _, err := os.Stat(thePath + "/secret.sec"); os.IsNotExist(err) {
+		log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", thePath+"/defaults").Run())
 	}
 	if !container.LxcInstanceExists(name) {
 		out, err := exec.Command(GPG, "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()

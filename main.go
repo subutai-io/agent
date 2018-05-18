@@ -9,13 +9,13 @@ import (
 	"github.com/subutai-io/agent/agent"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
 
 	gcli "github.com/urfave/cli"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/exec"
 	"strings"
+	"github.com/subutai-io/agent/db"
 )
 
 var version = "unknown"
@@ -63,11 +63,11 @@ func checkGPG() {
 	}
 }
 
-func initDb() {
-	if base, err := db.New(); err == nil {
-		defer base.Close()
-		if len(strings.TrimSpace(config.Management.Host)) == 0 {
-			config.Management.Host = base.DiscoveryLoad()
+func loadManagementIp() {
+	if len(strings.TrimSpace(config.Management.Host)) == 0 {
+		ip, err := db.INSTANCE.DiscoveryLoad()
+		if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
+			config.Management.Host = ip
 		}
 	}
 }
@@ -77,7 +77,7 @@ func main() {
 	app.Name = "Subutai"
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
-		initDb()
+		loadManagementIp()
 	}
 
 	app.Version = version

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
@@ -42,13 +41,6 @@ func LxcQuota(name, res, size, threshold string) {
 		quota = strconv.Itoa(container.QuotaRAM(name, size))
 	case "cpu":
 		quota = strconv.Itoa(container.QuotaCPU(name, size))
-	}
-	if len(res) > 0 && len(size) > 0 {
-		bolt, err := db.New()
-		if !log.Check(log.WarnLevel, "Opening database", err) {
-			log.Check(log.WarnLevel, "Writing continer data to database", bolt.ContainerQuota(name, res, size))
-			log.Check(log.WarnLevel, "Closing database", bolt.Close())
-		}
 	}
 
 	if quota == "none" {

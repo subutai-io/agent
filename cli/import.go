@@ -154,14 +154,9 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 }
 
 func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
-	var meta = make(map[string]string)
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		meta = bolt.TemplateByName(templateId)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-	}
+	meta, err := db.INSTANCE.TemplateByName(templateId)
 
-	if meta != nil {
+	if !log.Check(log.WarnLevel, "Getting template metadata from db", err) {
 		templateInfo, found := meta["templateInfo"]
 		if found {
 			log.Debug("Found cached template info:\n" + templateInfo)
@@ -190,14 +185,9 @@ func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
 		value = name
 	}
 
-	var templates []string
-	bolt, err := db.New()
-	if !log.Check(log.WarnLevel, "Opening database", err) {
-		templates = bolt.TemplateByKey(key, value)
-		log.Check(log.WarnLevel, "Closing database", bolt.Close())
-	}
-
-	if templates != nil && len(templates) > 0 {
+	templates, err := db.INSTANCE.TemplateByKey(key, value)
+	if !log.Check(log.WarnLevel, "Getting template metadata from db", err) &&
+		len(templates) > 0 {
 		//first found template is returned if several meet the specified criteria
 		return getTemplateInfoFromCacheById(templates[0])
 	}
@@ -608,17 +598,13 @@ func updateContainerConfig(templateName string) error {
 func cacheTemplateInfo(t templ) {
 	templateInfo, err := json.Marshal(&t)
 	if err == nil {
-		bolt, err := db.New()
-		if !log.Check(log.WarnLevel, "Opening database", err) {
-			defer bolt.Close()
-			log.Check(log.WarnLevel, "Writing template data to database",
-				bolt.TemplateAdd(t.Id,
-					map[string]string{"templateInfo": string(templateInfo),
-						"name": t.Name,
-						"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
-						"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
-					}))
-		}
+		log.Check(log.WarnLevel, "Writing template data to database",
+			db.INSTANCE.TemplateAdd(t.Id,
+				map[string]string{"templateInfo": string(templateInfo),
+					"name": t.Name,
+					"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
+					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
+				}))
 	}
 }
 
