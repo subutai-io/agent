@@ -8,6 +8,8 @@ import (
 	"github.com/subutai-io/agent/config"
 	"path"
 	"time"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
 )
 
 type Db struct {
@@ -20,10 +22,22 @@ var (
 	containers = []byte("containers")
 	templates  = []byte("templates")
 	portmap    = []byte("portmap")
+	dbPath     = path.Join(config.Agent.DataPrefix, "agent.db")
 )
 
+func initDb() {
+	if !fs.FileExists(dbPath) {
+		//open and close db to create a proper db file
+		db, err := bolt.Open(dbPath, 0600, &bolt.Options{ReadOnly: false})
+		log.Check(log.ErrorLevel, "Creating database", err)
+		db.Close()
+	}
+}
+
 func openDb(readOnly bool) (*bolt.DB, error) {
-	boltDB, err := bolt.Open(path.Join(config.Agent.DataPrefix, "agent.db"),
+	initDb()
+
+	boltDB, err := bolt.Open(dbPath,
 		0600, &bolt.Options{Timeout: 5 * time.Second, ReadOnly: readOnly})
 	if err != nil {
 		return nil, err
