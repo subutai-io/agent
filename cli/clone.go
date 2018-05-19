@@ -83,7 +83,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 
 	meta["interface"] = container.GetProperty(child, "lxc.network.veth.pair")
 
-	log.Check(log.WarnLevel, "Writing container metadata to database", db.INSTANCE.ContainerAdd(child, meta))
+	log.Check(log.ErrorLevel, "Writing container metadata to database", db.INSTANCE.ContainerAdd(child, meta))
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
