@@ -88,10 +88,13 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	os.MkdirAll(dst+"/deltas", 0755)
 
 	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
-		// snapshot each partition
-		if !fs.DatasetExists(name + "/" + vol + "@now") {
-			fs.CreateSnapshot(name + "/" + vol + "@now")
+		//remove old snapshot if any
+		if fs.DatasetExists(name + "/" + vol + "@now") {
+			fs.RemoveDataset(name+"/"+vol+"@now", false)
 		}
+		// snapshot each partition
+		fs.CreateSnapshot(name + "/" + vol + "@now")
+
 		// send incremental delta between parent and child to delta file
 		fs.SendStream(parentRef+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
 	}
