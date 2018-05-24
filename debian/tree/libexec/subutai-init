@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-LXC_CONF=/etc/lxc/lxc.conf
+LXC_CONF=/etc/lxc/default.conf
 LXC_MNT=/var/lib/lxc
 
 setup_fs() {
