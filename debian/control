@@ -32,8 +32,7 @@ XS-Go-Import-Path: github.com/subutai-io/agent
 
 Package: subutai
 Architecture: any
-Depends: cgmanager,
-         gnupg1 | gnupg (< 2.0.0~),
+Depends: gnupg1 | gnupg (< 2.0.0~),
          lxc,
          nsexec,
          rng-tools,
