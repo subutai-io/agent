@@ -199,7 +199,7 @@ func GetClientForUploadDownload() *http.Client {
 		Transport: &http.Transport{
 			Dial:                  timeoutDialer(time.Second*15, time.Hour*5),
 			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
+			ResponseHeaderTimeout: 3 * time.Minute,
 			DisableKeepAlives:     true,
 			MaxIdleConns:          1,
 			MaxIdleConnsPerHost:   1,
