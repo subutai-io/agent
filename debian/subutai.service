@@ -1,6 +1,5 @@
 [Unit]
 Description=Subutai Daemon
-Requires=cgmanager.service
 
 [Service]
 Type=simple
