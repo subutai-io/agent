@@ -481,6 +481,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 		downloaded := false
 
+		//TODO remove since owner is always present
 		if len(t.Owner) == 0 {
 			for _, owner := range owners {
 				if t.Owner = []string{owner}; len(owner) == 0 {
