@@ -281,7 +281,7 @@ func ParsePem(cert string) (crt, key []byte) {
 	}
 	return crt, key
 }
-
+//todo move to CDN related package
 // KurjunUserPK gets user's public GPG-key from Kurjun.
 func KurjunUserPK(owner string) []string {
 	utils.CheckCDN()
