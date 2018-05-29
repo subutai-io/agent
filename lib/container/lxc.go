@@ -299,10 +299,12 @@ func Clone(parent, child string) error {
 	}
 
 	mac := Mac()
+	mtu := Mtu()
 	SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
 		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
+		{"lxc.network.mtu", strconv.Itoa(mtu)},
 		{"subutai.parent", parentParts[0]},
 		{"subutai.parent.owner", parentParts[1]},
 		{"subutai.parent.version", parentParts[2]},
@@ -575,4 +577,16 @@ func Mac() string {
 	}
 
 	return mac
+}
+
+func Mtu() int {
+
+	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
+	output := strings.TrimSpace(string(out))
+	log.Check(log.FatalLevel, "Getting p2p mtu: "+output, err)
+
+	mtu, err := strconv.Atoi(output)
+	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
+
+	return mtu - 50
 }
