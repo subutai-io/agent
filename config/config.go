@@ -70,7 +70,7 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
-    url = cdn.subutai.io
+    url = bazaar.subutai.io
     sslport = 8338
     allowinsecure = false
 
@@ -119,7 +119,7 @@ func init() {
 	Management = config.Management
 	CDN = config.CDN
 
-	CDN.Kurjun = "https://" + path.Join(CDN.URL) + ":" + CDN.SSLport + "/kurjun/rest"
+	CDN.Kurjun = "https://" + path.Join(CDN.URL) + "/rest/v1/cdn"
 
 }
 

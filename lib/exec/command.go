@@ -8,7 +8,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"os"
 	"io"
-	"errors"
 )
 
 // executes command
@@ -63,7 +62,6 @@ func ExecuteOutput(command string, args ... string) (string, error) {
 	stdoutIn, _ := cmd.StdoutPipe()
 	stderrIn, _ := cmd.StderrPipe()
 
-	var errStdout, errStderr error
 	stdout := io.MultiWriter(os.Stdout, &stdoutBuf)
 	stderr := io.MultiWriter(os.Stderr, &stderrBuf)
 	err := cmd.Start()
@@ -72,20 +70,18 @@ func ExecuteOutput(command string, args ... string) (string, error) {
 	}
 
 	go func() {
-		_, errStdout = io.Copy(stdout, stdoutIn)
+		io.Copy(stdout, stdoutIn)
 	}()
 
 	go func() {
-		_, errStderr = io.Copy(stderr, stderrIn)
+		io.Copy(stderr, stderrIn)
 	}()
 
 	err = cmd.Wait()
 	if err != nil {
 		return fmt.Sprint(err), err
 	}
-	if errStdout != nil || errStderr != nil {
-		return "", errors.New("failed to capture stdout or stderr")
-	}
+
 	outStr := string(stdoutBuf.Bytes())
 	return outStr, nil
 }

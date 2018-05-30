@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +39,7 @@ type templ struct {
 	Md5       string            `json:"md5"`
 	Owner     []string          `json:"owner"`
 	Signature map[string]string `json:"signature"`
+	Size      string            `json:"size"`
 }
 
 type metainfo struct {
@@ -260,17 +260,9 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 // md5sum returns MD5 hash sum of specified file
 func md5sum(filePath string) string {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-
-	hash := md5.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return ""
-	}
-	return fmt.Sprintf("%x", hash.Sum(nil))
+	hash, err := fs.Md5Sum(filePath)
+	log.Check(log.WarnLevel, "Getting md5sum of "+filePath, err)
+	return hash
 }
 
 func downloadWithRetry(t templ, token string, retry int) bool {
