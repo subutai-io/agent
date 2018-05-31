@@ -184,7 +184,8 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 			cacheTemplateInfo(templateInfo)
 
 			//IMPORTANT: used by Console
-			log.Info("Template uploaded, hash:" + templateInfo.Id + " md5:" + templateInfo.Md5 + " size:" + templateInfo.Size)
+			log.Info("Template uploaded, hash:" + templateInfo.Id + " md5:" + templateInfo.Md5 +
+				" size:" + templateInfo.Size + " parent:'" + parentRef + "'")
 		}
 
 		//log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))

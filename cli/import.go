@@ -30,7 +30,7 @@ import (
 var (
 	owners = []string{"subutai", "jenkins", "docker", ""}
 )
-
+//todo make owner of type string instead of string slice
 type templ struct {
 	Name      string            `json:"name"`
 	File      string            `json:"file"`
