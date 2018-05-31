@@ -164,7 +164,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 			//cache template info since template is in CDN
 			//no need to calculate signature since for locally cached info it is not checked
-			var templateInfo = templ{}
+			var templateInfo = Template{}
 			templateInfo.Id = cdnFileId
 			if newname != "" {
 				templateInfo.Name = newname
@@ -173,19 +173,20 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 				templateInfo.Name = name
 			}
 			templateInfo.Version = version
-			templateInfo.Owner = []string{owner}
+			templateInfo.Owner = owner
 			md5Sum, err := fs.Md5Sum(templateArchive)
 			log.Check(log.WarnLevel, "Getting template md5sum", err)
-			templateInfo.Md5 = md5Sum
+			templateInfo.MD5 = md5Sum
 			fSize, err := fs.FileSize(templateArchive)
 			log.Check(log.WarnLevel, "Getting template size", err)
-			templateInfo.Size = strconv.FormatInt(fSize, 10)
+			templateInfo.Size = fSize
+			templateInfo.Parent = parentRef
 
 			cacheTemplateInfo(templateInfo)
 
 			//IMPORTANT: used by Console
-			log.Info("Template uploaded, hash:" + templateInfo.Id + " md5:" + templateInfo.Md5 +
-				" size:" + templateInfo.Size + " parent:'" + parentRef + "'")
+			log.Info("Template uploaded, hash:" + templateInfo.Id + " md5:" + templateInfo.MD5 +
+				" size:" + strconv.FormatInt(templateInfo.Size, 10) + " parent:'" + parentRef + "'")
 		}
 
 		//log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))

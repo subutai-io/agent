@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -11,8 +10,6 @@ import (
 
 	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/nightlyone/lockfile"
-	"gopkg.in/cheggaaa/pb.v1"
-
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
@@ -27,32 +24,14 @@ import (
 	"github.com/subutai-io/agent/lib/common"
 )
 
-var (
-	owners = []string{"subutai", "jenkins", "docker", ""}
-)
-//todo make owner of type string instead of string slice
-type templ struct {
-	Name      string            `json:"name"`
-	File      string            `json:"file"`
-	Version   string            `json:"version"`
-	Id        string            `json:"id"`
-	Md5       string            `json:"md5"`
-	Owner     []string          `json:"owner"`
-	Signature map[string]string `json:"signature"`
-	Size      string            `json:"size"`
-}
-
-type metainfo struct {
-	ID      string            `json:"id"`
-	Name    string            `json:"name"`
-	Owner   []string          `json:"owner"`
-	Version string            `json:"version"`
-	File    string            `json:"filename"`
-	Signs   map[string]string `json:"signature"`
-	Hash struct {
-		Md5    string
-		Sha256 string
-	} `json:"hash"`
+type Template struct {
+	Id      string `json:"id"`
+	Name    string `json:"name"`
+	Owner   string `json:"owner"`
+	Version string `json:"version"`
+	MD5     string `json:"md5"`
+	Parent  string `json:"parent"`
+	Size    int64  `json:"size"`
 }
 
 func init() {
@@ -61,12 +40,9 @@ func init() {
 	}
 }
 
-//TODO add only non empty params to URL
 // getTemplateInfoById retrieves template name from global repository by passed id string
-func getTemplateInfoById(t *templ, id string, token string) {
-	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
-	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
-	url := config.CDN.Kurjun + "/template/info?id=" + id + "&token=" + token
+func getTemplateInfoById(t *Template, id string) {
+	url := config.CDN.Kurjun + "/template?id=" + id
 
 	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(url)
@@ -83,33 +59,28 @@ func getTemplateInfoById(t *templ, id string, token string) {
 	body, err := ioutil.ReadAll(response.Body)
 	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
 
-	var meta []metainfo
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+	var templ Template
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &templ)) {
 		log.Error("Failed to parse template info")
 	}
 
-	t.Name = meta[0].Name
-	t.Owner = meta[0].Owner
-	t.Version = meta[0].Version
-	t.Id = meta[0].ID
-	t.File = meta[0].File
-	t.Md5 = meta[0].Hash.Md5
-	t.Signature = meta[0].Signs
+	t.Name = templ.Name
+	t.Owner = templ.Owner
+	t.Version = templ.Version
+	t.Id = templ.Id
+	t.MD5 = templ.MD5
+	t.Parent = templ.Parent
+	t.Size = templ.Size
 
-	log.Debug("Template identified as " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
+	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
 //TODO urlEncode the kurjun URL
-func getTemplateInfoByName(t *templ, name string, owner string, version string, token string) {
-	//Since only kurjun knows template's ID, we cannot define if we have template already installed in system by ID as we do it by name, so unreachable kurjun in this case is a deadend for us
-	//To omit this issue we should add ID into template config and use this ID as a "primary key" to any request
-
-	url := config.CDN.Kurjun + "/template/info?name=" + name
+func getTemplateInfoByName(t *Template, name string, owner string, version string) {
+	url := config.CDN.Kurjun + "/template?name=" + name
 
 	if owner != "" {
 		url += "&owner=" + owner
-	} else if token == "" {
-		url += "&verified=true"
 	}
 
 	if version == "" {
@@ -118,10 +89,6 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 		url += "&version=" + version
 	}
 
-	if token != "" {
-		url += "&token=" + token
-	}
-
 	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(url)
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
@@ -137,30 +104,30 @@ func getTemplateInfoByName(t *templ, name string, owner string, version string, 
 	body, err := ioutil.ReadAll(response.Body)
 	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
 
-	var meta []metainfo
-	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &meta)) || len(meta) == 0 {
+	var templ Template
+	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &templ)) {
 		log.Error("Failed to parse template info")
 	}
 
-	t.Name = meta[0].Name
-	t.Owner = meta[0].Owner
-	t.Version = meta[0].Version
-	t.Id = meta[0].ID
-	t.File = meta[0].File
-	t.Md5 = meta[0].Hash.Md5
-	t.Signature = meta[0].Signs
+	t.Name = templ.Name
+	t.Owner = templ.Owner
+	t.Version = templ.Version
+	t.Id = templ.Id
+	t.MD5 = templ.MD5
+	t.Parent = templ.Parent
+	t.Size = templ.Size
 
-	log.Debug("Template identified as " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
+	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
-func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
+func getTemplateInfoFromCacheById(templateId string) (Template, bool) {
 	meta, err := db.INSTANCE.TemplateByName(templateId)
 
 	if !log.Check(log.WarnLevel, "Getting template metadata from db", err) {
 		templateInfo, found := meta["templateInfo"]
 		if found {
 			log.Debug("Found cached template info:\n" + templateInfo)
-			var t templ
+			var t Template
 			err := json.Unmarshal([]byte(templateInfo), &t)
 			if err == nil {
 				return t, true
@@ -168,10 +135,10 @@ func getTemplateInfoFromCacheById(templateId string) (templ, bool) {
 		}
 	}
 
-	return templ{}, false
+	return Template{}, false
 }
 
-func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
+func getTemplateInfoFromCacheByName(name, owner, version string) (Template, bool) {
 
 	var key, value string
 	if name != "" && owner != "" && version != "" {
@@ -192,12 +159,12 @@ func getTemplateInfoFromCacheByName(name, owner, version string) (templ, bool) {
 		return getTemplateInfoFromCacheById(templates[0])
 	}
 
-	return templ{}, false
+	return Template{}, false
 }
 
-func getTemplateInfo(template string, kurjToken string) templ {
+func getTemplateInfo(template string) Template {
 
-	var t templ
+	var t Template
 
 	if id := strings.Split(template, "id:"); len(id) > 1 {
 		templateId := id[1]
@@ -208,7 +175,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 		utils.CheckCDN()
 
-		getTemplateInfoById(&t, templateId, kurjToken)
+		getTemplateInfoById(&t, templateId)
 
 	} else {
 
@@ -224,7 +191,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 			utils.CheckCDN()
 
-			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"], kurjToken)
+			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"])
 		} else if templateNameNOwnerRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
 
@@ -234,7 +201,7 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 			utils.CheckCDN()
 
-			getTemplateInfoByName(&t, groups["name"], groups["owner"], "", kurjToken)
+			getTemplateInfoByName(&t, groups["name"], groups["owner"], "")
 		} else if templateNameRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameRx, template)
 
@@ -244,14 +211,12 @@ func getTemplateInfo(template string, kurjToken string) templ {
 
 			utils.CheckCDN()
 
-			getTemplateInfoByName(&t, groups["name"], "", "", kurjToken)
+			getTemplateInfoByName(&t, groups["name"], "", "")
 		} else {
 			log.Error("Invalid template name " + template)
 		}
 
 	}
-
-	verifySignature(t)
 
 	log.Info("Version: " + t.Version)
 
@@ -263,71 +228,6 @@ func md5sum(filePath string) string {
 	hash, err := fs.Md5Sum(filePath)
 	log.Check(log.WarnLevel, "Getting md5sum of "+filePath, err)
 	return hash
-}
-
-func downloadWithRetry(t templ, token string, retry int) bool {
-
-	if len(t.Id) == 0 {
-		return false
-	}
-
-	for c := 0; c < retry; c++ {
-		ok, err := download(t, token)
-		if err == nil {
-			return ok
-		} else {
-			log.Check(log.WarnLevel, "Download interrupted, retrying", err)
-		}
-	}
-
-	return false
-}
-
-//TODO add only non empty params to URL
-// download gets template archive from global repository
-func download(t templ, token string) (bool, error) {
-
-	out, err := os.Create(path.Join(config.Agent.CacheDir, t.File))
-	if err != nil {
-		log.Debug("Failed to create archive ", err)
-		return false, err
-	}
-	defer out.Close()
-
-	client := utils.GetClientForUploadDownload()
-
-	url := config.CDN.Kurjun + "/template/download?id=" + t.Id + "&token=" + token
-
-	log.Debug("Template url " + url)
-
-	response, err := client.Get(url)
-	if err != nil {
-		log.Debug("Failed to connect to CDN ", err)
-		return false, err
-	}
-	defer utils.Close(response)
-
-	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
-	if response.ContentLength <= 0 {
-		bar.NotPrint = true
-	}
-	bar.Start()
-	rd := bar.NewProxyReader(response.Body)
-	defer bar.Finish()
-	_, err = io.Copy(out, rd)
-	if err != nil {
-		log.Debug("Failed to download template ", err)
-		return false, err
-	}
-
-	hash := md5sum(path.Join(config.Agent.CacheDir, t.File))
-	if t.Md5 == hash {
-		return true, nil
-	}
-
-	log.Warn("Hash sum mismatch")
-
-	return false, err
 }
 
 // lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation
@@ -380,12 +280,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	var t templ
+	var t Template
 	var templateRef string
+	var localArchive string
 
 	if !local {
-		t = getTemplateInfo(name, token)
-		templateRef = strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
+		t = getTemplateInfo(name)
+		templateRef = strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
+		localArchive = t.Id
 	} else {
 		//for local import we currently use only name and ignore owner and version!
 		nameParts := common.Splitter(name, ":@")
@@ -414,7 +316,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				}
 			}
 
-			t.File = strings.Replace(latestVersionFile, path.Join(config.Agent.CacheDir)+"/", "", 1)
+			localArchive = strings.Replace(latestVersionFile, path.Join(config.Agent.CacheDir)+"/", "", 1)
 
 		} else {
 			log.Error("Template " + t.Name + " not found in local cache")
@@ -440,15 +342,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	var archiveExists = fs.FileExists(path.Join(config.Agent.CacheDir, t.File))
+	var archiveExists = fs.FileExists(path.Join(config.Agent.CacheDir, localArchive))
 
 	if archiveExists {
 
 		log.Debug("Template archive is present in local cache")
 
 		if !local {
-			hash := md5sum(path.Join(config.Agent.CacheDir, t.File))
-			if t.Md5 == hash {
+			hash := md5sum(path.Join(config.Agent.CacheDir, localArchive))
+			if t.MD5 == hash {
 
 				log.Debug("File integrity is verified")
 			} else {
@@ -471,36 +373,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		//!important used by Console
 		log.Info("Downloading " + t.Name)
 
-		downloaded := false
-
-		//TODO remove since owner is always present
-		if len(t.Owner) == 0 {
-			for _, owner := range owners {
-				if t.Owner = []string{owner}; len(owner) == 0 {
-					t.Owner = []string{}
-				}
-				if downloadWithRetry(t, token, 5) {
-					downloaded = true
-					break
-				}
-			}
-		}
-
-		if !downloaded && !downloadWithRetry(t, token, 5) {
-
-			log.Error("Failed to download or verify template " + t.Name)
-		} else {
-
-			log.Info("File integrity is verified")
-		}
+		//TODO get template from IPFS , verify md5 and and pin it
 	}
 
 	//!important used by Console
 	log.Info("Unpacking template " + t.Name)
-	log.Debug(path.Join(config.Agent.CacheDir, t.File) + " to " + templateRef)
+	log.Debug(path.Join(config.Agent.CacheDir, localArchive) + " to " + templateRef)
 	tgz := extractor.NewTgz()
 	templdir := path.Join(config.Agent.CacheDir, templateRef)
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(path.Join(config.Agent.CacheDir, t.File), templdir))
+	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(path.Join(config.Agent.CacheDir, localArchive), templdir))
 
 	templateName := container.GetConfigItem(templdir+"/config", "subutai.template")
 	templateOwner := container.GetConfigItem(templdir+"/config", "subutai.template.owner")
@@ -539,7 +420,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//delete template archive
 	if !local {
-		templateArchive := path.Join(config.Agent.CacheDir, t.File)
+		templateArchive := path.Join(config.Agent.CacheDir, localArchive)
 		log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
 	}
 
@@ -554,14 +435,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		cacheTemplateInfo(t)
 	} else {
 		//cache local template info
-
-		templateInfo := templ{
+		size, _ := fs.FileSize(path.Join(config.Agent.CacheDir, localArchive))
+		templateInfo := Template{
 			Id:      strings.Join([]string{templateName, templateOwner, templateVersion}, ":"),
-			Owner:   []string{templateOwner},
+			Owner:   templateOwner,
 			Version: templateVersion,
 			Name:    templateName,
-			File:    t.File,
-			Md5:     md5sum(path.Join(config.Agent.CacheDir, t.File)),
+			Size:    size,
+			Parent:  parentRef,
+			MD5:     md5sum(path.Join(config.Agent.CacheDir, localArchive)),
 		}
 
 		cacheTemplateInfo(templateInfo)
@@ -588,15 +470,15 @@ func updateContainerConfig(templateName string) error {
 	return cfg.Save()
 }
 
-func cacheTemplateInfo(t templ) {
+func cacheTemplateInfo(t Template) {
 	templateInfo, err := json.Marshal(&t)
 	if err == nil {
 		log.Check(log.WarnLevel, "Writing template data to database",
 			db.INSTANCE.TemplateAdd(t.Id,
 				map[string]string{"templateInfo": string(templateInfo),
 					"name": t.Name,
-					"nameAndOwner": strings.Join([]string{t.Name, t.Owner[0]}, ":"),
-					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":"),
+					"nameAndOwner": strings.Join([]string{t.Name, t.Owner}, ":"),
+					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner, t.Version}, ":"),
 				}))
 	}
 }
@@ -604,25 +486,6 @@ func cacheTemplateInfo(t templ) {
 func getVersion(fileName string) string {
 
 	return strings.Replace(strings.SplitAfter(fileName, "subutai-template_")[1], "_"+strings.ToLower(runtime.GOARCH)+".tar.gz", "", 1)
-}
-
-func verifySignature(t templ) {
-
-	if len(t.Id) != 0 && len(t.Signature) == 0 {
-		log.Error("Template is not signed")
-	}
-
-	for owner, signature := range t.Signature {
-		for _, key := range gpg.KurjunUserPK(owner) {
-			if t.Id == gpg.VerifySignature(key, signature) {
-				log.Info("Template's owner signature verified")
-				log.Debug("Signature belongs to " + owner)
-				return
-			}
-			log.Debug("Signature does not match with template id")
-		}
-	}
-	log.Error("Failed to verify signature")
 }
 
 // Verify if package is already on dependency list
