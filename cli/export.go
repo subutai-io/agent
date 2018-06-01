@@ -65,6 +65,9 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 	if strings.TrimSpace(version) == "" {
 		version = parentVersion
+	}else{
+		//TODO check version format
+
 	}
 
 	//cleanup files
@@ -202,7 +205,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 func getOwner(token string) string {
 
-	url := config.CDN.Kurjun + "/users/username?token=" + token
+	url := config.CdnUrl + "/users/username?token=" + token
 
 	client := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := client.Get(url)

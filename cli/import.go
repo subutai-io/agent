@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"path"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/exec"
 )
 
 type Template struct {
@@ -42,7 +43,7 @@ func init() {
 
 // getTemplateInfoById retrieves template name from global repository by passed id string
 func getTemplateInfoById(t *Template, id string) {
-	url := config.CDN.Kurjun + "/template?id=" + id
+	url := config.CdnUrl + "/template?id=" + id
 
 	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
 	response, err := kurjun.Get(url)
@@ -77,7 +78,7 @@ func getTemplateInfoById(t *Template, id string) {
 
 //TODO urlEncode the kurjun URL
 func getTemplateInfoByName(t *Template, name string, owner string, version string) {
-	url := config.CDN.Kurjun + "/template?name=" + name
+	url := config.CdnUrl + "/template?name=" + name
 
 	if owner != "" {
 		url += "&owner=" + owner
@@ -287,7 +288,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	if !local {
 		t = getTemplateInfo(name)
 		templateRef = strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
-		localArchive = t.Id
+		localArchive = path.Join(config.Agent.CacheDir, t.Id)
 	} else {
 		//for local import we currently use only name and ignore owner and version!
 		nameParts := common.Splitter(name, ":@")
@@ -316,7 +317,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				}
 			}
 
-			localArchive = strings.Replace(latestVersionFile, path.Join(config.Agent.CacheDir)+"/", "", 1)
+			localArchive = latestVersionFile
 
 		} else {
 			log.Error("Template " + t.Name + " not found in local cache")
@@ -342,15 +343,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		return
 	}
 
-	var archiveExists = fs.FileExists(path.Join(config.Agent.CacheDir, localArchive))
+	var archiveExists = fs.FileExists(localArchive)
 
 	if archiveExists {
 
 		log.Debug("Template archive is present in local cache")
 
 		if !local {
-			hash := md5sum(path.Join(config.Agent.CacheDir, localArchive))
-			if t.MD5 == hash {
+			md5 := md5sum(localArchive)
+			if t.MD5 == md5 {
 
 				log.Debug("File integrity is verified")
 			} else {
@@ -373,15 +374,15 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		//!important used by Console
 		log.Info("Downloading " + t.Name)
 
-		//TODO get template from IPFS , verify md5 and and pin it
+		download(t)
 	}
 
 	//!important used by Console
 	log.Info("Unpacking template " + t.Name)
-	log.Debug(path.Join(config.Agent.CacheDir, localArchive) + " to " + templateRef)
+	log.Debug(localArchive + " to " + templateRef)
 	tgz := extractor.NewTgz()
 	templdir := path.Join(config.Agent.CacheDir, templateRef)
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(path.Join(config.Agent.CacheDir, localArchive), templdir))
+	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(localArchive, templdir))
 
 	templateName := container.GetConfigItem(templdir+"/config", "subutai.template")
 	templateOwner := container.GetConfigItem(templdir+"/config", "subutai.template.owner")
@@ -420,8 +421,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//delete template archive
 	if !local {
-		templateArchive := path.Join(config.Agent.CacheDir, localArchive)
-		log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+		log.Check(log.WarnLevel, "Removing file: "+localArchive, os.Remove(localArchive))
 	}
 
 	if t.Name == "management" {
@@ -435,7 +435,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		cacheTemplateInfo(t)
 	} else {
 		//cache local template info
-		size, _ := fs.FileSize(path.Join(config.Agent.CacheDir, localArchive))
+		size, _ := fs.FileSize(localArchive)
 		templateInfo := Template{
 			Id:      strings.Join([]string{templateName, templateOwner, templateVersion}, ":"),
 			Owner:   templateOwner,
@@ -443,13 +443,29 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 			Name:    templateName,
 			Size:    size,
 			Parent:  parentRef,
-			MD5:     md5sum(path.Join(config.Agent.CacheDir, localArchive)),
+			MD5:     md5sum(localArchive),
 		}
 
 		cacheTemplateInfo(templateInfo)
 
 	}
 
+}
+func download(template Template) {
+
+	templatePath := path.Join(config.Agent.CacheDir, template.Id)
+
+	//download template
+	_, err := exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
+	log.Check(log.FatalLevel, "Downloading template", err)
+
+	//verify its md5 sum
+	if template.MD5 != md5sum(templatePath) {
+		log.Fatal("File integrity verification failed")
+	}
+
+	//pin template
+	exec.Exec("ipfs", "pin", "add", template.Id)
 }
 
 func updateContainerConfig(templateName string) error {
