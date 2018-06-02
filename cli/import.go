@@ -455,6 +455,7 @@ func download(template Template) {
 
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
 
+	//TODO add timeout
 	//download template
 	_, err := exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
 	log.Check(log.FatalLevel, "Downloading template", err)

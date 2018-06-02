@@ -15,23 +15,19 @@ import (
 	"path"
 	"github.com/subutai-io/agent/lib/exec"
 	"strconv"
+	"regexp"
 )
 
 var (
-	allsizes = []string{"tiny", "small", "medium", "large", "huge"}
+	allsizes  = []string{"tiny", "small", "medium", "large", "huge"}
+	versionRx = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 // LxcExport sub command prepares an archive from a template config.Agent.CacheDir
 // This archive can be moved to another Subutai peer and deployed as ready-to-use template or uploaded to Subutai's global template repository to make it
 // widely available for others to use.
-//
-// Export consist of two steps if the target is a container:
-// container promotion to template (see "promote" command) and packing the template into the archive.
-// If already a template just the packing of the archive takes place.
-//
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
-//TODO update doco on site for export, import,clone
 
 func LxcExport(name, newname, version, prefsize, token, description string, private bool, local bool) {
 
@@ -41,6 +37,10 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 	if token == "" {
 		log.Error("Missing CDN token")
+	}
+
+	if strings.TrimSpace(version) != "" && !versionRx.MatchString(version) {
+		log.Error("Version must be in form X.Y.Z")
 	}
 
 	owner := getOwner(token)
@@ -65,9 +65,6 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 	if strings.TrimSpace(version) == "" {
 		version = parentVersion
-	}else{
-		//TODO check version format
-
 	}
 
 	//cleanup files
