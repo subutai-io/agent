@@ -174,8 +174,6 @@ func getTemplateInfo(template string) Template {
 			return t
 		}
 
-		utils.CheckCDN()
-
 		getTemplateInfoById(&t, templateId)
 
 	} else {
@@ -190,8 +188,6 @@ func getTemplateInfo(template string) Template {
 				return t
 			}
 
-			utils.CheckCDN()
-
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"])
 		} else if templateNameNOwnerRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
@@ -199,8 +195,6 @@ func getTemplateInfo(template string) Template {
 			if t, found := getTemplateInfoFromCacheByName(groups["name"], groups["owner"], ""); found {
 				return t
 			}
-
-			utils.CheckCDN()
 
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], "")
 		} else if templateNameRx.MatchString(template) {
@@ -210,16 +204,12 @@ func getTemplateInfo(template string) Template {
 				return t
 			}
 
-			utils.CheckCDN()
-
 			getTemplateInfoByName(&t, groups["name"], "", "")
 		} else {
 			log.Error("Invalid template name " + template)
 		}
 
 	}
-
-	log.Info("Version: " + t.Version)
 
 	return t
 }
