@@ -371,9 +371,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	if !archiveExists {
-		//!important used by Console
-		log.Info("Downloading " + t.Name)
-
 		download(t)
 	}
 
@@ -453,11 +450,21 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 }
 func download(template Template) {
 
+	log.Debug("Checking template availability in CDN network...")
+
+	err := exec.Exec("timeout", "30", "ipfs", "dht", "findprovs", "-n1", template.Id)
+
+	if err != nil {
+		log.Fatal("Template not found in CDN network")
+	}
+
+	//!important used by Console
+	log.Info("Downloading " + template.Name)
+
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
 
-	//TODO add timeout
 	//download template
-	_, err := exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
+	_, err = exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
 	log.Check(log.FatalLevel, "Downloading template", err)
 
 	//verify its md5 sum
