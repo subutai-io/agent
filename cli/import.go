@@ -58,7 +58,7 @@ func getTemplateInfoById(t *Template, id string) {
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
-	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Reading template info", err)
 
 	var templ Template
 	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &templ)) {
@@ -103,7 +103,7 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
-	log.Check(log.ErrorLevel, "Reading template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Reading template info", err)
 
 	var templ Template
 	if log.Check(log.WarnLevel, "Parsing response body", json.Unmarshal(body, &templ)) {
