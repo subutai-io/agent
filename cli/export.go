@@ -39,7 +39,9 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		log.Error("Missing CDN token")
 	}
 
-	if strings.TrimSpace(version) != "" && !versionRx.MatchString(version) {
+	version = strings.TrimSpace(version)
+
+	if version != "" && !versionRx.MatchString(version) {
 		log.Error("Version must be in form X.Y.Z")
 	}
 
@@ -63,7 +65,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	parentVersion := container.GetProperty(name, "subutai.parent.version")
 	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
 
-	if strings.TrimSpace(version) == "" {
+	if version == "" {
 		version = parentVersion
 	}
 
