@@ -20,7 +20,7 @@ var INSTANCE = Db{}
 var (
 	sshtunnels = []byte("sshtunnels")
 	containers = []byte("containers")
-	templates  = []byte("templates")
+	templates  = []byte("templates2")
 	portmap    = []byte("portmap")
 	dbPath     = path.Join(config.Agent.DataPrefix, "agent.db")
 )
