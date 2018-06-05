@@ -442,7 +442,13 @@ func download(template Template) {
 
 	log.Debug("Checking template availability in CDN network...")
 
-	err := exec.Exec("timeout", "30", "ipfs", "dht", "findprovs", "-n1", template.Id)
+	//check local node
+	_, err := exec.ExecuteWithBash("ipfs refs local | grep " + template.Id)
+
+	if err != nil {
+		//check network
+		err = exec.Exec("timeout", "30", "ipfs", "dht", "findprovs", "-n1", template.Id)
+	}
 
 	if err != nil {
 		log.Fatal("Template not found in CDN network")
