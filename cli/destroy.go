@@ -11,10 +11,6 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/lib/fs"
-	"runtime"
-	"github.com/subutai-io/agent/config"
-	"path"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -48,7 +44,8 @@ func LxcDestroy(id string, vlan bool) {
 		cleanupNet(id)
 	} else if id != "everything" {
 		if container.IsTemplate(id) {
-			log.Error("Pass -t flag to destroy template")
+			LxcDestroyTemplate(id)
+			return
 		}
 
 		c, err := db.INSTANCE.ContainerByName(id)
@@ -136,46 +133,33 @@ func removePortMap(name string) {
 	}
 }
 
-func Prune(what string) {
-	if what == "archives" {
+func Prune() {
+	var templatesInUse []string
 
-		//remove all template archives
-		wildcardTemplateName := path.Join(config.Agent.CacheDir, "*") +
-			"-subutai-template_*_" + strings.ToLower(runtime.GOARCH) + ".tar.gz"
+	//collect all templates that have children
+	for _, c := range container.All() {
+		self := strings.TrimSpace(container.GetProperty(c, "subutai.template")) + ":" +
+			strings.TrimSpace(container.GetProperty(c, "subutai.template.owner")) + ":" +
+			strings.TrimSpace(container.GetProperty(c, "subutai.template.version"))
 
-		fs.DeleteFilesWildcard(wildcardTemplateName)
+		parent := strings.TrimSpace(container.GetProperty(c, "subutai.parent")) + ":" +
+			strings.TrimSpace(container.GetProperty(c, "subutai.parent.owner")) + ":" +
+			strings.TrimSpace(container.GetProperty(c, "subutai.parent.version"))
 
-	} else if what == "templates" {
-
-		var templatesInUse []string
-
-		//collect all templates that have children
-		for _, c := range container.All() {
-			self := strings.TrimSpace(container.GetProperty(c, "subutai.template")) + ":" +
-				strings.TrimSpace(container.GetProperty(c, "subutai.template.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(c, "subutai.template.version"))
-
-			parent := strings.TrimSpace(container.GetProperty(c, "subutai.parent")) + ":" +
-				strings.TrimSpace(container.GetProperty(c, "subutai.parent.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(c, "subutai.parent.version"))
-
-			if self != parent || container.IsContainer(c) {
-				templatesInUse = append(templatesInUse, parent)
-			}
+		if self != parent || container.IsContainer(c) {
+			templatesInUse = append(templatesInUse, parent)
 		}
-
-		//figure out unused templates
-		unusedTemplates := difference(container.Templates(), templatesInUse)
-
-		//remove unused templates
-		for _, t := range unusedTemplates {
-			container.DestroyTemplate(t)
-		}
-
-	} else {
-
-		log.Error("Only archives/templates can be pruned")
 	}
+
+	//figure out unused templates
+	unusedTemplates := difference(container.Templates(), templatesInUse)
+
+	//remove unused templates
+	for _, t := range unusedTemplates {
+		log.Info("Destroying " + t)
+		container.DestroyTemplate(t)
+	}
+
 }
 
 func difference(a, b []string) []string {

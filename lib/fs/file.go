@@ -3,12 +3,9 @@ package fs
 import (
 	"io"
 	"os"
-	"path/filepath"
-
 	"github.com/jhoonb/archivex"
 
 	"github.com/subutai-io/agent/log"
-	"strings"
 	"os/exec"
 	"crypto/md5"
 	"fmt"
@@ -71,41 +68,6 @@ func Md5Sum(filePath string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
-}
-
-func GetFilesWildCard(wildcard string) []string {
-	files, err := filepath.Glob(wildcard)
-
-	if log.Check(log.WarnLevel, "Getting files by wildcard: "+wildcard, err) {
-		return nil
-	}
-
-	return files
-}
-
-func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
-
-	files := GetFilesWildCard(wildcard)
-
-	if files == nil {
-		return
-	}
-
-	for _, f := range files {
-
-		exclude := false
-
-		for _, excludedFile := range excludedFiles {
-			if strings.HasSuffix(f, excludedFile) {
-				exclude = true
-				break
-			}
-		}
-
-		if !exclude {
-			log.Check(log.WarnLevel, "Removing file: "+f, os.Remove(f))
-		}
-	}
 }
 
 func IsMountPoint(path string) bool {

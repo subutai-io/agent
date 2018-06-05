@@ -17,12 +17,12 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"github.com/mcuadros/go-version"
 	"github.com/subutai-io/agent/lib/fs"
 	"runtime"
 	"path"
-	"github.com/subutai-io/agent/lib/common"
 	"github.com/subutai-io/agent/lib/exec"
+	"path/filepath"
+	"subutai/lxc"
 )
 
 type Template struct {
@@ -242,23 +242,7 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 	return lock, nil
 }
 
-// LxcImport function deploys a Subutai template on a Resource Host. The import algorithm works with both the global template repository and a local directory
-// to provide more flexibility to enable working with published and custom local templates. Official published templates in the global repository have a overriding scope
-// over custom local artifacts if there's any template naming conflict.
-//
-// If Internet access is lost, or it is not possible to upload custom templates to the repository, the filesystem path config.Agent.CacheDir could be used as local repository;
-// the import sub command checks this directory if a requested published template or the global repository is not available.
-//
-// The import binding handles security checks to confirm the authenticity and integrity of templates. Besides using strict SSL connections for downloads,
-// it verifies the fingerprint and its checksum for each template: an MD5 hash sum signed with author's GPG key. Import executes different integrity and authenticity checks of the template
-// transparent to the user to protect system integrity from all possible risks related to template data transfers over the network.
-//
-// The repository supports public, group private (shared), and private files. Import without specifying a security token can only access public templates.
-//
-// `subutai import management` is a special operation which differs from the import of other templates. Besides the usual template deployment operations,
-// "import management" demotes the template, starts its container, transforms the host network, and forwards a few host ports, etc.
-// "subutai import management -t {secret}" is executed by Console to register the container with itself,
-// Console passes special secret token in place of CDN token using -t switch in this operation
+//TODO think of how to implement local import
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
@@ -280,38 +264,14 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		templateRef = strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
 		localArchive = path.Join(config.Agent.CacheDir, t.Id)
 	} else {
-		//for local import we currently use only name and ignore owner and version!
-		nameParts := common.Splitter(name, ":@")
-		t.Name = nameParts[0]
-		templateRef = t.Name
-
-		wildcardTemplateName := path.Join(config.Agent.CacheDir, strings.ToLower(t.Name)+
-			"-subutai-template_*_"+ strings.ToLower(runtime.GOARCH)+ ".tar.gz")
-
-		//check if template with the same name but any version exists locally
-		files := fs.GetFilesWildCard(wildcardTemplateName)
-
-		//figure out latest version among locally present ones
-		if files != nil && len(files) > 0 {
-
-			latestVersionFile := files[0]
-			latestVersion := getVersion(latestVersionFile)
-
-			for idx, file := range files {
-				if idx > 0 {
-					ver := getVersion(file)
-					if version.Compare(ver, latestVersion, ">") {
-						latestVersionFile = file
-						latestVersion = ver
-					}
-				}
-			}
-
-			localArchive = latestVersionFile
-
-		} else {
+		//for local import we accept full path to template archive
+		if !fs.FileExists(name) {
 			log.Error("Template " + t.Name + " not found in local cache")
 		}
+
+		t.Name = filepath.Base(name)
+		templateRef = "tmpl_" + t.Name
+		localArchive = name
 	}
 
 	log.Info("Importing " + t.Name)
@@ -368,23 +328,28 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	log.Info("Unpacking template " + t.Name)
 	log.Debug(localArchive + " to " + templateRef)
 	tgz := extractor.NewTgz()
-	templdir := path.Join(config.Agent.CacheDir, templateRef)
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(localArchive, templdir))
+	extractDir := path.Join(config.Agent.CacheDir, templateRef)
+	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(localArchive, extractDir))
 
-	templateName := container.GetConfigItem(templdir+"/config", "subutai.template")
-	templateOwner := container.GetConfigItem(templdir+"/config", "subutai.template.owner")
-	templateVersion := container.GetConfigItem(templdir+"/config", "subutai.template.version")
+	templateName := container.GetConfigItem(extractDir+"/config", "subutai.template")
+	templateOwner := container.GetConfigItem(extractDir+"/config", "subutai.template.owner")
+	templateVersion := container.GetConfigItem(extractDir+"/config", "subutai.template.version")
 
 	if local {
 		//rename template directory to follow full reference convention
 		templateRef = strings.Join([]string{templateName, templateOwner, templateVersion}, ":")
-		os.Rename(templdir, path.Join(config.Agent.CacheDir, templateRef))
-		templdir = path.Join(config.Agent.CacheDir, templateRef)
+		os.Rename(extractDir, path.Join(config.Agent.CacheDir, templateRef))
+		extractDir = path.Join(config.Agent.CacheDir, templateRef)
 	}
 
-	parent := container.GetConfigItem(templdir+"/config", "subutai.parent")
-	parentOwner := container.GetConfigItem(templdir+"/config", "subutai.parent.owner")
-	parentVersion := container.GetConfigItem(templdir+"/config", "subutai.parent.version")
+	if lxc.IsTemplate(templateRef) {
+		log.Check(log.WarnLevel, "Removing temp dir "+extractDir, os.RemoveAll(extractDir))
+		log.Error(templateRef + " exists")
+	}
+
+	parent := container.GetConfigItem(extractDir+"/config", "subutai.parent")
+	parentOwner := container.GetConfigItem(extractDir+"/config", "subutai.parent.owner")
+	parentVersion := container.GetConfigItem(extractDir+"/config", "subutai.parent.version")
 
 	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
 	if parentRef != templateRef && !container.IsTemplate(parentRef) && !stringInList(parentRef, auxDepList) {
@@ -397,14 +362,9 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	//!important used by Console
 	log.Info("Installing template " + t.Name)
 
-	//delete dataset if already exists
-	if fs.DatasetExists(templateRef) {
-		fs.RemoveDataset(templateRef, true)
-	}
-
 	template.Install(templateRef)
 
-	log.Check(log.FatalLevel, "Removing temp dir "+templdir, os.RemoveAll(templdir))
+	log.Check(log.WarnLevel, "Removing temp dir "+extractDir, os.RemoveAll(extractDir))
 
 	//delete template archive
 	if !local {
@@ -436,8 +396,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		cacheTemplateInfo(templateInfo)
 
 	}
-
 }
+
 func download(template Template) {
 
 	log.Debug("Checking template availability in CDN network...")
