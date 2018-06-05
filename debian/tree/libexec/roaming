@@ -43,14 +43,6 @@ function renew_ips(){
             fi
         fi
     
-
-        #obtain IPs or renew lease for private interface
-        if [ ! -z "$SUBUTAI_HOST_IFACE" ]; then
-
-            timeout 10 dhclient $SUBUTAI_HOST_IFACE
-
-        fi
-
         #obtain IPs or renew lease for NAT interface
         if [ ! -z "$SUBUTAI_NAT_IFACE" ]; then
 
