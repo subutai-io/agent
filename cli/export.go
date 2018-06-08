@@ -16,6 +16,8 @@ import (
 	"github.com/subutai-io/agent/lib/exec"
 	"strconv"
 	"regexp"
+	"net/url"
+	"encoding/json"
 )
 
 var (
@@ -184,7 +186,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 			templateInfo.Size = fSize
 			templateInfo.Parent = parentRef
 
-			cacheTemplateInfo(templateInfo)
+			registerWithCdn(templateInfo, token)
 
 			//IMPORTANT: used by Console
 			log.Info("Template uploaded, hash:" + templateInfo.Id + " md5:" + templateInfo.MD5 +
@@ -204,11 +206,11 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 func getOwner(token string) string {
 
-	url := config.CdnUrl + "/users/username?token=" + token
+	cdnUrl := config.CdnUrl + "/users/username?token=" + token
 
 	client := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := client.Get(url)
-	log.Check(log.ErrorLevel, "Getting owner, get: "+url, err)
+	response, err := client.Get(cdnUrl)
+	log.Check(log.ErrorLevel, "Getting owner, get: "+cdnUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode != 200 {
@@ -226,6 +228,16 @@ func getOwner(token string) string {
 
 func addToCdn(path string) (string, error) {
 	return exec.ExecuteOutput("ipfs", "add", "--progress", "-Q", path)
+}
+
+func registerWithCdn(template Template, token string) {
+	client := utils.GetClient(config.CDN.Allowinsecure, 15)
+	templateMeta, err := json.Marshal(&template)
+	log.Check(log.ErrorLevel, "Serializing template metadata", err)
+
+	resp, err := client.PostForm(config.CdnUrl+"/templates", url.Values{"token": {token}, "template": {string(templateMeta)}})
+	log.Check(log.ErrorLevel, "Registering template with CDN", err)
+	utils.Close(resp)
 }
 
 func updateTemplateConfig(path string, params [][]string) error {

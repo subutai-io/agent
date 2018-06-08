@@ -11,14 +11,12 @@ import (
 	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/lib/fs"
-	"runtime"
 	"path"
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
@@ -121,58 +119,13 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
-func getTemplateInfoFromCacheById(templateId string) (Template, bool) {
-	meta, err := db.INSTANCE.TemplateByName(templateId)
-
-	if !log.Check(log.WarnLevel, "Getting template metadata from db", err) {
-		templateInfo, found := meta["templateInfo"]
-		if found {
-			log.Debug("Found cached template info:\n" + templateInfo)
-			var t Template
-			err := json.Unmarshal([]byte(templateInfo), &t)
-			if err == nil {
-				return t, true
-			}
-		}
-	}
-
-	return Template{}, false
-}
-
-func getTemplateInfoFromCacheByName(name, owner, version string) (Template, bool) {
-
-	var key, value string
-	if name != "" && owner != "" && version != "" {
-		key = "nameAndOwnerAndVersion"
-		value = strings.Join([]string{name, owner, version}, ":")
-	} else if name != "" && owner != "" {
-		key = "nameAndOwner"
-		value = strings.Join([]string{name, owner}, ":")
-	} else {
-		key = "name"
-		value = name
-	}
-
-	templates, err := db.INSTANCE.TemplateByKey(key, value)
-	if !log.Check(log.WarnLevel, "Getting template metadata from db", err) &&
-		len(templates) > 0 {
-		//first found template is returned if several meet the specified criteria
-		return getTemplateInfoFromCacheById(templates[0])
-	}
-
-	return Template{}, false
-}
-
+//TODO remove template cache
 func getTemplateInfo(template string) Template {
 
 	var t Template
 
 	if id := strings.Split(template, "id:"); len(id) > 1 {
 		templateId := id[1]
-
-		if t, found := getTemplateInfoFromCacheById(templateId); found {
-			return t
-		}
 
 		getTemplateInfoById(&t, templateId)
 
@@ -184,25 +137,13 @@ func getTemplateInfo(template string) Template {
 		if templateNameNOwnerNVersionRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
 
-			if t, found := getTemplateInfoFromCacheByName(groups["name"], groups["owner"], groups["version"]); found {
-				return t
-			}
-
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"])
 		} else if templateNameNOwnerRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
 
-			if t, found := getTemplateInfoFromCacheByName(groups["name"], groups["owner"], ""); found {
-				return t
-			}
-
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], "")
 		} else if templateNameRx.MatchString(template) {
 			groups := utils.MatchRegexGroups(templateNameRx, template)
-
-			if t, found := getTemplateInfoFromCacheByName(groups["name"], "", ""); found {
-				return t
-			}
 
 			getTemplateInfoByName(&t, groups["name"], "", "")
 		} else {
@@ -242,7 +183,6 @@ func lockSubutai(file string) (lockfile.Lockfile, error) {
 	return lock, nil
 }
 
-//TODO think of how to implement local import
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
@@ -377,25 +317,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	}
 
 	log.Check(log.ErrorLevel, "Setting lxc config", updateContainerConfig(templateRef))
-
-	if !local {
-		cacheTemplateInfo(t)
-	} else {
-		//cache local template info
-		size, _ := fs.FileSize(localArchive)
-		templateInfo := Template{
-			Id:      strings.Join([]string{templateName, templateOwner, templateVersion}, ":"),
-			Owner:   templateOwner,
-			Version: templateVersion,
-			Name:    templateName,
-			Size:    size,
-			Parent:  parentRef,
-			MD5:     md5sum(localArchive),
-		}
-
-		cacheTemplateInfo(templateInfo)
-
-	}
 }
 
 func download(template Template) {
@@ -448,24 +369,6 @@ func updateContainerConfig(templateName string) error {
 	})
 
 	return cfg.Save()
-}
-
-func cacheTemplateInfo(t Template) {
-	templateInfo, err := json.Marshal(&t)
-	if err == nil {
-		log.Check(log.WarnLevel, "Writing template data to database",
-			db.INSTANCE.TemplateAdd(t.Id,
-				map[string]string{"templateInfo": string(templateInfo),
-					"name": t.Name,
-					"nameAndOwner": strings.Join([]string{t.Name, t.Owner}, ":"),
-					"nameAndOwnerAndVersion": strings.Join([]string{t.Name, t.Owner, t.Version}, ":"),
-				}))
-	}
-}
-
-func getVersion(fileName string) string {
-
-	return strings.Replace(strings.SplitAfter(fileName, "subutai-template_")[1], "_"+strings.ToLower(runtime.GOARCH)+".tar.gz", "", 1)
 }
 
 // Verify if package is already on dependency list
