@@ -206,7 +206,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	} else {
 		//for local import we accept full path to template archive
 		if !fs.FileExists(name) {
-			log.Error("Template " + t.Name + " not found in local cache")
+			log.Error("Template " + name + " not found")
 		}
 
 		t.Name = filepath.Base(name)
@@ -296,7 +296,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		// Append the template and parent name to dependency list
 		auxDepList = append(auxDepList, parentRef, templateRef)
 		log.Info("Parent template required: " + parentRef)
-		LxcImport(parentRef, token, local, auxDepList...)
+		LxcImport(parentRef, token, false, auxDepList...)
 	}
 
 	//!important used by Console
