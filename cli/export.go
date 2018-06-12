@@ -113,6 +113,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		{"lxc.network.ipv4"},
 		{"lxc.network.veth.pair"},
 		{"lxc.network.hwaddr"},
+		{"lxc.network.mtu"},
 		{"#vlan_id"},
 	}
 
