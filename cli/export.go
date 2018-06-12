@@ -54,10 +54,10 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		wasRunning = true
 	}
 
-	size := "tiny"
+	pSize := "tiny"
 	for _, s := range allsizes {
 		if prefsize == s {
-			size = prefsize
+			pSize = prefsize
 		}
 	}
 
@@ -108,7 +108,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		//{"subutai.template", name},
 		{"subutai.template.owner", owner},
 		{"subutai.template.version", version},
-		{"subutai.template.size", size},
+		{"subutai.template.size", pSize},
 		{"lxc.network.ipv4.gateway"},
 		{"lxc.network.ipv4"},
 		{"lxc.network.veth.pair"},
@@ -174,6 +174,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	templateInfo.MD5 = md5Sum
 	templateInfo.Size = fSize
 	templateInfo.Parent = parentRef
+	templateInfo.PrefSize = pSize
 
 	//upload to CDN
 	if !local {

@@ -31,6 +31,8 @@ type Template struct {
 	MD5     string `json:"md5"`
 	Parent  string `json:"parent"`
 	Size    int64  `json:"size"`
+	FullRef string `json:"full-ref"`
+	PrefSize string `json:"pref-size"`
 }
 
 func init() {
