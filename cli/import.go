@@ -20,18 +20,17 @@ import (
 	"path"
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
-	"subutai/lxc"
 )
 
 type Template struct {
-	Id      string `json:"id"`
-	Name    string `json:"name"`
-	Owner   string `json:"owner"`
-	Version string `json:"version"`
-	MD5     string `json:"md5"`
-	Parent  string `json:"parent"`
-	Size    int64  `json:"size"`
-	FullRef string `json:"full-ref"`
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	Owner    string `json:"owner"`
+	Version  string `json:"version"`
+	MD5      string `json:"md5"`
+	Parent   string `json:"parent"`
+	Size     int64  `json:"size"`
+	FullRef  string `json:"full-ref"`
 	PrefSize string `json:"pref-size"`
 }
 
@@ -284,7 +283,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		extractDir = path.Join(config.Agent.CacheDir, templateRef)
 	}
 
-	if lxc.IsTemplate(templateRef) {
+	if container.IsTemplate(templateRef) {
 		log.Check(log.WarnLevel, "Removing temp dir "+extractDir, os.RemoveAll(extractDir))
 		log.Error(templateRef + " exists")
 	}
