@@ -142,13 +142,9 @@ func main() {
 			return nil
 		}}, {
 
-		Name: "prune", Usage: "prune unused templates/archives",
+		Name: "prune", Usage: "prune unused templates",
 		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Prune(c.Args().Get(0))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
+			cli.Prune()
 			return nil
 		}}, {
 
@@ -175,16 +171,9 @@ func main() {
 		}}, {
 
 		Name: "destroy", Usage: "destroy Subutai container/template",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "template, t", Usage: "destroy template"},
-		},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				if c.Bool("t") {
-					cli.LxcDestroyTemplate(c.Args().Get(0))
-				} else {
-					cli.LxcDestroy(c.Args().Get(0), false)
-				}
+				cli.LxcDestroy(c.Args().Get(0), false)
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}

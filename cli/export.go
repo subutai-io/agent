@@ -1,17 +1,11 @@
 package cli
 
 import (
-	"bytes"
-	"fmt"
-	"io"
 	"io/ioutil"
-	"mime/multipart"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 
-	"gopkg.in/cheggaaa/pb.v1"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
@@ -19,23 +13,22 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
 	"path"
+	"github.com/subutai-io/agent/lib/exec"
+	"regexp"
+	"net/url"
+	"encoding/json"
 )
 
 var (
-	allsizes = []string{"tiny", "small", "medium", "large", "huge"}
+	allsizes  = []string{"tiny", "small", "medium", "large", "huge"}
+	versionRx = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 // LxcExport sub command prepares an archive from a template config.Agent.CacheDir
 // This archive can be moved to another Subutai peer and deployed as ready-to-use template or uploaded to Subutai's global template repository to make it
 // widely available for others to use.
-//
-// Export consist of two steps if the target is a container:
-// container promotion to template (see "promote" command) and packing the template into the archive.
-// If already a template just the packing of the archive takes place.
-//
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
-//TODO update doco on site for export, import,clone
 
 func LxcExport(name, newname, version, prefsize, token, description string, private bool, local bool) {
 
@@ -47,6 +40,12 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		log.Error("Missing CDN token")
 	}
 
+	version = strings.TrimSpace(version)
+
+	if version != "" && !versionRx.MatchString(version) {
+		log.Error("Version must be in form X.Y.Z")
+	}
+
 	owner := getOwner(token)
 
 	wasRunning := false
@@ -55,10 +54,10 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		wasRunning = true
 	}
 
-	size := "tiny"
+	pSize := "tiny"
 	for _, s := range allsizes {
 		if prefsize == s {
-			size = prefsize
+			pSize = prefsize
 		}
 	}
 
@@ -67,7 +66,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	parentVersion := container.GetProperty(name, "subutai.parent.version")
 	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
 
-	if strings.TrimSpace(version) == "" {
+	if version == "" {
 		version = parentVersion
 	}
 
@@ -109,11 +108,12 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 		//{"subutai.template", name},
 		{"subutai.template.owner", owner},
 		{"subutai.template.version", version},
-		{"subutai.template.size", size},
+		{"subutai.template.size", pSize},
 		{"lxc.network.ipv4.gateway"},
 		{"lxc.network.ipv4"},
 		{"lxc.network.veth.pair"},
 		{"lxc.network.hwaddr"},
+		{"lxc.network.mtu"},
 		{"#vlan_id"},
 	}
 
@@ -158,36 +158,42 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	log.Check(log.FatalLevel, "Removing temporary file", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
+	//generate template metadata
+	var templateInfo = Template{}
+	if newname != "" {
+		templateInfo.Name = newname
+
+	} else {
+		templateInfo.Name = name
+	}
+	md5Sum, err := fs.Md5Sum(templateArchive)
+	log.Check(log.WarnLevel, "Getting template md5sum", err)
+	fSize, err := fs.FileSize(templateArchive)
+	log.Check(log.WarnLevel, "Getting template size", err)
+	templateInfo.Version = version
+	templateInfo.Owner = owner
+	templateInfo.MD5 = md5Sum
+	templateInfo.Size = fSize
+	templateInfo.Parent = parentRef
+	templateInfo.PrefSize = pSize
+
 	//upload to CDN
 	if !local {
 
-		if hash, err := upload(templateArchive, token, private); err != nil {
+		if hash, err := addToCdn(templateArchive); err != nil {
 			log.Error("Failed to upload template: " + err.Error())
 		} else {
-			cdnFileId := string(hash)
-			log.Info("Template uploaded, hash: " + cdnFileId)
+			templateInfo.Id = strings.TrimSpace(hash)
 
-			//cache template info since template is in CDN
-			//no need to calculate signature since for locally cached info it is not checked
+			registerWithCdn(templateInfo, token)
 
-			var templateInfo = templ{}
-			templateInfo.Id = cdnFileId
-			if newname != "" {
-				templateInfo.Name = newname
-				templateInfo.File = newname + "-subutai-template_" + version + "_" + runtime.GOARCH
-
-			} else {
-				templateInfo.Name = name
-				templateInfo.File = name + "-subutai-template_" + version + "_" + runtime.GOARCH
-			}
-			templateInfo.Version = version
-			templateInfo.Owner = []string{owner}
-			templateInfo.Md5 = md5sum(templateArchive)
-
-			cacheTemplateInfo(templateInfo)
+			templateJson, _ := json.Marshal(templateInfo)
+			//IMPORTANT: used by Console
+			log.Info("Template uploaded, " + string(templateJson))
 		}
-
-		//log.Check(log.WarnLevel, "Removing file: "+templateArchive, os.Remove(templateArchive))
+	} else {
+		templateJson, _ := json.Marshal(templateInfo)
+		log.Info("Template exported, " + string(templateJson))
 	}
 
 	if wasRunning {
@@ -200,97 +206,38 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 func getOwner(token string) string {
 
-	url := config.CDN.Kurjun + "/auth/owner?token=" + token
+	cdnUrl := config.CdnUrl + "/users/username?token=" + token
 
-	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := kurjun.Get(url)
-	log.Check(log.ErrorLevel, "Getting owner, get: "+url, err)
+	client := utils.GetClient(config.CDN.Allowinsecure, 15)
+	response, err := client.Get(cdnUrl)
+	log.Check(log.ErrorLevel, "Getting owner, get: "+cdnUrl, err)
 	defer utils.Close(response)
 
-	if response.StatusCode == 404 {
-		log.Error("Owner not found")
-	}
 	if response.StatusCode != 200 {
 		log.Error("Failed to get owner:  " + response.Status)
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
-	log.Check(log.ErrorLevel, "Reading owner, get: "+url, err)
+	log.Check(log.ErrorLevel, "Reading owner ", err)
+	owner := string(body)
+	log.Debug("Owner is " + owner)
 
-	return string(body)
+	return owner
 
 }
 
-func upload(path, token string, private bool) ([]byte, error) {
-	//check file availability
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+func addToCdn(path string) (string, error) {
+	return exec.ExecuteOutput("ipfs", "add", "--progress", "-Q", path)
+}
 
-	//check CDN availability
-	utils.CheckCDN()
+func registerWithCdn(template Template, token string) {
+	client := utils.GetClient(config.CDN.Allowinsecure, 15)
+	templateMeta, err := json.Marshal(&template)
+	log.Check(log.ErrorLevel, "Serializing template metadata", err)
 
-	body := &bytes.Buffer{}
-
-	writer := multipart.NewWriter(body)
-
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, err
-	}
-
-	if private {
-		_ = writer.WriteField("private", "true")
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	// get size of file
-	fi, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	// create and start bar
-	bar := pb.New(int(fi.Size())).SetUnits(pb.U_BYTES)
-	bar.Start()
-	defer bar.Finish()
-
-	// create proxy reader
-	proxedBody := bar.NewProxyReader(body)
-
-	req, err := http.NewRequest("POST", config.CDN.Kurjun+"/template/upload", proxedBody)
-	if err != nil {
-		return nil, err
-	}
-
-	//set headers
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("token", token)
-
-	client := utils.GetClientForUploadDownload()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer utils.Close(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		out, err := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
-	}
-
-	return ioutil.ReadAll(resp.Body)
+	resp, err := client.PostForm(config.CdnUrl+"/templates", url.Values{"token": {token}, "template": {string(templateMeta)}})
+	log.Check(log.ErrorLevel, "Registering template with CDN", err)
+	utils.Close(resp)
 }
 
 func updateTemplateConfig(path string, params [][]string) error {

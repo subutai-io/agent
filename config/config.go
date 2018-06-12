@@ -41,7 +41,6 @@ type cdnConfig struct {
 	Allowinsecure bool
 	URL           string
 	SSLport       string
-	Kurjun        string
 }
 type configFile struct {
 	Agent      agentConfig
@@ -70,8 +69,8 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
-    url = cdn.subutai.io
-    sslport = 8338
+    url = bazaar.subutai.io
+    sslport = 443
     allowinsecure = false
 
 	[influxdb]
@@ -90,7 +89,8 @@ var (
 	// Influxdb describes configuration options for InluxDB server
 	Influxdb influxdbConfig
 	// CDN url and port
-	CDN cdnConfig
+	CDN    cdnConfig
+	CdnUrl string
 )
 
 func init() {
@@ -119,7 +119,7 @@ func init() {
 	Management = config.Management
 	CDN = config.CDN
 
-	CDN.Kurjun = "https://" + path.Join(CDN.URL) + ":" + CDN.SSLport + "/kurjun/rest"
+	CdnUrl = "https://" + path.Join(CDN.URL) + ":" + CDN.SSLport + "/rest/v1/cdn"
 
 }
 

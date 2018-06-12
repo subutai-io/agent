@@ -256,20 +256,6 @@ func DestroyTemplate(name string) {
 
 	log.Check(log.ErrorLevel, "Removing template", err)
 
-	DeleteTemplateInfoFromCache(name)
-}
-
-func DeleteTemplateInfoFromCache(name string) {
-	//remove metadata from db
-	//obtain id of template by ref
-	meta, err := db.INSTANCE.TemplateByKey("nameAndOwnerAndVersion", name)
-	if !log.Check(log.WarnLevel, "Checking template metadata", err) {
-		if meta != nil && len(meta) > 0 {
-			//take first element only since ref is unique
-			templateId := meta[0]
-			log.Check(log.WarnLevel, "Deleting template metadata entry", db.INSTANCE.TemplateDel(templateId))
-		}
-	}
 }
 
 // GetParent return a parent of the Subutai container.
