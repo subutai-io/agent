@@ -6,6 +6,7 @@ LASTVERSION=7.0.5~
 case "$1" in
 install|upgrade)
     if dpkg --compare-versions "$2" le "$LASTVERSION"; then
-        sed -i '/Kurjun/d;/AppDataPrefix/d;s/SSLPort.*/SSLPort = 443/' /etc/subutai/agent.conf
+        #sed -i '/Kurjun/d;/AppDataPrefix/d;s/SSLPort.*/SSLPort = 443/;s/cdn.subutai.io/bazaar.subutai.io/' /etc/subutai/agent.conf
+        cp /usr/lib/subutai/agent.conf /etc/subutai/
     fi
 esac
