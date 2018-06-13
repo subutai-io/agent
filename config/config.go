@@ -41,6 +41,7 @@ type cdnConfig struct {
 	Allowinsecure bool
 	URL           string
 	SSLport       string
+	IpfsPath      string
 }
 type configFile struct {
 	Agent      agentConfig
@@ -72,6 +73,7 @@ const defaultConfig = `
     url = bazaar.subutai.io
     sslport = 443
     allowinsecure = false
+    ipfsPath = /var/lib/ipfs/node
 
 	[influxdb]
 	user = root
