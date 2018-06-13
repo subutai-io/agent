@@ -5,6 +5,7 @@ After=rng-tools.service
 [Service]
 Type=forking
 ExecStart=/bin/bash -c "/bin/systemctl is-active --quiet rng-tools.service || /usr/sbin/rngd -r /dev/urandom"
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
