@@ -17,19 +17,19 @@ try {
 
                 switch (env.BRANCH_NAME) {
                     case ~/master/: 
-                        cdnHost = "mastercdn.subutai.io"; 
+                        cdnHost = "masterbazaar.subutai.io"; 
                         break;
                     case ~/dev/: 
-                        cdnHost = "devcdn.subutai.io"; 
+                        cdnHost = "devbazaar.subutai.io"; 
                         break;
                     case ~/no-snap/: 
-                        cdnHost = "devcdn.subutai.io"; 
+                        cdnHost = "devbazaar.subutai.io"; 
                         break;
                     case ~/sysnet/: 
-                        cdnHost = "sysnetcdn.subutai.io"; 
+                        cdnHost = "sysnetbazaar.subutai.io"; 
                         break;
                     default: 
-                        cdnHost = "cdn.subutai.io"; 
+                        cdnHost = "bazaar.subutai.io"; 
                 }
                 def release = env.BRANCH_NAME
 
