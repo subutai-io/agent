@@ -19,7 +19,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/influxdata/influxdb/client/v2"
 	"io"
-	"net"
 	"regexp"
 	"path"
 )
@@ -189,50 +188,6 @@ func newTLSConfig() *tls.Config {
 func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: allowInsecure}}
 	return &http.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
-}
-
-//one-shot client for one long lasting request
-//no keep-alive, 1 idle connection per client
-//new client must be used for each new request
-func GetClientForUploadDownload() *http.Client {
-	return &http.Client{
-		Transport: &http.Transport{
-			Dial:                  timeoutDialer(time.Second*15, time.Hour*5),
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 3 * time.Minute,
-			DisableKeepAlives:     true,
-			MaxIdleConns:          1,
-			MaxIdleConnsPerHost:   1,
-			IdleConnTimeout:       time.Second * 5,
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.CDN.Allowinsecure},
-		},
-	}
-}
-
-func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
-	return func(netw, addr string) (net.Conn, error) {
-		conn, err := net.DialTimeout(netw, addr, connectTimeout)
-		if err != nil {
-			return nil, err
-		}
-		conn.SetDeadline(time.Now().Add(rwTimeout))
-		return conn, nil
-	}
-}
-
-// CheckCDN checks if the Kurjun node available.
-func CheckCDN() {
-
-	address := path.Join(config.CDN.URL) + ":" + config.CDN.SSLport
-	_, err := net.DialTimeout("tcp", address, time.Duration(5)*time.Second)
-
-	for c := 0; err != nil && c < 5; _, err = net.DialTimeout("tcp", address, time.Duration(5)*time.Second) {
-		log.Info("CDN unreachable, retrying")
-		time.Sleep(3 * time.Second)
-		c++
-	}
-
-	log.Check(log.ErrorLevel, "Checking CDN accessibility", err)
 }
 
 func CleanTemplateName(name string) string {
