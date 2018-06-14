@@ -67,6 +67,7 @@ const defaultConfig = `
 	host =
 	secret = secret
 	restPublicKey = /rest/v1/security/keyman/getpublickeyring
+    fingerprint =
 	allowinsecure = true
 
     [cdn]
