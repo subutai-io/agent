@@ -35,17 +35,17 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 		log.Error("Container " + child + " already exists")
 	}
 
-	t := getTemplateInfo(parent, cdnToken)
+	t := getTemplateInfo(parent)
 
-	log.Debug("Parent template is " + t.Name + "@" + t.Owner[0] + ":" + t.Version)
+	log.Debug("Parent template is " + t.Name + "@" + t.Owner + ":" + t.Version)
 
 	meta := make(map[string]string)
 	meta["parent"] = t.Name
-	meta["parent.owner"] = t.Owner[0]
+	meta["parent.owner"] = t.Owner
 	meta["parent.version"] = t.Version
 	meta["parent.id"] = t.Id
 
-	fullRef := strings.Join([]string{t.Name, t.Owner[0], t.Version}, ":")
+	fullRef := strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
 
 	if !container.IsTemplate(fullRef) {
 		LxcImport("id:"+t.Id, cdnToken, false)
@@ -74,7 +74,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	container.SetApt(child)
 	container.SetDNS(child)
 	//add subutai.template.owner & subutai.template.version
-	container.CopyParentReference(child, t.Owner[0], t.Version)
+	container.CopyParentReference(child, t.Owner, t.Version)
 
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(child)

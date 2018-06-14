@@ -17,19 +17,19 @@ try {
 
                 switch (env.BRANCH_NAME) {
                     case ~/master/: 
-                        cdnHost = "mastercdn.subutai.io"; 
+                        cdnHost = "masterbazaar.subutai.io"; 
                         break;
                     case ~/dev/: 
-                        cdnHost = "devcdn.subutai.io"; 
+                        cdnHost = "devbazaar.subutai.io"; 
                         break;
                     case ~/no-snap/: 
-                        cdnHost = "devcdn.subutai.io"; 
+                        cdnHost = "devbazaar.subutai.io"; 
                         break;
                     case ~/sysnet/: 
-                        cdnHost = "sysnetcdn.subutai.io"; 
+                        cdnHost = "sysnetbazaar.subutai.io"; 
                         break;
                     default: 
-                        cdnHost = "cdn.subutai.io"; 
+                        cdnHost = "bazaar.subutai.io"; 
                 }
                 def release = env.BRANCH_NAME
 
@@ -61,7 +61,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			cd ${CWD}/agent
-			dpkg-buildpackage -rfakeroot
+			dpkg-buildpackage -rfakeroot -us -uc
 
 			cd ${CWD} || exit 1
 			for i in *.deb; do

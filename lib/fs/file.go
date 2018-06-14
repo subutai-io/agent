@@ -3,13 +3,12 @@ package fs
 import (
 	"io"
 	"os"
-	"path/filepath"
-
 	"github.com/jhoonb/archivex"
 
 	"github.com/subutai-io/agent/log"
-	"strings"
 	"os/exec"
+	"crypto/md5"
+	"fmt"
 )
 
 // Copy creates a copy of passed "source" file to "dest" file
@@ -46,39 +45,29 @@ func FileExists(name string) bool {
 	return err == nil
 }
 
-func GetFilesWildCard(wildcard string) []string {
-	files, err := filepath.Glob(wildcard)
+func FileSize(path string) (int64, error) {
+	stat, err := os.Stat(path)
 
-	if log.Check(log.WarnLevel, "Getting files by wildcard: "+wildcard, err) {
-		return nil
+	if err != nil {
+		return -1, err
 	}
 
-	return files
+	return stat.Size(), nil
 }
 
-func DeleteFilesWildcard(wildcard string, excludedFiles ...string) {
-
-	files := GetFilesWildCard(wildcard)
-
-	if files == nil {
-		return
+// md5sum returns MD5 hash sum of specified file
+func Md5Sum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
 	}
+	defer file.Close()
 
-	for _, f := range files {
-
-		exclude := false
-
-		for _, excludedFile := range excludedFiles {
-			if strings.HasSuffix(f, excludedFile) {
-				exclude = true
-				break
-			}
-		}
-
-		if !exclude {
-			log.Check(log.WarnLevel, "Removing file: "+f, os.Remove(f))
-		}
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
 	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 func IsMountPoint(path string) bool {

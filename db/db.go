@@ -20,7 +20,7 @@ var INSTANCE = Db{}
 var (
 	sshtunnels = []byte("sshtunnels")
 	containers = []byte("containers")
-	templates  = []byte("templates")
+	templates  = []byte("templates2")
 	portmap    = []byte("portmap")
 	dbPath     = path.Join(config.Agent.DataPrefix, "agent.db")
 )
@@ -136,87 +136,6 @@ func (i *Db) DiscoveryLoad() (ip string, err error) {
 		})
 	}
 	return ip, err
-}
-
-func (i *Db) TemplateAdd(name string, options map[string]string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			var b *bolt.Bucket
-			if b, err = tx.CreateBucketIfNotExists(templates); err == nil {
-				if b, err = b.CreateBucketIfNotExists([]byte(name)); err == nil {
-					for k, v := range options {
-						if err = b.Put([]byte(k), []byte(v)); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			return err
-		})
-	}
-	return err
-}
-
-func (i *Db) TemplateDel(name string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		instance.Update(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(templates); b != nil {
-				if err = b.DeleteBucket([]byte(name)); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-	}
-	return err
-}
-
-func (i *Db) TemplateByName(name string) (c map[string]string, err error) {
-	c = make(map[string]string)
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(templates); b != nil {
-				if b = b.Bucket([]byte(name)); b != nil {
-					b.ForEach(func(kk, vv []byte) error {
-						c[string(kk)] = string(vv)
-						return nil
-					})
-				}
-			}
-			return nil
-		})
-	}
-	return c, err
-}
-
-func (i *Db) TemplateByKey(key, value string) (list []string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(templates); b != nil {
-				b.ForEach(func(k, v []byte) error {
-					if c := b.Bucket(k); c != nil {
-						c.ForEach(func(kk, vv []byte) error {
-							if string(kk) == key && string(vv) == value {
-								list = append(list, string(k))
-							}
-							return nil
-						})
-					}
-					return nil
-				})
-			}
-			return nil
-		})
-	}
-	return list, err
 }
 
 func (i *Db) ContainerAdd(name string, options map[string]string) (err error) {
