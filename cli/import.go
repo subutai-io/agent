@@ -334,7 +334,7 @@ func download(template Template) {
 
 	if err != nil {
 		//check network
-		err = exec.Exec("ipfs","--timeout=180s", "dht", "findprovs", "-n1", template.Id)
+		err = exec.Exec("ipfs","--timeout=600s", "dht", "findprovs", "-n1", template.Id)
 	}
 
 	if err != nil {
