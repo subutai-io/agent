@@ -17,19 +17,24 @@ try {
 
                 switch (env.BRANCH_NAME) {
                     case ~/master/: 
-                        cdnHost = "masterbazaar.subutai.io"; 
+                        cdnHost = "masterbazaar.subutai.io";
+                        sshJumpServer = "mastercdn.subutai.io";
+                        aptHost = "mastercdn.subutai.io";
                         break;
                     case ~/dev/: 
-                        cdnHost = "devbazaar.subutai.io"; 
+                        cdnHost = "devbazaar.subutai.io";
+                        sshJumpServer = "devcdn.subutai.io";
+                        aptHost = "devcdn.subutai.io";
                         break;
-                    case ~/no-snap/: 
-                        cdnHost = "devbazaar.subutai.io"; 
+                    case ~/sysnet/:
+                        cdnHost = "sysnetbazaar.subutai.io";
+                        sshJumpServer = "sysnetcdn.subutai.io";
+                        aptHost = "sysnetcdn.subutai.io";
                         break;
-                    case ~/sysnet/: 
-                        cdnHost = "sysnetbazaar.subutai.io"; 
-                        break;
-                    default: 
-                        cdnHost = "bazaar.subutai.io"; 
+                    default:
+                        cdnHost = "bazaar.subutai.io";
+                        sshJumpServer = "cdn.subutai.io";
+                        aptHost = "cdn.subutai.io";
                 }
                 def release = env.BRANCH_NAME
 
@@ -53,7 +58,9 @@ try {
 			echo "VERSION is \$agent_version"
 
 			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
-                        cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
+            cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
+            cd ${CWD}/agent && sed -i 's/@sshJumpServer@/${sshJumpServer}/' debian/tree/agent.conf
+            cd ${CWD}/agent && sed -i 's/@aptHost@/${aptHost}/' debian/tree/agent.conf
 			dch -v "\$agent_version" -D stable "Test build for \$agent_version" 1>/dev/null 2>/dev/null
 		"""
 

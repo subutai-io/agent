@@ -136,6 +136,7 @@ func removePortMap(name string) {
 func Prune() {
 	var templatesInUse []string
 
+	//todo keep templates that have child CONTAINERs only
 	//collect all templates that have children
 	for _, c := range container.All() {
 		self := strings.TrimSpace(container.GetProperty(c, "subutai.template")) + ":" +

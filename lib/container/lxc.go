@@ -101,7 +101,7 @@ func SetApt(name string) {
 	log.Check(log.DebugLevel, "Writing apt source repo list",
 		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list"), repo, 0644))
 
-	kurjun := []byte("deb http://" + path.Join(config.CDN.URL) + ":8080/kurjun/rest/apt /\n")
+	kurjun := []byte("deb http://" + path.Join(config.CDN.Apt) + ":8080/kurjun/rest/apt /\n")
 	log.Check(log.DebugLevel, "Writing apt source kurjun list",
 		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list.d/subutai-repo.list"), kurjun, 0644))
 }
