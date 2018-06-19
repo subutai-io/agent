@@ -27,7 +27,7 @@ try {
                         aptHost = "devcdn.subutai.io";
                         break;
                     case ~/sysnet/:
-                        cdnHost = "sysnetbazaar.subutai.io";
+                        cdnHost = "devbazaar.subutai.io";
                         sshJumpServer = "sysnetcdn.subutai.io";
                         aptHost = "sysnetcdn.subutai.io";
                         break;
