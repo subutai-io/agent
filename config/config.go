@@ -13,14 +13,15 @@ import (
 )
 
 type agentConfig struct {
-	Debug       bool
-	GpgUser     string
-	LxcPrefix   string
-	Dataset     string
-	DataPrefix  string
-	CacheDir    string
-	GpgPassword string
-	GpgHome     string
+	Debug         bool
+	GpgUser       string
+	LxcPrefix     string
+	Dataset       string
+	DataPrefix    string
+	CacheDir      string
+	GpgPassword   string
+	GpgHome       string
+	SshJumpServer string
 }
 type managementConfig struct {
 	Host          string
@@ -42,6 +43,7 @@ type cdnConfig struct {
 	URL           string
 	SSLport       string
 	IpfsPath      string
+	Apt           string
 }
 type configFile struct {
 	Agent      agentConfig
@@ -60,6 +62,7 @@ const defaultConfig = `
 	lxcPrefix = /var/lib/lxc/
     dataset = subutai/fs
     cacheDir = /var/cache/subutai
+    sshJumpServer = cdn.subutai.io
 
 	[management]
 	gpgUser =
@@ -71,6 +74,7 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
+    apt = cdn.subutai.io
     url = bazaar.subutai.io
     sslport = 443
     allowinsecure = false
