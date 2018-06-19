@@ -75,13 +75,13 @@ func loadManagementIp() {
 func main() {
 	app := gcli.NewApp()
 	app.Name = "Subutai"
+	app.Version = version
+	app.Usage = "daemon and command line interface binary"
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
 		loadManagementIp()
 	}
 
-	app.Version = version
-	app.Usage = "daemon and command line interface binary"
 
 	app.Flags = []gcli.Flag{gcli.BoolFlag{
 		Name:  "d",
