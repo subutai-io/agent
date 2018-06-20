@@ -136,20 +136,32 @@ func removePortMap(name string) {
 func Prune() {
 	var templatesInUse []string
 
-	//todo keep templates that have child CONTAINERs only
-	//collect all templates that have children
-	for _, c := range container.All() {
-		self := strings.TrimSpace(container.GetProperty(c, "subutai.template")) + ":" +
-			strings.TrimSpace(container.GetProperty(c, "subutai.template.owner")) + ":" +
-			strings.TrimSpace(container.GetProperty(c, "subutai.template.version"))
+	//filter out all templates that have child containers
+	for _, c := range container.Containers() {
+		cont := c
 
-		parent := strings.TrimSpace(container.GetProperty(c, "subutai.parent")) + ":" +
-			strings.TrimSpace(container.GetProperty(c, "subutai.parent.owner")) + ":" +
-			strings.TrimSpace(container.GetProperty(c, "subutai.parent.version"))
+		self := strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
+			strings.TrimSpace(container.GetProperty(cont, "subutai.template.owner")) + ":" +
+			strings.TrimSpace(container.GetProperty(cont, "subutai.template.version"))
 
-		if self != parent || container.IsContainer(c) {
+		parent := strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
+			strings.TrimSpace(container.GetProperty(cont, "subutai.parent.owner")) + ":" +
+			strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version"))
+
+		for self != parent || container.IsContainer(cont) {
 			templatesInUse = append(templatesInUse, parent)
+
+			cont = parent
+
+			self = strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
+				strings.TrimSpace(container.GetProperty(cont, "subutai.template.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(cont, "subutai.template.version"))
+
+			parent = strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
+				strings.TrimSpace(container.GetProperty(cont, "subutai.parent.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version"))
 		}
+
 	}
 
 	//figure out unused templates
