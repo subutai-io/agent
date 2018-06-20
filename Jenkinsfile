@@ -1,5 +1,7 @@
 #!groovy
 
+//added webhook
+
 notifyBuildDetails = ""
 agentCommitId = ""
 
@@ -7,7 +9,7 @@ try {
 	notifyBuild('STARTED')
 	node("deb") {
 		deleteDir()
-     
+
 		stage("Checkout source")
 		
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
