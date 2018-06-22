@@ -19,7 +19,6 @@ func MngInit(templateRef string) {
 		{"lxc.network.veth.pair", "management"},
 	})
 	gpg.GenerateKey("management")
-	container.SetApt("management")
 	container.SetDNS("management")
 	container.AddMetadata("management", map[string]string{"ip": "10.10.10.1"})
 	container.Start("management")

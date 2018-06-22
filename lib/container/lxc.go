@@ -82,30 +82,6 @@ func State(name string) (state string) {
 	return "UNKNOWN"
 }
 
-// SetApt configures APT configuration inside Subutai container.
-func SetApt(name string) {
-	root := GetParent(name)
-	for parent := name; root != parent; root = GetParent(parent) {
-		parent = root
-	}
-	if root != "master" {
-		return
-	}
-	gateway := GetProperty(name, "lxc.network.ipv4.gateway")
-	if len(gateway) == 0 {
-		gateway = "10.10.10.254"
-	}
-	repo := []byte("deb http://" + gateway + "/apt/main trusty main restricted universe multiverse\n" +
-		"deb http://" + gateway + "/apt/main trusty-updates main restricted universe multiverse\n" +
-		"deb http://" + gateway + "/apt/security trusty-security main restricted universe multiverse\n")
-	log.Check(log.DebugLevel, "Writing apt source repo list",
-		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list"), repo, 0644))
-
-	apt := []byte("deb http://deb.subutai.io/subutai " + path.Join(config.CDN.Apt) + " main\n")
-	log.Check(log.DebugLevel, "Writing subutai apt source list",
-		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list.d/subutai-repo.list"), apt, 0644))
-}
-
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
 	if !LxcInstanceExists(name) {

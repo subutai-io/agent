@@ -23,6 +23,7 @@ type agentConfig struct {
 	GpgHome       string
 	SshJumpServer string
 }
+
 type managementConfig struct {
 	Host          string
 	Port          string
@@ -38,13 +39,14 @@ type influxdbConfig struct {
 	User string
 	Pass string
 }
+
 type cdnConfig struct {
 	Allowinsecure bool
 	URL           string
 	SSLport       string
 	IpfsPath      string
-	Apt           string
 }
+
 type configFile struct {
 	Agent      agentConfig
 	Management managementConfig
@@ -74,7 +76,6 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
-    apt = prod
     url = bazaar.subutai.io
     sslport = 443
     allowinsecure = false
