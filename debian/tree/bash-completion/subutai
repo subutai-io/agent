@@ -4,17 +4,17 @@ _subutai()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="attach backup batch checkpoint cleanup clone config daemon demote destroy export help hostname import info list map metrics p2p promote proxy quota rename restore start stats stop tunnel update vxlan"
+    opts="attach batch cleanup clone config daemon destroy export help hostname import info list map metrics proxy quota start stop tunnel update vxlan"
     case "${prev}" in
         import)
-            COMPREPLY=( $(compgen -W "master management ubuntu16" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "debian-stretch management ubuntu-xenial" -- ${cur}) )
             return 0
             ;;
-        clone | demote | export)
+        clone | export)
             COMPREPLY=( $(compgen -W "$(subutai list -t | tail -n +3)" -- ${cur}) )
             return 0
             ;;
-        start | stop | attach | promote | rename)
+        start | stop | attach)
             COMPREPLY=( $(compgen -W "$(subutai list -c | tail -n +3)" -- ${cur}) )
             return 0
             ;;
