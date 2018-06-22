@@ -74,7 +74,7 @@ const defaultConfig = `
 	allowinsecure = true
 
     [cdn]
-    apt = cdn.subutai.io
+    apt = prod
     url = bazaar.subutai.io
     sslport = 443
     allowinsecure = false

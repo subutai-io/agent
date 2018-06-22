@@ -21,22 +21,22 @@ try {
                     case ~/master/: 
                         cdnHost = "masterbazaar.subutai.io";
                         sshJumpServer = "mastercdn.subutai.io";
-                        aptHost = "mastercdn.subutai.io";
+                        aptHost = "master";
                         break;
                     case ~/dev/: 
                         cdnHost = "devbazaar.subutai.io";
                         sshJumpServer = "devcdn.subutai.io";
-                        aptHost = "devcdn.subutai.io";
+                        aptHost = "dev";
                         break;
                     case ~/sysnet/:
                         cdnHost = "devbazaar.subutai.io";
                         sshJumpServer = "sysnetcdn.subutai.io";
-                        aptHost = "sysnetcdn.subutai.io";
+                        aptHost = "sysnet";
                         break;
                     default:
                         cdnHost = "bazaar.subutai.io";
                         sshJumpServer = "cdn.subutai.io";
-                        aptHost = "cdn.subutai.io";
+                        aptHost = "prod";
                 }
                 def release = env.BRANCH_NAME
 

@@ -101,9 +101,9 @@ func SetApt(name string) {
 	log.Check(log.DebugLevel, "Writing apt source repo list",
 		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list"), repo, 0644))
 
-	kurjun := []byte("deb http://" + path.Join(config.CDN.Apt) + ":8080/kurjun/rest/apt /\n")
-	log.Check(log.DebugLevel, "Writing apt source kurjun list",
-		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list.d/subutai-repo.list"), kurjun, 0644))
+	apt := []byte("deb http://deb.subutai.io/subutai " + path.Join(config.CDN.Apt) + " main\n")
+	log.Check(log.DebugLevel, "Writing subutai apt source list",
+		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/apt/sources.list.d/subutai-repo.list"), apt, 0644))
 }
 
 // AddMetadata adds container information to database
