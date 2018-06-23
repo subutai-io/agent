@@ -166,7 +166,7 @@ func DatasetDiskUsage(dataset string) (int, error) {
 }
 
 func ConvertToBytes(input string) (int, error) {
-	input = strings.ToUpper(strings.TrimSpace(input))
+	input = strings.Replace(strings.ToUpper(strings.TrimSpace(input)), ",", ".", 1)
 
 	multiplier := 1
 	value := input
