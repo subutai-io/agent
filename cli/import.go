@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"path"
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 type Template struct {
@@ -163,27 +163,6 @@ func md5sum(filePath string) string {
 	return hash
 }
 
-// lockSubutai creates lock file for period of import for certain template to prevent conflicts during write operation
-func lockSubutai(file string) (lockfile.Lockfile, error) {
-	lock, err := lockfile.New("/var/run/lock/subutai." + file)
-	if log.Check(log.DebugLevel, "Init lock "+file, err) {
-		return lock, err
-	}
-
-	err = lock.TryLock()
-	if log.Check(log.DebugLevel, "Locking file "+file, err) {
-		if p, err2 := lock.GetOwner(); err2 == nil {
-			cmd, err2 := ioutil.ReadFile(fmt.Sprintf("/proc/%v/cmdline", p.Pid))
-			if err2 != nil || !(strings.Contains(string(cmd), "subutai") && strings.Contains(string(cmd), "import")) {
-				log.Check(log.DebugLevel, "Removing broken lockfile /var/run/lock/subutai."+file, os.Remove("/var/run/lock/subutai."+file))
-			}
-		}
-		return lock, err
-	}
-
-	return lock, nil
-}
-
 func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var err error
 
@@ -218,7 +197,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	log.Info("Importing " + t.Name)
 
 	var lock lockfile.Lockfile
-	for lock, err = lockSubutai(templateRef + ".import"); err != nil; lock, err = lockSubutai(templateRef + ".import") {
+	for lock, err = common.LockFile(templateRef, "import"); err != nil; lock, err = common.LockFile(templateRef, "import") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
@@ -305,7 +284,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 	//delete dataset if already exists
 	if fs.DatasetExists(templateRef) {
-		fs.RemoveDataset(templateRef, true)
+		container.Destroy(templateRef, true)
 	}
 
 	template.Install(templateRef)
@@ -334,7 +313,7 @@ func download(template Template) {
 
 	if err != nil {
 		//check network
-		err = exec.Exec("ipfs","--timeout=600s", "dht", "findprovs", "-n1", template.Id)
+		err = exec.Exec("ipfs", "--timeout=600s", "dht", "findprovs", "-n1", template.Id)
 	}
 
 	if err != nil {

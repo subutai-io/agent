@@ -51,7 +51,7 @@ func LxcDestroy(id string, vlan bool) {
 		c, err := db.INSTANCE.ContainerByName(id)
 		log.Check(log.WarnLevel, "Reading container metadata from db", err)
 
-		msg = id + " is destroyed"
+		msg = "Container " + id + " is destroyed"
 
 		if len(c) != 0 {
 

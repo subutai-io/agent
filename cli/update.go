@@ -8,6 +8,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/snapcore/snapd/snap"
 	"strings"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 func init() {
@@ -23,7 +24,7 @@ func init() {
 // if a newer version is found, installs it. Please note, system security policies requires that such commands should be performed by the superuser manually,
 // otherwise an application's attempt to update itself will be blocked.
 func Update(name string, check bool) {
-	lock, err := lockSubutai(name + ".update")
+	lock, err := common.LockFile(name, "update")
 	if err != nil {
 		log.Error("Another update process is already running")
 	}
