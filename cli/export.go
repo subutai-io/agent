@@ -86,7 +86,7 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 	os.MkdirAll(dst, 0755)
 	os.MkdirAll(dst+"/deltas", 0755)
 
-	for _, vol := range []string{"rootfs", "home", "opt", "var"} {
+	for _, vol := range fs.ChildDatasets {
 		//remove old snapshot if any
 		if fs.DatasetExists(name + "/" + vol + "@now") {
 			fs.RemoveDataset(name+"/"+vol+"@now", false)
