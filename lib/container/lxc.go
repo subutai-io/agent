@@ -242,7 +242,7 @@ func Destroy(name string, silent bool) error {
 	var err error = nil
 
 	var lock lockfile.Lockfile
-	for lock, err = common.LockFile(name, "destroy"); err != nil; lock, err = common.LockFile(name, "destroy") {
+	for lock, err = common.LockFile("lxc", "destroy"); err != nil; lock, err = common.LockFile("lxc", "destroy") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
