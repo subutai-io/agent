@@ -19,6 +19,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/nightlyone/lockfile"
 	"path"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 var (
@@ -60,7 +61,7 @@ func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remo
 		var mapping = protocol + domain + sockInt + sockExt
 		var lock lockfile.Lockfile
 		var err error
-		for lock, err = lockSubutai(mapping + ".map"); err != nil; lock, err = lockSubutai(mapping + ".map") {
+		for lock, err = common.LockFile(mapping, "map"); err != nil; lock, err = common.LockFile(mapping, "map") {
 			time.Sleep(time.Second * 1)
 		}
 		defer lock.Unlock()

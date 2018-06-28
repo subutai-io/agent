@@ -11,6 +11,7 @@ import (
 )
 
 var zfsRootDataset string
+var ChildDatasets = []string{"rootfs", "home", "var", "opt"}
 
 func init() {
 	zfsRootDataset = config.Agent.Dataset

@@ -25,6 +25,8 @@ import (
 	"crypto/rand"
 	"time"
 	"hash/crc32"
+	"github.com/nightlyone/lockfile"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 var crc32Table = crc32.MakeTable(0xD5828281)
@@ -212,7 +214,7 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*120))
 
-	for i := 1; fs.RemoveDataset(name, true) != nil && i < 3; i++ {
+	for i := 1; Destroy(name, false) != nil && i < 3; i++ {
 		time.Sleep(time.Second * time.Duration(i*5))
 	}
 
@@ -228,16 +230,53 @@ func DestroyTemplate(name string) {
 		log.Error("Template " + name + " not found")
 	}
 
-	err := fs.RemoveDataset(name, true)
+	err := Destroy(name, false)
 
 	log.Check(log.ErrorLevel, "Removing template", err)
 
+	log.Info("Template " + name + " is destroyed")
 }
 
-// GetParent return a parent of the Subutai container.
-func GetParent(name string) string {
-	return GetProperty(name, "subutai.parent")
+func Destroy(name string, silent bool) error {
+
+	var err error = nil
+
+	var lock lockfile.Lockfile
+	for lock, err = common.LockFile(name, "destroy"); err != nil; lock, err = common.LockFile(name, "destroy") {
+		time.Sleep(time.Second * 1)
+	}
+	defer lock.Unlock()
+
+	//destroy child datasets
+	for _, dataset := range fs.ChildDatasets {
+
+		//destroy snapshot
+		childSnapshot := path.Join(name, dataset) + "@now"
+		if fs.DatasetExists(childSnapshot) {
+			err = fs.RemoveDataset(childSnapshot, false)
+			if !silent && err != nil {
+				break
+			}
+		}
+
+		//destroy dataset
+		childDataset := path.Join(name, dataset)
+		if fs.DatasetExists(childDataset) {
+			err = fs.RemoveDataset(childDataset, false)
+			if !silent && err != nil {
+				break
+			}
+		}
+	}
+
+	//destroy parent dataset
+	if (silent || err == nil) && fs.DatasetExists(name) {
+		err = fs.RemoveDataset(name, false)
+	}
+
+	return err
 }
+
 func GetProperty(templateOrContainerName string, propertyName string) string {
 	return GetConfigItem(path.Join(config.Agent.LxcPrefix, templateOrContainerName, "config"), propertyName)
 }
