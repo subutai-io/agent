@@ -82,7 +82,6 @@ func main() {
 		loadManagementIp()
 	}
 
-
 	app.Flags = []gcli.Flag{gcli.BoolFlag{
 		Name:  "d",
 		Usage: "debug mode"}}
@@ -135,7 +134,7 @@ func main() {
 		Name: "cleanup", Usage: "clean Subutai environment",
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), true)
+				cli.LxcDestroy(c.Args().Get(0), true, false)
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -173,7 +172,7 @@ func main() {
 		Name: "destroy", Usage: "destroy Subutai container/template",
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), false)
+				cli.LxcDestroy(c.Args().Get(0), false, false)
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
