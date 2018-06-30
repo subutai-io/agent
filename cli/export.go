@@ -206,11 +206,13 @@ func LxcExport(name, newname, version, prefsize, token, description string, priv
 
 func getOwner(token string) string {
 
-	cdnUrl := config.CdnUrl + "/users/username?token=" + token
+	url := config.CdnUrl + "/users/username?token=" + token
 
-	client := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := client.Get(cdnUrl)
-	log.Check(log.ErrorLevel, "Getting owner, get: "+cdnUrl, err)
+	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+
+	response, err := utils.RetryGet(url, clnt, 3)
+
+	log.Check(log.ErrorLevel, "Getting owner, get: "+url, err)
 	defer utils.Close(response)
 
 	if response.StatusCode != 200 {
