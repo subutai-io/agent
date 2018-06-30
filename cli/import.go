@@ -44,8 +44,10 @@ func init() {
 func getTemplateInfoById(t *Template, id string) {
 	url := config.CdnUrl + "/template?id=" + id
 
-	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := kurjun.Get(url)
+	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+
+	response, err := utils.RetryGet(url, clnt, 3)
+
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
 	defer utils.Close(response)
 
@@ -89,8 +91,10 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 		url += "&version=" + version
 	}
 
-	kurjun := utils.GetClient(config.CDN.Allowinsecure, 15)
-	response, err := kurjun.Get(url)
+	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+
+	response, err := utils.RetryGet(url, clnt, 3)
+
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
 	defer utils.Close(response)
 
