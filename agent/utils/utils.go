@@ -197,6 +197,7 @@ func RetryGet(url string, clnt *http.Client, attempts int) (*http.Response, erro
 
 	for response, err = clnt.Get(url); err != nil && attempt < attempts; response, err = clnt.Get(url) {
 		attempt++
+		time.Sleep(time.Duration(attempt*5) * time.Second)
 	}
 
 	return response, err
