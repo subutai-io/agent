@@ -11,11 +11,13 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 
-	gcli "github.com/urfave/cli"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/exec"
 	"strings"
 	"github.com/subutai-io/agent/db"
+	"gopkg.in/alecthomas/kingpin.v2"
+	"fmt"
+	"github.com/subutai-io/agent/lib/net"
 )
 
 var version = "unknown"
@@ -72,352 +74,350 @@ func loadManagementIp() {
 	}
 }
 
-func main() {
-	app := gcli.NewApp()
-	app.Name = "Subutai"
-	app.Version = version
-	app.Usage = "daemon and command line interface binary"
+var (
+	app       = kingpin.New("subutai", "Subutai Agent")
+	debugFlag = app.Flag("debug", "Set log level to DEBUG").Short('d').Bool()
 
-	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
+	//daemon command
+	daemon = app.Command("daemon", "Run subutai agent daemon")
+
+	//subutai list command
+	list                     = app.Command("list", "List containers/templates")
+	listName                 = list.Arg("name", "container/template name").String()
+	listContainersFlag       = list.Flag("containers", "list containers").Short('c').Bool()
+	listTemplatesFlag        = list.Flag("templates", "list templates").Short('t').Bool()
+	listContainerDetailsFlag = list.Flag("info", "list containers info").Short('i').Bool()
+	listParentsFlag          = list.Flag("parents", "list parents").Short('p').Bool()
+
+	//attach command
+	attach        = app.Command("attach", "Attach to Subutai container")
+	attachName    = attach.Arg("name", "running container name").Required().String()
+	attachCommand = attach.Arg("command", "ad-hoc command to execute").String()
+
+	//clone command
+	clone          = app.Command("clone", "Create Subutai container")
+	cloneTemplate  = clone.Arg("template", "source template").Required().String()
+	cloneContainer = clone.Arg("container", "container name").Required().String()
+	cloneEnvId     = clone.Flag("environment", "id of container environment").Short('e').String()
+	//todo change Console to use -n flag instead of -i
+	cloneNetwork = clone.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret  = clone.Flag("secret", "console secret").Short('s').String()
+
+	//cleanup command
+	cleanup     = app.Command("cleanup", "Cleanup environment")
+	cleanupVlan = cleanup.Arg("vlan", "environment vlan").Required().String()
+
+	//prune templates command
+	prune = app.Command("prune", "Prune templates with no child containers")
+
+	//destroy command
+	destroy     = app.Command("destroy", "Destroy Subutai container/template")
+	destroyName = destroy.Arg("name", "container/template name").Required().String()
+
+	//export command
+	export          = app.Command("export", "Export container as a template")
+	exportContainer = export.Arg("container", "source container").Required().String()
+	exportToken     = export.Flag("token", "CDN token").Required().Short('t').String()
+	exportName      = export.Flag("name", "template name").Short('n').String()
+	exportSize      = export.Flag("size", "template preferred size").Short('s').String()
+	exportLocal     = export.Flag("local", "export template to local cache").Short('l').Bool()
+	//todo update Console side
+	exportVersion = export.Flag("ver", "template version").Short('r').String()
+
+	//import command
+	importCmd  = app.Command("import", "Import Subutai template")
+	importName = importCmd.Arg("template", "template name/path to template archive").Required().String()
+	//todo refactor if template is path then assume it is local import, remove -l flag
+	//todo update Console side
+	importLocal  = importCmd.Flag("local", "import local template").Short('l').Bool()
+	importSecret = importCmd.Flag("secret", "console secret").Short('s').String()
+
+	//info command
+	info          = app.Command("info", "System information")
+	infoIdCmd     = info.Command("id", "resource host id")
+	infoSystemCmd = info.Command("system", "resource host info").Alias("sys")
+	infoOsCmd     = info.Command("os", "resource host os")
+	infoIpCmd     = info.Command("ipaddr", "resource host ip address").Alias("ip")
+
+	//
+	//	Name: "info", Usage: "information about host system",
+	//	Action: func(c *gcli.Context) error {
+	//		cli.Info(c.Args().Get(0), c.Args().Get(1))
+	//		return nil
+	//	}}, {
+)
+
+func init() {
+	app.Version(version)
+	app.HelpFlag.Short('h')
+	app.VersionFlag.Short('v')
+
+}
+
+func main() {
+
+	input := kingpin.MustParse(app.Parse(os.Args[1:]))
+
+	if *debugFlag {
+		log.Level(log.DebugLevel)
+	}
+
+	if input != daemon.FullCommand() {
 		loadManagementIp()
 	}
 
-	app.Flags = []gcli.Flag{gcli.BoolFlag{
-		Name:  "d",
-		Usage: "debug mode"}}
+	switch input {
 
-	app.Before = func(c *gcli.Context) error {
-		if c.IsSet("d") {
-			log.Level(log.DebugLevel)
-		}
-		return nil
+	case list.FullCommand():
+		cli.LxcList(*listName, *listContainersFlag, *listTemplatesFlag, *listContainerDetailsFlag, *listParentsFlag)
+	case daemon.FullCommand():
+		config.InitAgentDebug()
+		agent.Start()
+	case attach.FullCommand():
+		cli.LxcAttach(*attachName, *attachCommand)
+	case clone.FullCommand():
+		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
+	case cleanup.FullCommand():
+		cli.LxcDestroy(*cleanupVlan, true, false)
+	case prune.FullCommand():
+		cli.Prune()
+	case destroy.FullCommand():
+		cli.LxcDestroy(*destroyName, false, false)
+	case export.FullCommand():
+		cli.LxcExport(*exportContainer, *exportName, *exportVersion, *exportSize, *exportToken, *exportLocal)
+	case importCmd.FullCommand():
+		cli.LxcImport(*importName, *importSecret, *importLocal)
+	case infoIdCmd.FullCommand():
+		fmt.Println(cli.GetFingerprint())
+	case infoSystemCmd.FullCommand():
+		fmt.Println(cli.GetSystemInfo())
+	case infoOsCmd.FullCommand():
+		fmt.Println(cli.GetOsName())
+	case infoIpCmd.FullCommand():
+		fmt.Println(net.GetIp())
 	}
 
-	app.Commands = []gcli.Command{{
-		Name: "attach", Usage: "attach to Subutai container",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcAttach(c.Args().Get(0), c.Args().Tail())
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
+	//
+	//	Name: "hostname", Usage: "Set hostname of container or host",
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) == "" {
+	//			gcli.ShowSubcommandHelp(c)
+	//		} else if len(c.Args().Get(1)) != 0 {
+	//			cli.LxcHostname(c.Args().Get(0), c.Args().Get(1))
+	//		} else {
+	//			cli.Hostname(c.Args().Get(0))
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//
+	//	Name: "map", Usage: "Subutai port mapping",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
+	//		gcli.StringFlag{Name: "external, e", Usage: "RH port"},
+	//		gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
+	//		gcli.StringFlag{Name: "cert, c", Usage: "https certificate"},
+	//		gcli.StringFlag{Name: "policy, p", Usage: "balancing policy"},
+	//		gcli.BoolFlag{Name: "list, l", Usage: "list mapped ports"},
+	//		gcli.BoolFlag{Name: "remove, r", Usage: "remove map"},
+	//		gcli.BoolFlag{Name: "sslbackend", Usage: "ssl backend in https upstream"},
+	//	},
+	//	Action: func(c *gcli.Context) error {
+	//		if len(c.Args()) > 0 || c.NumFlags() > 0 {
+	//			cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "metrics", Usage: "list Subutai container",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "start, s", Usage: "start time"},
+	//		gcli.StringFlag{Name: "end, e", Usage: "end time"}},
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "proxy", Usage: "Subutai reverse proxy",
+	//	Subcommands: []gcli.Command{
+	//		{
+	//			Name:     "add",
+	//			Usage:    "add reverse proxy component",
+	//			HideHelp: true,
+	//			Flags: []gcli.Flag{
+	//				gcli.StringFlag{Name: "domain, d", Usage: "add domain to vlan"},
+	//				gcli.StringFlag{Name: "host, h", Usage: "add host to domain on vlan"},
+	//				gcli.StringFlag{Name: "policy, p", Usage: "set load balance policy (rr|lb|hash)"},
+	//				gcli.StringFlag{Name: "file, f", Usage: "specify pem certificate file"}},
+	//			Action: func(c *gcli.Context) error {
+	//				cli.ProxyAdd(c.Args().Get(0), c.String("d"), c.String("h"), c.String("p"), c.String("f"))
+	//				return nil
+	//			},
+	//		},
+	//		{
+	//			Name:     "del",
+	//			Usage:    "del reverse proxy component",
+	//			HideHelp: true,
+	//			Flags: []gcli.Flag{
+	//				gcli.BoolFlag{Name: "domain, d", Usage: "delete domain from vlan"},
+	//				gcli.StringFlag{Name: "host, h", Usage: "delete host from domain on vlan"}},
+	//			Action: func(c *gcli.Context) error {
+	//				cli.ProxyDel(c.Args().Get(0), c.String("h"), c.Bool("d"))
+	//				return nil
+	//			},
+	//		},
+	//		{
+	//			Name:     "check",
+	//			Usage:    "check existing domain or host",
+	//			HideHelp: true,
+	//			Flags: []gcli.Flag{
+	//				gcli.BoolFlag{Name: "domain, d", Usage: "check domains on vlan"},
+	//				gcli.StringFlag{Name: "host, h", Usage: "check hosts on vlan"}},
+	//			Action: func(c *gcli.Context) error {
+	//				cli.ProxyCheck(c.Args().Get(0), c.String("h"), c.Bool("d"))
+	//				return nil
+	//			},
+	//		},
+	//	}}, {
+	//
+	//	Name: "quota", Usage: "set quotas for Subutai container",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "set, s", Usage: "set quota for the specified resource type (cpu, cpuset, ram, disk, network)"},
+	//		gcli.StringFlag{Name: "threshold, t", Usage: "set alert threshold"}},
+	//	Action: func(c *gcli.Context) error {
+	//		cli.LxcQuota(c.Args().Get(0), c.Args().Get(1), c.String("s"), c.String("t"))
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "stats", Usage: "statistics from host",
+	//	Action: func(c *gcli.Context) error {
+	//		cli.Info(c.Args().Get(0), c.Args().Get(1))
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "start", Usage: "start Subutai container",
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.LxcStart(c.Args().Get(0))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "stop", Usage: "stop Subutai container",
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.LxcStop(c.Args().Get(0))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "restart", Usage: "restart Subutai container",
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.LxcRestart(c.Args().Get(0))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "tunnel", Usage: "SSH tunnel management",
+	//	Subcommands: []gcli.Command{
+	//		{
+	//			Name:  "add",
+	//			Usage: "add ssh tunnel",
+	//			Flags: []gcli.Flag{
+	//				gcli.BoolFlag{Name: "global, g", Usage: "create tunnel to global proxy"}},
+	//			Action: func(c *gcli.Context) error {
+	//				cli.TunAdd(c.Args().Get(0), c.Args().Get(1))
+	//				return nil
+	//			}}, {
+	//			Name:  "del",
+	//			Usage: "delete tunnel",
+	//			Action: func(c *gcli.Context) error {
+	//				cli.TunDel(c.Args().Get(0))
+	//				return nil
+	//			}}, {
+	//			Name:  "list",
+	//			Usage: "list active ssh tunnels",
+	//			Action: func(c *gcli.Context) error {
+	//				cli.TunList()
+	//				return nil
+	//			}}, {
+	//			Name:  "check",
+	//			Usage: "check active ssh tunnels",
+	//			Action: func(c *gcli.Context) error {
+	//				cli.TunCheck()
+	//				return nil
+	//			}},
+	//	}}, {
+	//
+	//	Name: "update", Usage: "update Subutai management, container or Resource host",
+	//	Flags: []gcli.Flag{
+	//		gcli.BoolFlag{Name: "check, c", Usage: "check for updates without installation"}},
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.Update(c.Args().Get(0), c.Bool("c"))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//
+	//	Name: "vxlan", Usage: "VXLAN tunnels operation",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "create, c", Usage: "create vxlan tunnel"},
+	//		gcli.StringFlag{Name: "delete, d", Usage: "delete vxlan tunnel"},
+	//		gcli.BoolFlag{Name: "list, l", Usage: "list vxlan tunnels"},
+	//
+	//		gcli.StringFlag{Name: "remoteip, r", Usage: "vxlan tunnel remote ip"},
+	//		gcli.StringFlag{Name: "vlan, vl", Usage: "tunnel vlan"},
+	//		gcli.StringFlag{Name: "vni, v", Usage: "vxlan tunnel vni"},
+	//	},
+	//	Action: func(c *gcli.Context) error {
+	//		cli.VxlanTunnel(c.String("c"), c.String("d"), c.String("r"), c.String("vl"), c.String("v"), c.Bool("l"))
+	//		return nil
+	//	}},
+	//}
+	//
 
-		Name: "batch", Usage: "batch commands execution",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "json, j", Usage: "JSON string with commands"}},
-		Action: func(c *gcli.Context) error {
-			if c.String("j") != "" {
-				cli.Batch(c.String("j"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
+	//TODO implement or remove batch later
+	//	Name: "batch", Usage: "batch commands execution",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "json, j", Usage: "JSON string with commands"}},
+	//	Action: func(c *gcli.Context) error {
+	//		if c.String("j") != "" {
+	//			cli.Batch(c.String("j"))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
 
-		Name: "clone", Usage: "clone Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "env, e", Usage: "set environment id for container"},
-			gcli.StringFlag{Name: "ipaddr, i", Usage: "set container IP address and VLAN"},
-			gcli.StringFlag{Name: "token, t", Usage: "CDN token to clone private and shared templates"},
-			gcli.StringFlag{Name: "secret, s", Usage: "Console secret"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" && c.Args().Get(1) != "" {
-				cli.LxcClone(c.Args().Get(0), c.Args().Get(1), c.String("e"), c.String("i"), c.String("s"), c.String("t"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "cleanup", Usage: "clean Subutai environment",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), true, false)
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "prune", Usage: "prune unused templates",
-		Action: func(c *gcli.Context) error {
-			cli.Prune()
-			return nil
-		}}, {
-
-		Name: "config", Usage: "edit container config",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "operation, o", Usage: "<add|del> operation"},
-			gcli.StringFlag{Name: "key, k", Usage: "configuration key"},
-			gcli.StringFlag{Name: "value, v", Usage: "configuration value"},
-		},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcConfig(c.Args().Get(0), c.String("o"), c.String("k"), c.String("v"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "daemon", Usage: "start Subutai agent",
-		Action: func(c *gcli.Context) error {
-			config.InitAgentDebug()
-			agent.Start()
-			return nil
-		}}, {
-
-		Name: "destroy", Usage: "destroy Subutai container/template",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), false, false)
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "export", Usage: "export Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "name, n", Usage: "new template name"},
-			gcli.StringFlag{Name: "version, v", Usage: "template version"},
-			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"},
-			gcli.StringFlag{Name: "token, t", Usage: "mandatory CDN token"},
-			gcli.StringFlag{Name: "description, d", Usage: "template description"},
-			gcli.BoolFlag{Name: "private, p", Usage: "use private repo for uploading template"},
-			gcli.BoolFlag{Name: "local, l", Usage: "export template to local cache"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcExport(c.Args().Get(0), c.String("n"), c.String("v"), c.String("s"),
-					c.String("t"), c.String("d"), c.Bool("p"), c.Bool("l"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "import", Usage: "import Subutai template",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "token, t", Usage: "CDN token to import private and shared templates"},
-			gcli.BoolFlag{Name: "local, l", Usage: "prefer to use local template archive"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcImport(c.Args().Get(0), c.String("t"), c.Bool("l"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "info", Usage: "information about host system",
-		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1))
-			return nil
-		}}, {
-
-		Name: "hostname", Usage: "Set hostname of container or host",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) == "" {
-				gcli.ShowSubcommandHelp(c)
-			} else if len(c.Args().Get(1)) != 0 {
-				cli.LxcHostname(c.Args().Get(0), c.Args().Get(1))
-			} else {
-				cli.Hostname(c.Args().Get(0))
-			}
-			return nil
-		}}, {
-
-		Name: "list", Usage: "list Subutai container",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "container, c", Usage: "containers only"},
-			gcli.BoolFlag{Name: "template, t", Usage: "templates only"},
-			gcli.BoolFlag{Name: "info, i", Usage: "detailed container info"},
-			gcli.BoolFlag{Name: "parent, p", Usage: "with parent"}},
-		Action: func(c *gcli.Context) error {
-			cli.LxcList(c.Args().Get(0), c.Bool("c"), c.Bool("t"), c.Bool("i"), c.Bool("p"))
-			return nil
-		}}, {
-
-		Name: "map", Usage: "Subutai port mapping",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "internal, i", Usage: "internal socket"},
-			gcli.StringFlag{Name: "external, e", Usage: "RH port"},
-			gcli.StringFlag{Name: "domain, d", Usage: "domain name"},
-			gcli.StringFlag{Name: "cert, c", Usage: "https certificate"},
-			gcli.StringFlag{Name: "policy, p", Usage: "balancing policy"},
-			gcli.BoolFlag{Name: "list, l", Usage: "list mapped ports"},
-			gcli.BoolFlag{Name: "remove, r", Usage: "remove map"},
-			gcli.BoolFlag{Name: "sslbackend", Usage: "ssl backend in https upstream"},
-		},
-		Action: func(c *gcli.Context) error {
-			if len(c.Args()) > 0 || c.NumFlags() > 0 {
-				cli.MapPort(c.Args().Get(0), c.String("i"), c.String("e"), c.String("p"), c.String("d"), c.String("c"), c.Bool("l"), c.Bool("r"), c.Bool("sslbackend"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "metrics", Usage: "list Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "start, s", Usage: "start time"},
-			gcli.StringFlag{Name: "end, e", Usage: "end time"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "proxy", Usage: "Subutai reverse proxy",
-		Subcommands: []gcli.Command{
-			{
-				Name:     "add",
-				Usage:    "add reverse proxy component",
-				HideHelp: true,
-				Flags: []gcli.Flag{
-					gcli.StringFlag{Name: "domain, d", Usage: "add domain to vlan"},
-					gcli.StringFlag{Name: "host, h", Usage: "add host to domain on vlan"},
-					gcli.StringFlag{Name: "policy, p", Usage: "set load balance policy (rr|lb|hash)"},
-					gcli.StringFlag{Name: "file, f", Usage: "specify pem certificate file"}},
-				Action: func(c *gcli.Context) error {
-					cli.ProxyAdd(c.Args().Get(0), c.String("d"), c.String("h"), c.String("p"), c.String("f"))
-					return nil
-				},
-			},
-			{
-				Name:     "del",
-				Usage:    "del reverse proxy component",
-				HideHelp: true,
-				Flags: []gcli.Flag{
-					gcli.BoolFlag{Name: "domain, d", Usage: "delete domain from vlan"},
-					gcli.StringFlag{Name: "host, h", Usage: "delete host from domain on vlan"}},
-				Action: func(c *gcli.Context) error {
-					cli.ProxyDel(c.Args().Get(0), c.String("h"), c.Bool("d"))
-					return nil
-				},
-			},
-			{
-				Name:     "check",
-				Usage:    "check existing domain or host",
-				HideHelp: true,
-				Flags: []gcli.Flag{
-					gcli.BoolFlag{Name: "domain, d", Usage: "check domains on vlan"},
-					gcli.StringFlag{Name: "host, h", Usage: "check hosts on vlan"}},
-				Action: func(c *gcli.Context) error {
-					cli.ProxyCheck(c.Args().Get(0), c.String("h"), c.Bool("d"))
-					return nil
-				},
-			},
-		}}, {
-
-		Name: "quota", Usage: "set quotas for Subutai container",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "set, s", Usage: "set quota for the specified resource type (cpu, cpuset, ram, disk, network)"},
-			gcli.StringFlag{Name: "threshold, t", Usage: "set alert threshold"}},
-		Action: func(c *gcli.Context) error {
-			cli.LxcQuota(c.Args().Get(0), c.Args().Get(1), c.String("s"), c.String("t"))
-			return nil
-		}}, {
-
-		Name: "stats", Usage: "statistics from host",
-		Action: func(c *gcli.Context) error {
-			cli.Info(c.Args().Get(0), c.Args().Get(1))
-			return nil
-		}}, {
-
-		Name: "start", Usage: "start Subutai container",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcStart(c.Args().Get(0))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "stop", Usage: "stop Subutai container",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcStop(c.Args().Get(0))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "restart", Usage: "restart Subutai container",
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.LxcRestart(c.Args().Get(0))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "tunnel", Usage: "SSH tunnel management",
-		Subcommands: []gcli.Command{
-			{
-				Name:  "add",
-				Usage: "add ssh tunnel",
-				Flags: []gcli.Flag{
-					gcli.BoolFlag{Name: "global, g", Usage: "create tunnel to global proxy"}},
-				Action: func(c *gcli.Context) error {
-					cli.TunAdd(c.Args().Get(0), c.Args().Get(1))
-					return nil
-				}}, {
-				Name:  "del",
-				Usage: "delete tunnel",
-				Action: func(c *gcli.Context) error {
-					cli.TunDel(c.Args().Get(0))
-					return nil
-				}}, {
-				Name:  "list",
-				Usage: "list active ssh tunnels",
-				Action: func(c *gcli.Context) error {
-					cli.TunList()
-					return nil
-				}}, {
-				Name:  "check",
-				Usage: "check active ssh tunnels",
-				Action: func(c *gcli.Context) error {
-					cli.TunCheck()
-					return nil
-				}},
-		}}, {
-
-		Name: "update", Usage: "update Subutai management, container or Resource host",
-		Flags: []gcli.Flag{
-			gcli.BoolFlag{Name: "check, c", Usage: "check for updates without installation"}},
-		Action: func(c *gcli.Context) error {
-			if c.Args().Get(0) != "" {
-				cli.Update(c.Args().Get(0), c.Bool("c"))
-			} else {
-				gcli.ShowSubcommandHelp(c)
-			}
-			return nil
-		}}, {
-
-		Name: "vxlan", Usage: "VXLAN tunnels operation",
-		Flags: []gcli.Flag{
-			gcli.StringFlag{Name: "create, c", Usage: "create vxlan tunnel"},
-			gcli.StringFlag{Name: "delete, d", Usage: "delete vxlan tunnel"},
-			gcli.BoolFlag{Name: "list, l", Usage: "list vxlan tunnels"},
-
-			gcli.StringFlag{Name: "remoteip, r", Usage: "vxlan tunnel remote ip"},
-			gcli.StringFlag{Name: "vlan, vl", Usage: "tunnel vlan"},
-			gcli.StringFlag{Name: "vni, v", Usage: "vxlan tunnel vni"},
-		},
-		Action: func(c *gcli.Context) error {
-			cli.VxlanTunnel(c.String("c"), c.String("d"), c.String("r"), c.String("vl"), c.String("v"), c.Bool("l"))
-			return nil
-		}},
-	}
-
-	app.Run(os.Args)
+	// TODO remove
+	//	Name: "config", Usage: "edit container config",
+	//	Flags: []gcli.Flag{
+	//		gcli.StringFlag{Name: "operation, o", Usage: "<add|del> operation"},
+	//		gcli.StringFlag{Name: "key, k", Usage: "configuration key"},
+	//		gcli.StringFlag{Name: "value, v", Usage: "configuration value"},
+	//	},
+	//	Action: func(c *gcli.Context) error {
+	//		if c.Args().Get(0) != "" {
+	//			cli.LxcConfig(c.Args().Get(0), c.String("o"), c.String("k"), c.String("v"))
+	//		} else {
+	//			gcli.ShowSubcommandHelp(c)
+	//		}
+	//		return nil
+	//	}}, {
+	//app.Run(os.Args)
 }

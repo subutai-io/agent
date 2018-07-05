@@ -28,7 +28,7 @@ var (
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
-func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
+func LxcClone(parent, child, envID, addr, consoleSecret string) {
 	child = utils.CleanTemplateName(child)
 
 	if container.LxcInstanceExists(child) {
@@ -48,7 +48,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
 	fullRef := strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
 
 	if !container.IsTemplate(fullRef) {
-		LxcImport("id:"+t.Id, cdnToken, false)
+		LxcImport("id:"+t.Id, "", false)
 	}
 
 	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child))

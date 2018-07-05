@@ -299,7 +299,7 @@ func Info(command, host string) {
 		}
 	} else if command == "os" {
 
-		fmt.Printf("%s\n", getOsName())
+		fmt.Printf("%s\n", GetOsName())
 	} else if command == "id" {
 		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 		defer os.Unsetenv("GNUPGHOME")
@@ -320,7 +320,18 @@ func Info(command, host string) {
 	}
 }
 
-func getOsName() string {
+func GetSystemInfo() string {
+	host, err := os.Hostname()
+	log.Check(log.DebugLevel, "Getting hostname of the system", err)
+	return sysLoad(host)
+}
+func GetFingerprint() string {
+	os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+	defer os.Unsetenv("GNUPGHOME")
+	return gpg.GetFingerprint("rh@subutai.io")
+}
+
+func GetOsName() string {
 
 	out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
