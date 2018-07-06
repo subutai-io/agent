@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"fmt"
-
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/fs"
@@ -25,14 +23,13 @@ import (
 var (
 	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
+
+func GetMapList(protocol string) []string {
+	return mapList(protocol)
+}
+
 // MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
-func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, list, remove, sslbcknd bool) {
-	if list {
-		for _, v := range mapList(protocol) {
-			fmt.Println(v)
-		}
-		return
-	}
+func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, remove, sslbcknd bool) {
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
 		log.Error("Unsupported protocol \"" + protocol + "\"")

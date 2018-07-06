@@ -27,6 +27,7 @@ import (
 	"path"
 )
 
+//TODO convert to util and move to lib package
 type hostStat struct {
 	Host string `json:"host"`
 	CPU struct {
@@ -221,7 +222,7 @@ func diskQuotaUsage(path string) int {
 }
 
 // quota returns Json string with container's resource quota information
-func quota(h string) string {
+func GetContainerQuotaUsage(h string) string {
 	usage := new(quotaUsage)
 	usage.Container = h
 	usage.CPU = cpuQuotaUsage(h)
@@ -294,7 +295,7 @@ func Info(command, host string) {
 		fmt.Println(net.GetIp())
 		return
 	} else if command == "ports" {
-		for k := range usedPorts() {
+		for k := range GetUsedPorts() {
 			fmt.Println(k)
 		}
 	} else if command == "os" {
@@ -312,12 +313,18 @@ func Info(command, host string) {
 		if len(host) == 0 {
 			log.Error("Usage: subutai info <quota|system> <hostname>")
 		}
-		fmt.Println(quota(host))
+		fmt.Println(GetContainerQuotaUsage(host))
 	} else if command == "system" {
 		host, err := os.Hostname()
 		log.Check(log.DebugLevel, "Getting hostname of the system", err)
 		fmt.Println(sysLoad(host))
 	}
+}
+
+func GetDiskUsage(lxcName string) int {
+	usage, err := fs.DatasetDiskUsage(lxcName)
+	log.Check(log.ErrorLevel, "Checking disk usage", err)
+	return usage
 }
 
 func GetSystemInfo() string {
@@ -364,7 +371,7 @@ func GetOsName() string {
 	}
 }
 
-func usedPorts() map[string]bool {
+func GetUsedPorts() map[string]bool {
 	ports := make(map[string]bool)
 
 	out, _ := exec.Command("ss", "-ltun").Output()

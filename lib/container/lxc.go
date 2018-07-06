@@ -345,16 +345,20 @@ func QuotaRAM(name string, size ...string) int {
 // QuotaCPU sets container CPU limitation and return current value in percents.
 // If passed value < 100, we assume that this value mean percents.
 // If passed value > 100, we assume that this value mean MHz.
-func QuotaCPU(name string, size ...string) int {
+func QuotaCPU(name string, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
 		defer lxc.Release(c)
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	cfsPeriod := 100000
-	tmp, err := strconv.Atoi(size[0])
-	log.Check(log.DebugLevel, "Parsing quota size", err)
-	quota := float32(tmp)
+	var quota float32;
+
+	if size != "" {
+		tmp, err := strconv.Atoi(size)
+		log.Check(log.DebugLevel, "Parsing quota size", err)
+		quota = float32(tmp)
+	}
 
 	if quota > 100 {
 		out, err := ioutil.ReadFile("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq")
@@ -375,7 +379,7 @@ func QuotaCPU(name string, size ...string) int {
 		quota = quota * 100 / float32(freq) / float32(runtime.NumCPU())
 	}
 
-	if size[0] != "" && State(name) == "RUNNING" {
+	if size != "" && State(name) == "RUNNING" {
 		value := strconv.Itoa(int(float32(cfsPeriod) * float32(runtime.NumCPU()) * quota / 100))
 		log.Check(log.DebugLevel, "Setting cpu.cfs_quota_us", c.SetCgroupItem("cpu.cfs_quota_us", value))
 
