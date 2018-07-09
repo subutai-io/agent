@@ -111,7 +111,7 @@ var (
 	pruneCmd = app.Command("prune", "Prune templates with no child containers")
 
 	//destroy command
-	destroyCmd  = app.Command("destroy", "Destroy Subutai container/template")
+	destroyCmd  = app.Command("destroy", "Destroy Subutai container/template").Alias("rm").Alias("del")
 	destroyName = destroyCmd.Arg("name", "container/template name").Required().String()
 
 	//export command
@@ -121,37 +121,38 @@ var (
 	exportName      = exportCmd.Flag("name", "template name").Short('n').String()
 	exportSize      = exportCmd.Flag("size", "template preferred size").Short('s').String()
 	exportLocal     = exportCmd.Flag("local", "export template to local cache").Short('l').Bool()
-	//todo update Console side
+	//todo change Console side to use -r flag instead of -v
 	exportVersion = exportCmd.Flag("ver", "template version").Short('r').String()
 
 	//import command
 	importCmd  = app.Command("import", "Import Subutai template")
 	importName = importCmd.Arg("template", "template name/path to template archive").Required().String()
 	//todo refactor if template is path then assume it is local import, remove -l flag
-	//todo update Console side
 	importLocal  = importCmd.Flag("local", "import local template").Short('l').Bool()
 	importSecret = importCmd.Flag("secret", "console secret").Short('s').String()
 
 	//info command
-	infoCmd         = app.Command("info", "System information")
-	infoIdCmd       = infoCmd.Command("id", "host id")
-	infoSystemCmd   = infoCmd.Command("system", "host info").Alias("sys")
-	infoOsCmd       = infoCmd.Command("os", "host os")
-	infoIpCmd       = infoCmd.Command("ipaddr", "host ip address").Alias("ip")
-	infoPortsCmd    = infoCmd.Command("ports", "host used ports").Alias("p")
-	infoDUCmd       = infoCmd.Command("du", "container disk usage")
-	infoDUContainer = infoDUCmd.Arg("container", "container name").Required().String()
-	//todo remove "subutai quota" usage on Console side
+	infoCmd            = app.Command("info", "System information")
+	infoIdCmd          = infoCmd.Command("id", "host id")
+	infoSystemCmd      = infoCmd.Command("system", "host info").Alias("sys")
+	infoOsCmd          = infoCmd.Command("os", "host os")
+	infoIpCmd          = infoCmd.Command("ipaddr", "host ip address").Alias("ip")
+	infoPortsCmd       = infoCmd.Command("ports", "host used ports").Alias("p")
+	infoDUCmd          = infoCmd.Command("du", "container disk usage")
+	infoDUContainer    = infoDUCmd.Arg("container", "container name").Required().String()
 	infoQuotaCmd       = infoCmd.Command("qu", "container quota usage")
 	infoQuotaContainer = infoQuotaCmd.Arg("container", "container name").Required().String()
 
 	//hostname command
-	//todo refactor Console side
+	//todo think of more explicit design
+	//e.g. subutai hostname rh, subutai hostname foo
 	hostnameCmd         = app.Command("hostname", "Set host/container hostname")
 	hostnameNewHostname = hostnameCmd.Arg("hostname", "new hostname").Required().String()
 	hostnameContainer   = hostnameCmd.Arg("container", "container name").String()
 
 	//map command
+	//todo think of more explicit design
+	//e.g. subutai map list, subutai map add .., subutai map del ..
 	mapCmd            = app.Command("map", "Map ports")
 	mapProtocol       = mapCmd.Arg("protocol", "http, https, tcp or udp").String()
 	mapInternalSocket = mapCmd.Flag("internal", "internal socket").Short('i').String()
@@ -160,15 +161,100 @@ var (
 	mapCert           = mapCmd.Flag("cert", "https certificate").Short('c').String()
 	mapPolicy         = mapCmd.Flag("policy", "balancing policy").Short('p').String()
 	mapRemove         = mapCmd.Flag("remove", "remove mapping").Short('r').Bool()
-	mapSslBackend     = mapCmd.Flag("sslbackend", "ssl backend in https upstream").Bool()
+	mapSslBackend     = mapCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
 	mapList           = mapCmd.Flag("list", "list mapped ports").Short('l').Bool()
+
+	//metrics command
+	metricsCmd   = app.Command("metrics", "Print host/container metrics")
+	metricsHost  = metricsCmd.Arg("name", "host/container name").Required().String()
+	metricsStart = metricsCmd.Flag("start", "metrics start time 'yyyy-mm-dd hh:mi:ss'").Short('s').Required().String()
+	metricsEnd   = metricsCmd.Flag("end", "metrics end time 'yyyy-mm-dd hh:mi:ss'").Short('e').Required().String()
+
+	//proxy command
+	//todo think of more explicit design
+	//e.g. subutai proxy host add, subutai proxy domain check
+	proxyCmd = app.Command("proxy", "Subutai reverse proxy")
+
+	//proxy add command
+	proxyAddCmd    = proxyCmd.Command("add", "Add reverse proxy component")
+	proxyAddVlan   = proxyAddCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyAddDomain = proxyAddCmd.Flag("domain", "environment domain").Short('d').String()
+	proxyAddHost   = proxyAddCmd.Flag("host", "container IP").Short('h').String()
+	proxyAddCert   = proxyAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
+	proxyAddPolicy = proxyAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('p').String()
+
+	//proxy del command
+	proxyDelCmd    = proxyCmd.Command("del", "Remove reverse proxy component").Alias("rm")
+	proxyDelVlan   = proxyDelCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyDelDomain = proxyDelCmd.Flag("domain", "remove environment domain").Short('d').Bool()
+	proxyDelHost   = proxyDelCmd.Flag("host", "container IP").Short('h').String()
+
+	//proxy check command
+	proxyCheckCmd    = proxyCmd.Command("check", "Check existing domain/host")
+	proxyCheckVlan   = proxyCheckCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyCheckDomain = proxyCheckCmd.Flag("domain", "check environment domain").Short('d').Bool()
+	proxyCheckHost   = proxyCheckCmd.Flag("host", "container IP").Short('h').String()
+
+	//todo improve, remove threshold param since alerts are not used
+	//todo think of more explicit design
+	//use subutai quota set ram foo 123
+	//subutai quota get network foo
+	//quota command
+	quotaCmd       = app.Command("quota", "Manage container quotas")
+	quotaContainer = quotaCmd.Arg("container", "container name").Required().String()
+	quotaResource  = quotaCmd.Arg("resource", "resource type (cpu, cpuset, ram, disk, network)").Required().String()
+	quotaLimit     = quotaCmd.Flag("set", "limit (% for cpu, # for cpuset, b for network, mb for ram, gb for disk )").Short('s').String()
+	quotaThreshold = quotaCmd.Flag("threshold", "for internal usage").Hidden().Short('t').String()
+
+	//start command
+	startCmd          = app.Command("start", "Start Subutai container")
+	startCmdContainer = startCmd.Arg("name", "container name").Required().String()
+
+	//stop command
+	stopCmd          = app.Command("stop", "Stop Subutai container")
+	stopCmdContainer = stopCmd.Arg("name", "container name").Required().String()
+
+	//restart command
+	restartCmd          = app.Command("restart", "Restart Subutai container")
+	restartCmdContainer = restartCmd.Arg("name", "container name").Required().String()
+
+	//update command
+	updateCmd          = app.Command("update", "Update peer components")
+	updateCmdComponent = updateCmd.Arg("component", "component to update (rh, management)").Required().String()
+	updateCheck        = updateCmd.Flag("check", "check for updates without installation").Short('c').Bool()
+
+	//tunnel command
+	tunnelCmd = app.Command("tunnel", "Manage ssh tunnels")
+	//tunnel add command
+	tunnelAddCmd     = tunnelCmd.Command("add", "Create ssh tunnel")
+	tunneAddSocket   = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
+	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
+	//tunnel del command
+	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
+	tunnelDelSocket = tunnelDelCmd.Arg("del socket", "socket in form ip[:port]").Required().String()
+	//tunnel list command
+	tunnelListCmd = tunnelCmd.Command("list", "List ssh tunnels").Alias("ls")
+	//tunnel check command
+	tunnelCheckCmd = tunnelCmd.Command("check", "for internal usage").Hidden()
+
+	//todo think of more explicit design
+	//e.g. subutai vxlan add, subutai vxlan del
+	//vxlan command
+	//todo change Console side to use either long flags with double dash or new short flags
+	vxlanCmd            = app.Command("vxlan", "Manage vxlan tunnels")
+	vxlanCreate         = vxlanCmd.Flag("create", "tunnel name").Short('c').String()
+	vxlanCreateRemoteIp = vxlanCmd.Flag("remoteip", "remote ip").Short('r').String()
+	vxlanCreateVni      = vxlanCmd.Flag("vni", "environment vni").Short('n').String()
+	vxlanCreateVlan     = vxlanCmd.Flag("vlan", "environment vlan").Short('l').String()
+
+	vxlanDelete = vxlanCmd.Flag("delete", "tunnel name").Short('d').String()
+
+	vxlanList = vxlanCmd.Flag("list", "list tunnels").Bool()
 )
 
 func init() {
 	app.Version(version)
-	app.HelpFlag.Short('h')
 	app.VersionFlag.Hidden().Short('v')
-
 }
 
 func main() {
@@ -186,6 +272,8 @@ func main() {
 	switch input {
 
 	case listCmd.FullCommand():
+		//todo LxcList should return result that is printed here , not inside LxcList
+		//todo separeate into diff methods
 		cli.LxcList(*listName, *listContainers, *listTemplates, *listContainerDetails, *listParents)
 	case daemonCmd.FullCommand():
 		config.InitAgentDebug()
@@ -236,174 +324,45 @@ func main() {
 		} else if *mapProtocol != "" {
 			if (*mapRemove && *mapExternalSocket != "") ||
 				(!*mapRemove && *mapInternalSocket != "") {
-
+				//todo separeate into diff methods
 				cli.MapPort(*mapProtocol, *mapInternalSocket, *mapExternalSocket, *mapPolicy, *mapDomain, *mapCert, *mapRemove, *mapSslBackend)
 				break
 			}
 		}
 		app.Usage([]string{"map"})
-	}
+	case metricsCmd.FullCommand():
+		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
+	case proxyAddCmd.FullCommand():
+		cli.ProxyAdd(*proxyAddVlan, *proxyAddDomain, *proxyAddHost, *proxyAddPolicy, *proxyAddCert)
+	case proxyDelCmd.FullCommand():
+		cli.ProxyDel(*proxyDelVlan, *proxyDelHost, *proxyDelDomain)
+	case proxyCheckCmd.FullCommand():
+		cli.ProxyCheck(*proxyCheckVlan, *proxyCheckHost, *proxyCheckDomain)
+	case quotaCmd.FullCommand():
+		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, *quotaThreshold)
+	case startCmd.FullCommand():
+		cli.LxcStart(*startCmdContainer)
+	case stopCmd.FullCommand():
+		cli.LxcStop(*stopCmdContainer)
+	case restartCmd.FullCommand():
+		cli.LxcRestart(*restartCmdContainer)
+	case updateCmd.FullCommand():
+		cli.Update(*updateCmdComponent, *updateCheck)
+	case tunnelAddCmd.FullCommand():
+		cli.TunAdd(*tunneAddSocket, *tunnelAddTimeout)
+	case tunnelDelCmd.FullCommand():
+		cli.TunDel(*tunnelDelSocket)
+	case tunnelCheckCmd.FullCommand():
+		cli.TunCheck()
+	case tunnelListCmd.FullCommand():
+		for _, tun := range cli.GetTunnels() {
+			fmt.Printf("%s\t%s\t%s\n", tun.Remote, tun.Local, tun.Ttl)
+		}
 
-	//
-	//	Name: "metrics", Usage: "list Subutai container",
-	//	Flags: []gcli.Flag{
-	//		gcli.StringFlag{Name: "start, s", Usage: "start time"},
-	//		gcli.StringFlag{Name: "end, e", Usage: "end time"}},
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.HostMetrics(c.Args().Get(0), c.String("s"), c.String("e"))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "proxy", Usage: "Subutai reverse proxy",
-	//	Subcommands: []gcli.Command{
-	//		{
-	//			Name:     "add",
-	//			Usage:    "add reverse proxy component",
-	//			HideHelp: true,
-	//			Flags: []gcli.Flag{
-	//				gcli.StringFlag{Name: "domain, d", Usage: "add domain to vlan"},
-	//				gcli.StringFlag{Name: "host, h", Usage: "add host to domain on vlan"},
-	//				gcli.StringFlag{Name: "policy, p", Usage: "set load balance policy (rr|lb|hash)"},
-	//				gcli.StringFlag{Name: "file, f", Usage: "specify pem certificate file"}},
-	//			Action: func(c *gcli.Context) error {
-	//				cli.ProxyAdd(c.Args().Get(0), c.String("d"), c.String("h"), c.String("p"), c.String("f"))
-	//				return nil
-	//			},
-	//		},
-	//		{
-	//			Name:     "del",
-	//			Usage:    "del reverse proxy component",
-	//			HideHelp: true,
-	//			Flags: []gcli.Flag{
-	//				gcli.BoolFlag{Name: "domain, d", Usage: "delete domain from vlan"},
-	//				gcli.StringFlag{Name: "host, h", Usage: "delete host from domain on vlan"}},
-	//			Action: func(c *gcli.Context) error {
-	//				cli.ProxyDel(c.Args().Get(0), c.String("h"), c.Bool("d"))
-	//				return nil
-	//			},
-	//		},
-	//		{
-	//			Name:     "check",
-	//			Usage:    "check existing domain or host",
-	//			HideHelp: true,
-	//			Flags: []gcli.Flag{
-	//				gcli.BoolFlag{Name: "domain, d", Usage: "check domains on vlan"},
-	//				gcli.StringFlag{Name: "host, h", Usage: "check hosts on vlan"}},
-	//			Action: func(c *gcli.Context) error {
-	//				cli.ProxyCheck(c.Args().Get(0), c.String("h"), c.Bool("d"))
-	//				return nil
-	//			},
-	//		},
-	//	}}, {
-	//
-	//	Name: "quota", Usage: "set quotas for Subutai container",
-	//	Flags: []gcli.Flag{
-	//		gcli.StringFlag{Name: "set, s", Usage: "set quota for the specified resource type (cpu, cpuset, ram, disk, network)"},
-	//		gcli.StringFlag{Name: "threshold, t", Usage: "set alert threshold"}},
-	//	Action: func(c *gcli.Context) error {
-	//		cli.LxcQuota(c.Args().Get(0), c.Args().Get(1), c.String("s"), c.String("t"))
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "stats", Usage: "statistics from host",
-	//	Action: func(c *gcli.Context) error {
-	//		cli.Info(c.Args().Get(0), c.Args().Get(1))
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "start", Usage: "start Subutai container",
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.LxcStart(c.Args().Get(0))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "stop", Usage: "stop Subutai container",
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.LxcStop(c.Args().Get(0))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "restart", Usage: "restart Subutai container",
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.LxcRestart(c.Args().Get(0))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "tunnel", Usage: "SSH tunnel management",
-	//	Subcommands: []gcli.Command{
-	//		{
-	//			Name:  "add",
-	//			Usage: "add ssh tunnel",
-	//			Flags: []gcli.Flag{
-	//				gcli.BoolFlag{Name: "global, g", Usage: "create tunnel to global proxy"}},
-	//			Action: func(c *gcli.Context) error {
-	//				cli.TunAdd(c.Args().Get(0), c.Args().Get(1))
-	//				return nil
-	//			}}, {
-	//			Name:  "del",
-	//			Usage: "delete tunnel",
-	//			Action: func(c *gcli.Context) error {
-	//				cli.TunDel(c.Args().Get(0))
-	//				return nil
-	//			}}, {
-	//			Name:  "list",
-	//			Usage: "list active ssh tunnels",
-	//			Action: func(c *gcli.Context) error {
-	//				cli.TunList()
-	//				return nil
-	//			}}, {
-	//			Name:  "check",
-	//			Usage: "check active ssh tunnels",
-	//			Action: func(c *gcli.Context) error {
-	//				cli.TunCheck()
-	//				return nil
-	//			}},
-	//	}}, {
-	//
-	//	Name: "update", Usage: "update Subutai management, container or Resource host",
-	//	Flags: []gcli.Flag{
-	//		gcli.BoolFlag{Name: "check, c", Usage: "check for updates without installation"}},
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.Update(c.Args().Get(0), c.Bool("c"))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//
-	//	Name: "vxlan", Usage: "VXLAN tunnels operation",
-	//	Flags: []gcli.Flag{
-	//		gcli.StringFlag{Name: "create, c", Usage: "create vxlan tunnel"},
-	//		gcli.StringFlag{Name: "delete, d", Usage: "delete vxlan tunnel"},
-	//		gcli.BoolFlag{Name: "list, l", Usage: "list vxlan tunnels"},
-	//
-	//		gcli.StringFlag{Name: "remoteip, r", Usage: "vxlan tunnel remote ip"},
-	//		gcli.StringFlag{Name: "vlan, vl", Usage: "tunnel vlan"},
-	//		gcli.StringFlag{Name: "vni, v", Usage: "vxlan tunnel vni"},
-	//	},
-	//	Action: func(c *gcli.Context) error {
-	//		cli.VxlanTunnel(c.String("c"), c.String("d"), c.String("r"), c.String("vl"), c.String("v"), c.Bool("l"))
-	//		return nil
-	//	}},
-	//}
-	//
+	case vxlanCmd.FullCommand():
+		//todo separeate into diff methods
+		cli.VxlanTunnel(*vxlanCreate, *vxlanDelete, *vxlanCreateRemoteIp, *vxlanCreateVlan, *vxlanCreateVni, *vxlanList)
+	}
 
 	//TODO implement or remove batch later
 	//	Name: "batch", Usage: "batch commands execution",
@@ -418,20 +377,4 @@ func main() {
 	//		return nil
 	//	}}, {
 
-	// TODO remove
-	//	Name: "config", Usage: "edit container config",
-	//	Flags: []gcli.Flag{
-	//		gcli.StringFlag{Name: "operation, o", Usage: "<add|del> operation"},
-	//		gcli.StringFlag{Name: "key, k", Usage: "configuration key"},
-	//		gcli.StringFlag{Name: "value, v", Usage: "configuration value"},
-	//	},
-	//	Action: func(c *gcli.Context) error {
-	//		if c.Args().Get(0) != "" {
-	//			cli.LxcConfig(c.Args().Get(0), c.String("o"), c.String("k"), c.String("v"))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
-	//app.Run(os.Args)
 }

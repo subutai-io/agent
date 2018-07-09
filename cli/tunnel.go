@@ -18,6 +18,12 @@ import (
 	"path"
 )
 
+type SshTunnel struct {
+	Remote string
+	Local  string
+	Ttl    string
+}
+
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
 // In Subutai, tunnels are used to access the SS management server's web UI from the Hub, and open direct connection to containers, etc.
 // There are two types of channels - local (default), which is created from destination address to host and global (-g flag), from destination to Subutai Helper node.
@@ -96,6 +102,17 @@ func TunList() {
 			fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
 		}
 	}
+}
+
+func GetTunnels() []SshTunnel {
+	res := []SshTunnel{}
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
+		for _, item := range list {
+			res = append(res, SshTunnel{Remote: item["remote"], Local: item["local"], Ttl: item["ttl"]})
+		}
+	}
+	return res
 }
 
 // TunDel removes tunnel entry from list and kills running tunnel process

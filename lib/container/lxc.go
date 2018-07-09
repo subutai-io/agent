@@ -95,23 +95,27 @@ func AddMetadata(name string, meta map[string]string) error {
 
 // Start starts the Subutai container.
 func Start(name string) error {
+
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+
 	if log.Check(log.DebugLevel, "Creating container object", err) {
 		return err
 	}
 	defer lxc.Release(c)
 
 	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
+
 	if c.State().String() != "RUNNING" {
 		return errors.New("Unable to start container " + name)
 	}
+
 	AddMetadata(name, map[string]string{"state": "RUNNING"})
+
 	return nil
 }
 
 // Stop stops the Subutai container.
-func Stop(name string, addMetadata bool) error {
-
+func Stop(name string) error {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 
 	if log.Check(log.DebugLevel, "Creating container object", err) {
@@ -125,9 +129,7 @@ func Stop(name string, addMetadata bool) error {
 		return errors.New("Unable to stop container " + name)
 	}
 
-	if addMetadata {
-		AddMetadata(name, map[string]string{"state": "STOPPED"})
-	}
+	AddMetadata(name, map[string]string{"state": "STOPPED"})
 
 	return nil
 }
@@ -141,14 +143,18 @@ func Restart(name string) error {
 	defer lxc.Release(c)
 
 	if c.State().String() == "RUNNING" {
-		err = c.Reboot()
-	} else {
-		err = c.Start()
+		log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
 	}
 
-	log.Check(log.DebugLevel, "Restarting LXC container "+name, err)
+	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
 
-	return err
+	if c.State().String() != "RUNNING" {
+		return errors.New("Unable to start container " + name)
+	}
+
+	AddMetadata(name, map[string]string{"state": "RUNNING"})
+
+	return nil
 }
 
 // AttachExec executes a command inside Subutai container.
@@ -353,7 +359,6 @@ func QuotaCPU(name string, size string) int {
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	cfsPeriod := 100000
 	var quota float32;
-
 	if size != "" {
 		tmp, err := strconv.Atoi(size)
 		log.Check(log.DebugLevel, "Parsing quota size", err)
