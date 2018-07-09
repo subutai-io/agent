@@ -144,11 +144,14 @@ var (
 	infoQuotaContainer = infoQuotaCmd.Arg("container", "container name").Required().String()
 
 	//hostname command
-	//todo think of more explicit design
-	//e.g. subutai hostname rh, subutai hostname foo
-	hostnameCmd         = app.Command("hostname", "Set host/container hostname")
-	hostnameNewHostname = hostnameCmd.Arg("hostname", "new hostname").Required().String()
-	hostnameContainer   = hostnameCmd.Arg("container", "container name").String()
+	//e.g. subutai hostname rh rh2, subutai hostname con foo foo2
+	hostnameCmd           = app.Command("hostname", "Set host/container hostname")
+	hostnameRh            = hostnameCmd.Command("rh", "Set RH hostname")
+	hostnameRhNewHostname = hostnameRh.Arg("hostname", "new hostname").Required().String()
+
+	hostnameContainer            = hostnameCmd.Command("con", "Set container hostname").Alias("container")
+	hostnameContainerName        = hostnameContainer.Arg("container", "container name").Required().String()
+	hostnameContainerNewHostname = hostnameContainer.Arg("hostname", "new hostname").Required().String()
 
 	//map command
 	//todo think of more explicit design
@@ -312,12 +315,10 @@ func main() {
 		fmt.Println(cli.GetDiskUsage(*infoDUContainer))
 	case infoQuotaCmd.FullCommand():
 		fmt.Println(cli.GetContainerQuotaUsage(*infoQuotaContainer))
-	case hostnameCmd.FullCommand():
-		if *hostnameContainer != "" {
-			cli.LxcHostname(*hostnameContainer, *hostnameNewHostname)
-		} else {
-			cli.Hostname(*hostnameNewHostname)
-		}
+	case hostnameRh.FullCommand():
+		cli.Hostname(*hostnameRhNewHostname)
+	case hostnameContainer.FullCommand():
+		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
 	case mapCmd.FullCommand():
 
 		if *mapList {
