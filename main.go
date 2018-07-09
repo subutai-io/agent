@@ -250,6 +250,10 @@ var (
 	vxlanDelete = vxlanCmd.Flag("delete", "tunnel name").Short('d').String()
 
 	vxlanList = vxlanCmd.Flag("list", "list tunnels").Bool()
+
+	//batch command
+	batchCmd  = app.Command("batch", "Execute a batch of commands")
+	batchJson = batchCmd.Arg("commands", "batch of commands in JSON").Required().String()
 )
 
 func init() {
@@ -362,19 +366,8 @@ func main() {
 	case vxlanCmd.FullCommand():
 		//todo separeate into diff methods
 		cli.VxlanTunnel(*vxlanCreate, *vxlanDelete, *vxlanCreateRemoteIp, *vxlanCreateVlan, *vxlanCreateVni, *vxlanList)
+	case batchCmd.FullCommand():
+		cli.Batch(*batchJson)
 	}
-
-	//TODO implement or remove batch later
-	//	Name: "batch", Usage: "batch commands execution",
-	//	Flags: []gcli.Flag{
-	//		gcli.StringFlag{Name: "json, j", Usage: "JSON string with commands"}},
-	//	Action: func(c *gcli.Context) error {
-	//		if c.String("j") != "" {
-	//			cli.Batch(c.String("j"))
-	//		} else {
-	//			gcli.ShowSubcommandHelp(c)
-	//		}
-	//		return nil
-	//	}}, {
 
 }
