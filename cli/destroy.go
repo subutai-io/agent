@@ -26,13 +26,14 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	}
 
 	if strings.HasPrefix(id, "id:") {
+		contId := strings.ToUpper(strings.TrimPrefix(id, "id:"))
 		for _, c := range container.Containers() {
-			if strings.ToUpper(strings.TrimPrefix(id, "id:")) == gpg.GetFingerprint(c) {
+			if contId == gpg.GetFingerprint(c) {
 				LxcDestroy(c, false, false)
 				return
 			}
-			log.Error("Container " + id + " not found")
 		}
+		log.Error("Container " + contId + " not found")
 	} else if vlan {
 		list, err := db.INSTANCE.ContainerByKey("vlan", id)
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
