@@ -212,16 +212,13 @@ var (
 	proxyHostCheckVlan = proxyHostCheckCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyHostCheckHost = proxyHostCheckCmd.Arg("host", "container ip[:port]").Required().String()
 
-	//todo improve, remove threshold param since alerts are not used
-	//todo think of more explicit design
-	//use subutai quota ram set foo 123
-	//subutai quota network get foo
+	//e.g. subutai quota ram foo -s 123
+	//subutai quota cpu foo
 	//quota command
 	quotaCmd       = app.Command("quota", "Manage container quotas")
-	quotaContainer = quotaCmd.Arg("container", "container name").Required().String()
 	quotaResource  = quotaCmd.Arg("resource", "resource type (cpu, cpuset, ram, disk, network)").Required().String()
+	quotaContainer = quotaCmd.Arg("container", "container name").Required().String()
 	quotaLimit     = quotaCmd.Flag("set", "limit (% for cpu, # for cpuset, b for network, mb for ram, gb for disk )").Short('s').String()
-	quotaThreshold = quotaCmd.Flag("threshold", "for internal usage").Hidden().Short('t').String()
 
 	//start command
 	startCmd          = app.Command("start", "Start Subutai container")
@@ -358,7 +355,7 @@ func main() {
 		cli.ProxyCheck(*proxyHostCheckVlan, *proxyHostCheckHost, false)
 
 	case quotaCmd.FullCommand():
-		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, *quotaThreshold)
+		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, "")
 	case startCmd.FullCommand():
 		cli.LxcStart(*startCmdContainer)
 	case stopCmd.FullCommand():

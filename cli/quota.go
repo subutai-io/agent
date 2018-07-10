@@ -17,6 +17,7 @@ import (
 //	rootfs/home/var/opt, Gb
 // The threshold value represents a percentage for each resource. Once resource consumption exceeds this threshold it triggers an alert.
 // The clone operation, sets no quotas and thresholds for new containers; quotas need to be configured with quota command after a clone operation.
+//todo improve, remove threshold param since alerts are not used
 func LxcQuota(name, res, size, threshold string) {
 	if len(threshold) > 0 {
 		setQuotaThreshold(name, res, threshold)
