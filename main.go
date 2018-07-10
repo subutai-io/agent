@@ -84,7 +84,7 @@ var (
 	daemonCmd = app.Command("daemon", "Run subutai agent daemon")
 
 	//subutai list command
-	listCmd              = app.Command("list", "List containers/templates")
+	listCmd              = app.Command("list", "List containers/templates").Alias("ls")
 	listName             = listCmd.Arg("name", "container/template name").String()
 	listContainers       = listCmd.Flag("containers", "list containers").Short('c').Bool()
 	listTemplates        = listCmd.Flag("templates", "list templates").Short('t').Bool()
@@ -251,18 +251,19 @@ var (
 	//tunnel check command
 	tunnelCheckCmd = tunnelCmd.Command("check", "for internal usage").Hidden()
 
-	//todo think of more explicit design
-	//e.g. subutai vxlan add, subutai vxlan del
 	//vxlan command
-	vxlanCmd            = app.Command("vxlan", "Manage vxlan tunnels")
-	vxlanCreate         = vxlanCmd.Flag("create", "tunnel name").Short('c').String()
-	vxlanCreateRemoteIp = vxlanCmd.Flag("remoteip", "remote ip").Short('r').String()
-	vxlanCreateVni      = vxlanCmd.Flag("vni", "environment vni").Short('n').String()
-	vxlanCreateVlan     = vxlanCmd.Flag("vlan", "environment vlan").Short('l').String()
-
-	vxlanDelete = vxlanCmd.Flag("delete", "tunnel name").Short('d').String()
-
-	vxlanList = vxlanCmd.Flag("list", "list tunnels").Bool()
+	vxlanCmd = app.Command("vxlan", "Manage vxlan tunnels")
+	//vxlan add command
+	vxlanAddCmd      = vxlanCmd.Command("add", "Add vxlan tunnel")
+	vxlanAddName     = vxlanAddCmd.Arg("name", "tunnel name").Required().String()
+	vxlanAddRemoteIp = vxlanAddCmd.Flag("remoteip", "remote ip").Required().Short('r').String()
+	vxlanAddVni      = vxlanAddCmd.Flag("vni", "environment vni").Required().Short('n').String()
+	vxlanAddVlan     = vxlanAddCmd.Flag("vlan", "environment vlan").Required().Short('l').String()
+	//vxlan del command
+	vxlanDelCmd  = vxlanCmd.Command("del", "Delete vxlan tunnel").Alias("rm")
+	vxlanDelName = vxlanDelCmd.Arg("name", "tunnel name").Required().String()
+	//vxlan list command
+	vxlanListCmd = vxlanCmd.Command("list", "List vxlan tunnels").Alias("ls")
 
 	//batch command
 	batchCmd  = app.Command("batch", "Execute a batch of commands")
@@ -375,8 +376,12 @@ func main() {
 			fmt.Printf("%s\t%s\t%s\n", tun.Remote, tun.Local, tun.Ttl)
 		}
 
-	case vxlanCmd.FullCommand():
-		cli.VxlanTunnel(*vxlanCreate, *vxlanDelete, *vxlanCreateRemoteIp, *vxlanCreateVlan, *vxlanCreateVni, *vxlanList)
+	case vxlanAddCmd.FullCommand():
+		cli.VxlanTunnel(*vxlanAddName, "", *vxlanAddRemoteIp, *vxlanAddVlan, *vxlanAddVni, false)
+	case vxlanDelCmd.FullCommand():
+		cli.VxlanTunnel("", *vxlanDelName, "", "", "", false)
+	case vxlanListCmd.FullCommand():
+		cli.VxlanTunnel("", "", "", "", "", true)
 	case batchCmd.FullCommand():
 		cli.Batch(*batchJson)
 	}
