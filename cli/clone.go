@@ -48,7 +48,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 	fullRef := strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
 
 	if !container.IsTemplate(fullRef) {
-		LxcImport("id:"+t.Id, "", false)
+		LxcImport("id:"+t.Id, "")
 	}
 
 	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child))

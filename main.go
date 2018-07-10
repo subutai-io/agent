@@ -99,9 +99,8 @@ var (
 	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
 	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
 	cloneEnvId     = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
-	//todo change Console to use -n flag instead of -i
-	cloneNetwork = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
-	cloneSecret  = cloneCmd.Flag("secret", "console secret").Short('s').String()
+	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
 
 	//cleanup command
 	cleanupCmd  = app.Command("cleanup", "Cleanup environment")
@@ -121,14 +120,11 @@ var (
 	exportName      = exportCmd.Flag("name", "template name").Short('n').String()
 	exportSize      = exportCmd.Flag("size", "template preferred size").Short('s').String()
 	exportLocal     = exportCmd.Flag("local", "export template to local cache").Short('l').Bool()
-	//todo change Console side to use -r flag instead of -v
-	exportVersion = exportCmd.Flag("ver", "template version").Short('r').String()
+	exportVersion   = exportCmd.Flag("ver", "template version").Short('r').String()
 
 	//import command
 	importCmd  = app.Command("import", "Import Subutai template")
 	importName = importCmd.Arg("template", "template name/path to template archive").Required().String()
-	//todo refactor if template is path then assume it is local import, remove -l flag
-	importLocal  = importCmd.Flag("local", "import local template").Short('l').Bool()
 	importSecret = importCmd.Flag("secret", "console secret").Short('s').String()
 
 	//info command
@@ -298,7 +294,7 @@ func main() {
 	case exportCmd.FullCommand():
 		cli.LxcExport(*exportContainer, *exportName, *exportVersion, *exportSize, *exportToken, *exportLocal)
 	case importCmd.FullCommand():
-		cli.LxcImport(*importName, *importSecret, *importLocal)
+		cli.LxcImport(*importName, *importSecret)
 	case infoIdCmd.FullCommand():
 		fmt.Println(cli.GetFingerprint())
 	case infoSystemCmd.FullCommand():

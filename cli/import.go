@@ -167,7 +167,7 @@ func md5sum(filePath string) string {
 	return hash
 }
 
-func LxcImport(name, token string, local bool, auxDepList ...string) {
+func LxcImport(name, token string, auxDepList ...string) {
 	var err error
 
 	if !fs.IsMountPoint(config.Agent.LxcPrefix) {
@@ -182,6 +182,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	var t Template
 	var templateRef string
 	var localArchive string
+
+	local := fs.FileExists(name)
 
 	if !local {
 		t = getTemplateInfo(name)
@@ -236,7 +238,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				archiveExists = false
 			}
 		} else {
-			log.Warn("Skipping file integrity verification since -local flag was passed")
+			log.Warn("Skipping file integrity verification for local import")
 		}
 
 	} else {
@@ -280,7 +282,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 		// Append the template and parent name to dependency list
 		auxDepList = append(auxDepList, parentRef, templateRef)
 		log.Info("Parent template required: " + parentRef)
-		LxcImport(parentRef, token, false, auxDepList...)
+		LxcImport(parentRef, token, auxDepList...)
 	}
 
 	//!important used by Console
