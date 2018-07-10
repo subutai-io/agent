@@ -74,6 +74,8 @@ func loadManagementIp() {
 	}
 }
 
+//TODO split cli.LxcList, cli.MapPort, cli.VxlanTunnel, cli.Proxy* up into diff methods
+
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
 	debugFlag = app.Flag("debug", "Set log level to DEBUG").Bool()
@@ -176,34 +178,44 @@ var (
 	metricsEnd   = metricsCmd.Flag("end", "metrics end time 'yyyy-mm-dd hh:mi:ss'").Short('e').Required().String()
 
 	//proxy command
-	//todo think of more explicit design
-	//e.g. subutai proxy host add, subutai proxy domain check
-	proxyCmd = app.Command("proxy", "Subutai reverse proxy")
+	proxyCmd       = app.Command("proxy", "Subutai reverse proxy")
+	proxyDomainCmd = proxyCmd.Command("domain", "Manage vlan-domain mappings").Alias("dom")
+	proxyHostCmd   = proxyCmd.Command("host", "Manage domain hosts")
 
-	//proxy add command
-	proxyAddCmd    = proxyCmd.Command("add", "Add reverse proxy component")
-	proxyAddVlan   = proxyAddCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyAddDomain = proxyAddCmd.Flag("domain", "environment domain").Short('d').String()
-	proxyAddHost   = proxyAddCmd.Flag("host", "container IP").Short('h').String()
-	proxyAddCert   = proxyAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
-	proxyAddPolicy = proxyAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('p').String()
+	//proxy dom add command
+	proxyDomainAddCmd    = proxyDomainCmd.Command("add", "Add vlan-domain mapping")
+	proxyDomainAddVlan   = proxyDomainAddCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyDomainAddDomain = proxyDomainAddCmd.Arg("domain", "environment domain").Required().String()
+	proxyDomainAddCert   = proxyDomainAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
+	proxyDomainAddPolicy = proxyDomainAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('p').String()
 
-	//proxy del command
-	proxyDelCmd    = proxyCmd.Command("del", "Remove reverse proxy component").Alias("rm")
-	proxyDelVlan   = proxyDelCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyDelDomain = proxyDelCmd.Flag("domain", "remove environment domain").Short('d').Bool()
-	proxyDelHost   = proxyDelCmd.Flag("host", "container IP").Short('h').String()
+	//proxy dom del {vlan} command
+	proxyDomainDelCmd  = proxyDomainCmd.Command("del", "Remove vlan-domain mapping").Alias("rm")
+	proxyDomainDelVlan = proxyDomainDelCmd.Arg("vlan", "environment vlan").Required().String()
 
-	//proxy check command
-	proxyCheckCmd    = proxyCmd.Command("check", "Check existing domain/host")
-	proxyCheckVlan   = proxyCheckCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyCheckDomain = proxyCheckCmd.Flag("domain", "check environment domain").Short('d').Bool()
-	proxyCheckHost   = proxyCheckCmd.Flag("host", "container IP").Short('h').String()
+	//proxy dom check {vlan} command
+	proxyDomainCheckCmd  = proxyDomainCmd.Command("check", "Check vlan-domain mapping")
+	proxyDomainCheckVlan = proxyDomainCheckCmd.Arg("vlan", "environment vlan").Required().String()
+
+	//proxy host add {vlan} {ip} command
+	proxyHostAddCmd  = proxyHostCmd.Command("add", "Add host to domain")
+	proxyHostAddVlan = proxyHostAddCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyHostAddHost = proxyHostAddCmd.Arg("host", "container ip[:port]").Required().String()
+
+	//proxy host del {vlan} {ip} command
+	proxyHostDelCmd  = proxyHostCmd.Command("del", "Remove host from domain").Alias("rm")
+	proxyHostDelVlan = proxyHostDelCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyHostDelHost = proxyHostDelCmd.Arg("host", "container ip[:port]").Required().String()
+
+	//proxy host check {vlan} {ip} command
+	proxyHostCheckCmd  = proxyHostCmd.Command("check", "Check host in domain")
+	proxyHostCheckVlan = proxyHostCheckCmd.Arg("vlan", "environment vlan").Required().String()
+	proxyHostCheckHost = proxyHostCheckCmd.Arg("host", "container ip[:port]").Required().String()
 
 	//todo improve, remove threshold param since alerts are not used
 	//todo think of more explicit design
-	//use subutai quota set ram foo 123
-	//subutai quota get network foo
+	//use subutai quota ram set foo 123
+	//subutai quota network get foo
 	//quota command
 	quotaCmd       = app.Command("quota", "Manage container quotas")
 	quotaContainer = quotaCmd.Arg("container", "container name").Required().String()
@@ -281,7 +293,6 @@ func main() {
 
 	case listCmd.FullCommand():
 		//todo LxcList should return result that is printed here , not inside LxcList
-		//todo separeate into diff methods
 		cli.LxcList(*listName, *listContainers, *listTemplates, *listContainerDetails, *listParents)
 	case daemonCmd.FullCommand():
 		config.InitAgentDebug()
@@ -321,11 +332,9 @@ func main() {
 	case hostnameContainer.FullCommand():
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
 	case mapAddCmd.FullCommand():
-		//todo separate into diff methods
 		cli.MapPort(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
 			*mapAddPolicy, *mapAddDomain, *mapAddCert, false, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
-		//todo separate into diff methods
 		cli.MapPort(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
 			"", *mapRemoveDomain, "", true, false)
 	case mapList.FullCommand():
@@ -334,12 +343,20 @@ func main() {
 		}
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
-	case proxyAddCmd.FullCommand():
-		cli.ProxyAdd(*proxyAddVlan, *proxyAddDomain, *proxyAddHost, *proxyAddPolicy, *proxyAddCert)
-	case proxyDelCmd.FullCommand():
-		cli.ProxyDel(*proxyDelVlan, *proxyDelHost, *proxyDelDomain)
-	case proxyCheckCmd.FullCommand():
-		cli.ProxyCheck(*proxyCheckVlan, *proxyCheckHost, *proxyCheckDomain)
+
+	case proxyDomainAddCmd.FullCommand():
+		cli.ProxyAdd(*proxyDomainAddVlan, *proxyDomainAddDomain, "", *proxyDomainAddPolicy, *proxyDomainAddCert)
+	case proxyDomainDelCmd.FullCommand():
+		cli.ProxyDel(*proxyDomainDelVlan, "", true)
+	case proxyDomainCheckCmd.FullCommand():
+		cli.ProxyCheck(*proxyDomainCheckVlan, "", true)
+	case proxyHostAddCmd.FullCommand():
+		cli.ProxyAdd(*proxyHostAddVlan, "", *proxyHostAddHost, "", "")
+	case proxyHostDelCmd.FullCommand():
+		cli.ProxyDel(*proxyHostDelVlan, *proxyHostDelHost, false)
+	case proxyHostCheckCmd.FullCommand():
+		cli.ProxyCheck(*proxyHostCheckVlan, *proxyHostCheckHost, false)
+
 	case quotaCmd.FullCommand():
 		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, *quotaThreshold)
 	case startCmd.FullCommand():
@@ -362,7 +379,6 @@ func main() {
 		}
 
 	case vxlanCmd.FullCommand():
-		//todo separeate into diff methods
 		cli.VxlanTunnel(*vxlanCreate, *vxlanDelete, *vxlanCreateRemoteIp, *vxlanCreateVlan, *vxlanCreateVni, *vxlanList)
 	case batchCmd.FullCommand():
 		cli.Batch(*batchJson)
