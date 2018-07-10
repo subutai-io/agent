@@ -123,8 +123,8 @@ var (
 	exportVersion   = exportCmd.Flag("ver", "template version").Short('r').String()
 
 	//import command
-	importCmd  = app.Command("import", "Import Subutai template")
-	importName = importCmd.Arg("template", "template name/path to template archive").Required().String()
+	importCmd    = app.Command("import", "Import Subutai template")
+	importName   = importCmd.Arg("template", "template name/path to template archive").Required().String()
 	importSecret = importCmd.Flag("secret", "console secret").Short('s').String()
 
 	//info command
@@ -140,7 +140,6 @@ var (
 	infoQuotaContainer = infoQuotaCmd.Arg("container", "container name").Required().String()
 
 	//hostname command
-	//e.g. subutai hostname rh rh2, subutai hostname con foo foo2
 	hostnameCmd           = app.Command("hostname", "Set host/container hostname")
 	hostnameRh            = hostnameCmd.Command("rh", "Set RH hostname")
 	hostnameRhNewHostname = hostnameRh.Arg("hostname", "new hostname").Required().String()
@@ -150,18 +149,25 @@ var (
 	hostnameContainerNewHostname = hostnameContainer.Arg("hostname", "new hostname").Required().String()
 
 	//map command
-	//todo think of more explicit design
 	//e.g. subutai map list, subutai map add .., subutai map del ..
-	mapCmd            = app.Command("map", "Map ports")
-	mapProtocol       = mapCmd.Arg("protocol", "http, https, tcp or udp").String()
-	mapInternalSocket = mapCmd.Flag("internal", "internal socket").Short('i').String()
-	mapExternalSocket = mapCmd.Flag("external", "external socket").Short('e').String()
-	mapDomain         = mapCmd.Flag("domain", "domain name").Short('d').String()
-	mapCert           = mapCmd.Flag("cert", "https certificate").Short('c').String()
-	mapPolicy         = mapCmd.Flag("policy", "balancing policy").Short('p').String()
-	mapRemove         = mapCmd.Flag("remove", "remove mapping").Short('r').Bool()
-	mapSslBackend     = mapCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
-	mapList           = mapCmd.Flag("list", "list mapped ports").Short('l').Bool()
+	mapCmd               = app.Command("map", "Map ports")
+	mapAddCmd            = mapCmd.Command("add", "Add port mapping")
+	mapAddProtocol       = mapAddCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
+	mapAddInternalSocket = mapAddCmd.Flag("internal", "internal socket").Short('i').Required().String()
+	mapAddExternalSocket = mapAddCmd.Flag("external", "external socket").Short('e').String()
+	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('d').String()
+	mapAddCert           = mapAddCmd.Flag("cert", "https certificate").Short('c').String()
+	mapAddPolicy         = mapAddCmd.Flag("policy", "balancing policy").Short('p').String()
+	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
+
+	mapRemoveCmd            = mapCmd.Command("rm", "Remove port mapping").Alias("del")
+	mapRemoveProtocol       = mapRemoveCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
+	mapRemoveExternalSocket = mapRemoveCmd.Flag("external", "external socket").Short('e').Required().String()
+	mapRemoveInternalSocket = mapRemoveCmd.Flag("internal", "internal socket").Short('i').String()
+	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('d').String()
+
+	mapList         = mapCmd.Command("list", "list mapped ports").Alias("ls")
+	mapListProtocol = mapList.Arg("protocol", "http, https, tcp or udp").String()
 
 	//metrics command
 	metricsCmd   = app.Command("metrics", "Print host/container metrics")
@@ -239,7 +245,6 @@ var (
 	//todo think of more explicit design
 	//e.g. subutai vxlan add, subutai vxlan del
 	//vxlan command
-	//todo change Console side to use either long flags with double dash or new short flags
 	vxlanCmd            = app.Command("vxlan", "Manage vxlan tunnels")
 	vxlanCreate         = vxlanCmd.Flag("create", "tunnel name").Short('c').String()
 	vxlanCreateRemoteIp = vxlanCmd.Flag("remoteip", "remote ip").Short('r').String()
@@ -315,22 +320,18 @@ func main() {
 		cli.Hostname(*hostnameRhNewHostname)
 	case hostnameContainer.FullCommand():
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
-	case mapCmd.FullCommand():
-
-		if *mapList {
-			for _, v := range cli.GetMapList(*mapProtocol) {
-				fmt.Println(v)
-			}
-			break
-		} else if *mapProtocol != "" {
-			if (*mapRemove && *mapExternalSocket != "") ||
-				(!*mapRemove && *mapInternalSocket != "") {
-				//todo separeate into diff methods
-				cli.MapPort(*mapProtocol, *mapInternalSocket, *mapExternalSocket, *mapPolicy, *mapDomain, *mapCert, *mapRemove, *mapSslBackend)
-				break
-			}
+	case mapAddCmd.FullCommand():
+		//todo separate into diff methods
+		cli.MapPort(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
+			*mapAddPolicy, *mapAddDomain, *mapAddCert, false, *mapAddSslBackend)
+	case mapRemoveCmd.FullCommand():
+		//todo separate into diff methods
+		cli.MapPort(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
+			"", *mapRemoveDomain, "", true, false)
+	case mapList.FullCommand():
+		for _, v := range cli.GetMapList(*mapListProtocol) {
+			fmt.Println(v)
 		}
-		app.Usage([]string{"map"})
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 	case proxyAddCmd.FullCommand():
