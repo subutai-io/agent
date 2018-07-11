@@ -357,12 +357,10 @@ func main() {
 		cli.DelProxyDomain(*proxyDomainDelVlan)
 	case proxyDomainCheckCmd.FullCommand():
 		domain := cli.GetProxyDomain(*proxyDomainCheckVlan)
-		//todo refactor Console side to accept 0 code in both cases
 		if domain != "" {
 			fmt.Println(domain)
-			os.Exit(0)
 		} else {
-			os.Exit(1)
+			fmt.Println("No domain")
 		}
 	case proxyHostAddCmd.FullCommand():
 		cli.AddProxyHost(*proxyHostAddVlan, *proxyHostAddHost)
@@ -370,13 +368,10 @@ func main() {
 		cli.DelProxyHost(*proxyHostDelVlan, *proxyHostDelHost)
 	case proxyHostCheckCmd.FullCommand():
 		res := cli.IsHostInDomain(*proxyHostCheckVlan, *proxyHostCheckHost)
-		//todo refactor Console side to accept 0 code in both cases
 		if res {
-			log.Info("Node is in domain")
-			os.Exit(0)
+			log.Info("Host is in domain")
 		} else {
-			log.Info("Node is not in domain")
-			os.Exit(1)
+			log.Info("Host is not in domain")
 		}
 	case quotaCmd.FullCommand():
 		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, "")
