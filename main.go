@@ -74,22 +74,23 @@ func loadManagementIp() {
 	}
 }
 
-//TODO split cli.LxcList, cli.MapPort, cli.VxlanTunnel, cli.Proxy* up into diff methods
+//TODO split cli.VxlanTunnel, cli.Proxy* up into diff methods
 
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
-	debugFlag = app.Flag("debug", "Set log level to DEBUG").Bool()
+	debugFlag = app.Flag("debug", "Set log level to DEBUG").Short('d').Bool()
 
 	//daemon command
 	daemonCmd = app.Command("daemon", "Run subutai agent daemon")
 
 	//subutai list command
-	listCmd              = app.Command("list", "List containers/templates").Alias("ls")
-	listName             = listCmd.Arg("name", "container/template name").String()
-	listContainers       = listCmd.Flag("containers", "list containers").Short('c').Bool()
-	listTemplates        = listCmd.Flag("templates", "list templates").Short('t').Bool()
-	listContainerDetails = listCmd.Flag("info", "list containers info").Short('i').Bool()
-	listParents          = listCmd.Flag("parents", "list parents").Short('p').Bool()
+	listCmd               = app.Command("list", "List containers/templates").Alias("ls")
+	listContainers        = listCmd.Command("containers", "List containers").Alias("c")
+	listTemplates         = listCmd.Command("templates", "List templates").Alias("t")
+	listAll               = listCmd.Command("all", "List all").Alias("a")
+	listContainersDetails = listCmd.Command("info", "List containers info").Alias("i")
+	listName              = listCmd.Flag("name", "container/template name").Short('n').String()
+	listParents           = listCmd.Flag("parents", "list parents").Short('p').Bool()
 
 	//attach command
 	attachCmd     = app.Command("attach", "Attach to Subutai container")
@@ -157,7 +158,7 @@ var (
 	mapAddProtocol       = mapAddCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
 	mapAddInternalSocket = mapAddCmd.Flag("internal", "internal socket").Short('i').Required().String()
 	mapAddExternalSocket = mapAddCmd.Flag("external", "external socket").Short('e').String()
-	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('d').String()
+	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('n').String()
 	mapAddCert           = mapAddCmd.Flag("cert", "https certificate").Short('c').String()
 	mapAddPolicy         = mapAddCmd.Flag("policy", "balancing policy").Short('p').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
@@ -166,7 +167,7 @@ var (
 	mapRemoveProtocol       = mapRemoveCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
 	mapRemoveExternalSocket = mapRemoveCmd.Flag("external", "external socket").Short('e').Required().String()
 	mapRemoveInternalSocket = mapRemoveCmd.Flag("internal", "internal socket").Short('i').String()
-	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('d').String()
+	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('n').String()
 
 	mapList         = mapCmd.Command("list", "list mapped ports").Alias("ls")
 	mapListProtocol = mapList.Arg("protocol", "http, https, tcp or udp").String()
@@ -245,7 +246,7 @@ var (
 	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
 	//tunnel del command
 	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
-	tunnelDelSocket = tunnelDelCmd.Arg("del socket", "socket in form ip[:port]").Required().String()
+	tunnelDelSocket = tunnelDelCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	//tunnel list command
 	tunnelListCmd = tunnelCmd.Command("list", "List ssh tunnels").Alias("ls")
 	//tunnel check command
@@ -272,6 +273,7 @@ var (
 
 func init() {
 	app.Version(version)
+	app.HelpFlag.Short('h')
 	app.VersionFlag.Hidden().Short('v')
 }
 
@@ -289,9 +291,14 @@ func main() {
 
 	switch input {
 
-	case listCmd.FullCommand():
-		//todo LxcList should return result that is printed here , not inside LxcList
-		cli.LxcList(*listName, *listContainers, *listTemplates, *listContainerDetails, *listParents)
+	case listContainers.FullCommand():
+		cli.LxcList(*listName, true, false, false, *listParents)
+	case listTemplates.FullCommand():
+		cli.LxcList(*listName, false, true, false, *listParents)
+	case listContainersDetails.FullCommand():
+		cli.LxcList(*listName, false, false, true, *listParents)
+	case listAll.FullCommand():
+		cli.LxcList(*listName, true, true, false, *listParents)
 	case daemonCmd.FullCommand():
 		config.InitAgentDebug()
 		agent.Start()
@@ -329,12 +336,14 @@ func main() {
 		cli.Hostname(*hostnameRhNewHostname)
 	case hostnameContainer.FullCommand():
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
+
 	case mapAddCmd.FullCommand():
-		cli.MapPort(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
-			*mapAddPolicy, *mapAddDomain, *mapAddCert, false, *mapAddSslBackend)
+		cli.AddMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
+			*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
-		cli.MapPort(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
-			"", *mapRemoveDomain, "", true, false)
+		cli.RemoveMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
+			*mapRemoveDomain)
+
 	case mapList.FullCommand():
 		for _, v := range cli.GetMapList(*mapListProtocol) {
 			fmt.Println(v)
