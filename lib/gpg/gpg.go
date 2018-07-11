@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	exec2 "github.com/subutai-io/agent/lib/exec"
 
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
@@ -21,6 +22,41 @@ import (
 var (
 	GPG = "gpg1"
 )
+
+func DetermineGPGVersion() {
+	out, err := exec2.Execute("gpg1", "--version")
+	if err != nil {
+		out, err = exec2.Execute("gpg", "--version")
+
+		if err != nil {
+			log.Fatal("GPG not found " + out)
+		} else {
+			lines := strings.Split(out, "\n")
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+				version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+				if strings.HasPrefix(version, "1.4") {
+					GPG = "gpg"
+				} else {
+					log.Fatal("GPG version " + version + " is not compatible with subutai")
+				}
+			} else {
+				log.Fatal("Failed to determine GPG version " + out)
+			}
+		}
+	} else {
+		lines := strings.Split(out, "\n")
+		if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+			version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+			if strings.HasPrefix(version, "1.4") {
+				GPG = "gpg1"
+			} else {
+				log.Fatal("GPG version " + version + " is not compatible with subutai")
+			}
+		} else {
+			log.Fatal("Failed to determine GPG version " + out)
+		}
+	}
+}
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
 func ImportPk(k []byte) string {

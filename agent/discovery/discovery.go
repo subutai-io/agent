@@ -168,6 +168,15 @@ func save(ip string) {
 	config.Management.Host = ip
 }
 
+func LoadManagementIp() {
+	if len(strings.TrimSpace(config.Management.Host)) == 0 {
+		ip, err := db.INSTANCE.DiscoveryLoad()
+		if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
+			config.Management.Host = ip
+		}
+	}
+}
+
 func getKey() []byte {
 	client := utils.GetClient(config.Management.Allowinsecure, 5)
 	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)

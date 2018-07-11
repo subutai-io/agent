@@ -11,15 +11,15 @@ _subutai()
             return 0
             ;;
         clone | export)
-            COMPREPLY=( $(compgen -W "$(subutai list -t | tail -n +3)" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "$(subutai list t | tail -n +3)" -- ${cur}) )
             return 0
             ;;
         start | stop | attach)
-            COMPREPLY=( $(compgen -W "$(subutai list -c | tail -n +3)" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "$(subutai list c | tail -n +3)" -- ${cur}) )
             return 0
             ;;
         destroy)
-            COMPREPLY=( $(compgen -W "$(subutai list | tail -n +3)" -- ${cur}) )
+            COMPREPLY=( $(compgen -W "$(subutai list a | tail -n +3)" -- ${cur}) )
             return 0
             ;;
         *)

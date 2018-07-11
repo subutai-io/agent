@@ -10,14 +10,11 @@ import (
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
-
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/lib/exec"
-	"strings"
-	"github.com/subutai-io/agent/db"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/agent/discovery"
 )
 
 var version = "unknown"
@@ -27,53 +24,7 @@ func init() {
 		log.Error("Please run as root")
 	}
 
-	checkGPG()
-}
-
-//todo move to GPG package
-func checkGPG() {
-	out, err := exec.Execute("gpg1", "--version")
-	if err != nil {
-		out, err = exec.Execute("gpg", "--version")
-
-		if err != nil {
-			log.Fatal("GPG not found " + out)
-		} else {
-			lines := strings.Split(out, "\n")
-			if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
-				version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
-				if strings.HasPrefix(version, "1.4") {
-					gpg.GPG = "gpg"
-				} else {
-					log.Fatal("GPG version " + version + " is not compatible with subutai")
-				}
-			} else {
-				log.Fatal("Failed to determine GPG version " + out)
-			}
-		}
-	} else {
-		lines := strings.Split(out, "\n")
-		if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
-			version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
-			if strings.HasPrefix(version, "1.4") {
-				gpg.GPG = "gpg1"
-			} else {
-				log.Fatal("GPG version " + version + " is not compatible with subutai")
-			}
-		} else {
-			log.Fatal("Failed to determine GPG version " + out)
-		}
-	}
-}
-
-//todo move to discovery package
-func loadManagementIp() {
-	if len(strings.TrimSpace(config.Management.Host)) == 0 {
-		ip, err := db.INSTANCE.DiscoveryLoad()
-		if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
-			config.Management.Host = ip
-		}
-	}
+	gpg.DetermineGPGVersion()
 }
 
 var (
@@ -286,7 +237,7 @@ func main() {
 	}
 
 	if input != daemonCmd.FullCommand() {
-		loadManagementIp()
+		discovery.LoadManagementIp()
 	}
 
 	switch input {
