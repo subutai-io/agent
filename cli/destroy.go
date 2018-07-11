@@ -19,6 +19,8 @@ import (
 // The destroy command always runs each step in "force" mode to provide reliable deletion results;
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
+
+//todo refactor split into smaller methods
 func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	var msg string
 	if len(id) == 0 {
@@ -58,7 +60,7 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 
 			if ip, ok := c["ip"]; ok {
 				if vlan, ok := c["vlan"]; ok {
-					ProxyDel(vlan, ip, false)
+					DelProxyHost(vlan, ip)
 				}
 			}
 
@@ -114,7 +116,7 @@ func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
 	p2p.RemoveByIface("p2p" + id)
 	cleanupNetStat(id)
-	ProxyDel(id, "", true)
+	DelProxyDomain(id)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
@@ -131,7 +133,7 @@ func removePortMap(name string) {
 	if portMap, err := db.INSTANCE.GetContainerMapping(name);
 		!log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 		for _, v := range portMap {
-			RemovePOrtMapping(v["protocol"], v["internal"], v["external"], v["domain"])
+			RemovePortMapping(v["protocol"], v["internal"], v["external"], v["domain"])
 		}
 	}
 }

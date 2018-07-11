@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -29,73 +28,96 @@ var (
 // The reverse proxy functionality supports three common load balancing strategies - round-robin, load based and "sticky" sessions.
 // It can also accept SSL certificates in .pem file format and install it for a domain.
 
-// ProxyAdd checks input args and perform required operations to configure reverse proxy
-func ProxyAdd(vlan, domain, node, policy, cert string) {
+func AddProxyHost(vlan, host string) {
 	if vlan == "" {
 		log.Error("Please specify VLAN")
-	} else if domain != "" {
-		if isVlanExist(vlan) {
-			log.Error("Domain already exists")
+	} else if host == "" {
+		log.Error("Please specify host (container ip[:port])")
+	}
+
+	if hostExists(vlan, host) {
+		log.Error("Host is already in domain")
+	}
+	addHost(vlan, host)
+	restart()
+}
+
+func AddProxyDomain(vlan, domain, policy, cert string) {
+	if vlan == "" {
+		log.Error("Please specify VLAN")
+	} else if domain == "" {
+		log.Error("Please specify domain")
+	}
+
+	if vlanExists(vlan) {
+		log.Error("Domain already exists")
+	}
+
+	if crt := strings.Split(cert, ":"); len(crt) > 1 && container.LxcInstanceExists(crt[0]) {
+		if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
+			crt[0] += "/rootfs"
 		}
-		if crt := strings.Split(cert, ":"); len(crt) > 1 && container.LxcInstanceExists(crt[0]) {
-			if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
-				crt[0] += "/rootfs"
-			}
-			cert = path.Join(config.Agent.LxcPrefix, crt[0], strings.Join(crt[1:], ":"))
-		}
-		addDomain(vlan, domain, cert)
-		switch policy {
-		case "rr":
-			setPolicy(vlan, "")
-		case "lb":
-			setPolicy(vlan, "least_conn;")
-		case "hash":
-			setPolicy(vlan, "ip_hash;")
-		}
-		restart()
-	} else if node != "" {
-		if isNodeExist(vlan, node) {
-			log.Error("Node is already in domain")
-		}
-		addNode(vlan, node)
+		cert = path.Join(config.Agent.LxcPrefix, crt[0], strings.Join(crt[1:], ":"))
+	}
+
+	addDomain(vlan, domain, cert)
+
+	switch policy {
+	case "rr":
+		setPolicy(vlan, "")
+	case "lb":
+		setPolicy(vlan, "least_conn;")
+	case "hash":
+		setPolicy(vlan, "ip_hash;")
+	}
+
+	restart()
+}
+
+func DelProxyDomain(vlan string) {
+	if vlan == "" {
+		log.Error("Please specify VLAN")
+	}
+
+	if vlanExists(vlan) {
+		delDomain(vlan)
 		restart()
 	}
 }
 
-// ProxyDel checks what need to be removed - domain or node and pass args to required functions
-func ProxyDel(vlan, node string, domain bool) {
-	if isVlanExist(vlan) {
-		if domain && node == "" {
-			delDomain(vlan)
-		}
-		if node != "" {
-			delNode(vlan, node)
-		}
+func DelProxyHost(vlan, host string) {
+	if vlan == "" {
+		log.Error("Please specify VLAN")
+	}
+
+	if host == "" {
+		log.Error("Please specify host (container ip[:port])")
+	}
+
+	if vlanExists(vlan) {
+		delHost(vlan, host)
 		restart()
 	}
-	// else {
-	// 	os.Exit(1)
-	// }
 }
 
-// ProxyCheck exits with 0 code if domain or node is exists in specified vlan, otherwise exitcode is 1
-func ProxyCheck(vlan, node string, domain bool) {
-	if vlan != "" && domain {
-		if d := getDomain(vlan); d != "" {
-			fmt.Println(d)
-			os.Exit(0)
-		} else {
-			os.Exit(1)
-		}
-	} else if vlan != "" && node != "" {
-		if isNodeExist(vlan, node) {
-			log.Info("Node is in domain")
-			os.Exit(0)
-		} else {
-			log.Info("Node is not in domain")
-			os.Exit(1)
-		}
+func GetProxyDomain(vlan string) string {
+	if vlan == "" {
+		log.Error("Please specify VLAN")
 	}
+
+	return getDomain(vlan)
+}
+
+func IsHostInDomain(vlan, host string) bool {
+	if vlan == "" {
+		log.Error("Please specify VLAN")
+	}
+
+	if host == "" {
+		log.Error("Please specify host (container ip[:port])")
+	}
+
+	return hostExists(vlan, host)
 }
 
 // restart reloads nginx process
@@ -148,8 +170,8 @@ func addDomain(vlan, domain, cert string) {
 	addLine(vlanConf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://"+domain+"-upstream/;", true)
 }
 
-// addNode adds configuration lines to domain configuration
-func addNode(vlan, node string) {
+// addHost adds configuration lines to domain configuration
+func addHost(vlan, node string) {
 	vlanConf := path.Join(confinc, vlan+".conf")
 
 	delLine(vlanConf, "server localhost:81;")
@@ -178,13 +200,13 @@ func delDomain(vlan string) {
 	os.Remove(vlanConf)
 }
 
-// delNode removes node configuration entries from domain config
-func delNode(vlan, node string) {
+// delHost removes node configuration entries from domain config
+func delHost(vlan, node string) {
 	vlanConf := path.Join(confinc, vlan+".conf")
 
 	delLine(vlanConf, "server "+node+"; #$node")
 	delLine(vlanConf, "server "+node+": #$node")
-	if nodeCount(vlan) == 0 {
+	if hostCount(vlan) == 0 {
 		addLine(vlanConf, "#Add new host here", "   server localhost:81;", false)
 	}
 }
@@ -207,21 +229,21 @@ func getDomain(vlan string) string {
 	return ""
 }
 
-// isVlanExist is true is domain was configured on specified vlan and false if not
-func isVlanExist(vlan string) bool {
+// vlanExists is true is domain was configured on specified vlan and false if not
+func vlanExists(vlan string) bool {
 	if _, err := os.Stat(path.Join(confinc, vlan+".conf")); err == nil {
 		return true
 	}
 	return false
 }
 
-// isNodeExist is true if specified node belongs to vlan, otherwise it is false
-func isNodeExist(vlan, node string) bool {
-	return addLine(path.Join(confinc, vlan+".conf"), "server "+node+";", "", false)
+// hostExists is true if specified node belongs to vlan, otherwise it is false
+func hostExists(vlan, host string) bool {
+	return addLine(path.Join(confinc, vlan+".conf"), "server "+host+";", "", false)
 }
 
-// nodeCount returns the number of nodes assigned to domain on specified vlan
-func nodeCount(vlan string) int {
+// hostCount returns the number of nodes assigned to domain on specified vlan
+func hostCount(vlan string) int {
 	vlanConf := path.Join(confinc, vlan+".conf")
 	f, err := ioutil.ReadFile(vlanConf)
 	if !log.Check(log.DebugLevel, "Cannot read file "+vlanConf, err) {

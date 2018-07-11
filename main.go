@@ -66,7 +66,7 @@ func checkGPG() {
 	}
 }
 
-//move to discovery package
+//todo move to discovery package
 func loadManagementIp() {
 	if len(strings.TrimSpace(config.Management.Host)) == 0 {
 		ip, err := db.INSTANCE.DiscoveryLoad()
@@ -75,8 +75,6 @@ func loadManagementIp() {
 		}
 	}
 }
-
-//TODO split cli.VxlanTunnel, cli.Proxy* up into diff methods
 
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
@@ -343,7 +341,7 @@ func main() {
 		cli.AddPortMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
 			*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
-		cli.RemovePOrtMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
+		cli.RemovePortMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
 			*mapRemoveDomain)
 
 	case mapList.FullCommand():
@@ -354,18 +352,32 @@ func main() {
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 
 	case proxyDomainAddCmd.FullCommand():
-		cli.ProxyAdd(*proxyDomainAddVlan, *proxyDomainAddDomain, "", *proxyDomainAddPolicy, *proxyDomainAddCert)
+		cli.AddProxyDomain(*proxyDomainAddVlan, *proxyDomainAddDomain, *proxyDomainAddPolicy, *proxyDomainAddCert)
 	case proxyDomainDelCmd.FullCommand():
-		cli.ProxyDel(*proxyDomainDelVlan, "", true)
+		cli.DelProxyDomain(*proxyDomainDelVlan)
 	case proxyDomainCheckCmd.FullCommand():
-		cli.ProxyCheck(*proxyDomainCheckVlan, "", true)
+		domain := cli.GetProxyDomain(*proxyDomainCheckVlan)
+		//todo refactor Console side to accept 0 code in both cases
+		if domain != "" {
+			fmt.Println(domain)
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
 	case proxyHostAddCmd.FullCommand():
-		cli.ProxyAdd(*proxyHostAddVlan, "", *proxyHostAddHost, "", "")
+		cli.AddProxyHost(*proxyHostAddVlan, *proxyHostAddHost)
 	case proxyHostDelCmd.FullCommand():
-		cli.ProxyDel(*proxyHostDelVlan, *proxyHostDelHost, false)
+		cli.DelProxyHost(*proxyHostDelVlan, *proxyHostDelHost)
 	case proxyHostCheckCmd.FullCommand():
-		cli.ProxyCheck(*proxyHostCheckVlan, *proxyHostCheckHost, false)
-
+		res := cli.IsHostInDomain(*proxyHostCheckVlan, *proxyHostCheckHost)
+		//todo refactor Console side to accept 0 code in both cases
+		if res {
+			log.Info("Node is in domain")
+			os.Exit(0)
+		} else {
+			log.Info("Node is not in domain")
+			os.Exit(1)
+		}
 	case quotaCmd.FullCommand():
 		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, "")
 	case startCmd.FullCommand():

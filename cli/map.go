@@ -28,7 +28,7 @@ func GetPortMappings(protocol string) []string {
 	return mapList(protocol)
 }
 
-func RemovePOrtMapping(protocol, sockInt, sockExt, domain string) {
+func RemovePortMapping(protocol, sockInt, sockExt, domain string) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
