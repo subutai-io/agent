@@ -24,11 +24,11 @@ var (
 	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
 
-func GetMapList(protocol string) []string {
+func GetPortMappings(protocol string) []string {
 	return mapList(protocol)
 }
 
-func RemoveMapping(protocol, sockInt, sockExt, domain string) {
+func RemovePOrtMapping(protocol, sockInt, sockExt, domain string) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
@@ -54,7 +54,7 @@ func RemoveMapping(protocol, sockInt, sockExt, domain string) {
 	restart()
 }
 
-func AddMapping(protocol, sockInt, sockExt, domain, policy, cert string, sslBackend bool) {
+func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, sslBackend bool) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {

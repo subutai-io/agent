@@ -131,7 +131,7 @@ func removePortMap(name string) {
 	if portMap, err := db.INSTANCE.GetContainerMapping(name);
 		!log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 		for _, v := range portMap {
-			RemoveMapping(v["protocol"], v["internal"], v["external"], v["domain"])
+			RemovePOrtMapping(v["protocol"], v["internal"], v["external"], v["domain"])
 		}
 	}
 }

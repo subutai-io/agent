@@ -30,6 +30,7 @@ func init() {
 	checkGPG()
 }
 
+//todo move to GPG package
 func checkGPG() {
 	out, err := exec.Execute("gpg1", "--version")
 	if err != nil {
@@ -65,6 +66,7 @@ func checkGPG() {
 	}
 }
 
+//move to discovery package
 func loadManagementIp() {
 	if len(strings.TrimSpace(config.Management.Host)) == 0 {
 		ip, err := db.INSTANCE.DiscoveryLoad()
@@ -338,14 +340,14 @@ func main() {
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
 
 	case mapAddCmd.FullCommand():
-		cli.AddMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
+		cli.AddPortMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
 			*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
-		cli.RemoveMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
+		cli.RemovePOrtMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
 			*mapRemoveDomain)
 
 	case mapList.FullCommand():
-		for _, v := range cli.GetMapList(*mapListProtocol) {
+		for _, v := range cli.GetPortMappings(*mapListProtocol) {
 			fmt.Println(v)
 		}
 	case metricsCmd.FullCommand():
@@ -375,22 +377,25 @@ func main() {
 	case updateCmd.FullCommand():
 		cli.Update(*updateCmdComponent, *updateCheck)
 	case tunnelAddCmd.FullCommand():
-		cli.TunAdd(*tunneAddSocket, *tunnelAddTimeout)
+		cli.AddSshTunnel(*tunneAddSocket, *tunnelAddTimeout)
 	case tunnelDelCmd.FullCommand():
-		cli.TunDel(*tunnelDelSocket)
+		cli.DelSshTunnel(*tunnelDelSocket)
 	case tunnelCheckCmd.FullCommand():
-		cli.TunCheck()
+		cli.CheckSshTunnels()
 	case tunnelListCmd.FullCommand():
-		for _, tun := range cli.GetTunnels() {
+		for _, tun := range cli.GetSshTunnels() {
 			fmt.Printf("%s\t%s\t%s\n", tun.Remote, tun.Local, tun.Ttl)
 		}
 
 	case vxlanAddCmd.FullCommand():
-		cli.VxlanTunnel(*vxlanAddName, "", *vxlanAddRemoteIp, *vxlanAddVlan, *vxlanAddVni, false)
+		cli.AddVxlanTunnel(*vxlanAddName, *vxlanAddRemoteIp, *vxlanAddVlan, *vxlanAddVni)
 	case vxlanDelCmd.FullCommand():
-		cli.VxlanTunnel("", *vxlanDelName, "", "", "", false)
+		cli.DelVxlanTunnel(*vxlanDelName)
 	case vxlanListCmd.FullCommand():
-		cli.VxlanTunnel("", "", "", "", "", true)
+		for _, tun := range cli.GetVxlanTunnels() {
+			fmt.Println(tun.Name, tun.RemoteIp, tun.Vlan, tun.Vni)
+		}
+
 	case batchCmd.FullCommand():
 		cli.Batch(*batchJson)
 	}
