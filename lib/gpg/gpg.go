@@ -16,6 +16,8 @@ import (
 	"github.com/subutai-io/agent/log"
 	"time"
 	"path"
+	exec2 "github.com/subutai-io/agent/lib/exec"
+	"fmt"
 )
 
 var (
@@ -260,10 +262,28 @@ func ExchageAndEncrypt(c, t string) {
 }
 
 // ValidatePem checks if OpenSSL x509 certificate valid.
-func ValidatePem(cert string) bool {
-	out, err := exec.Command("openssl", "x509", "-in", cert, "-text", "-noout").Output()
-	log.Check(log.DebugLevel, "Validating OpenSSL x509 certificate", err)
-	return strings.Contains(string(out), "Public Key") && strings.Contains(string(out), "X509")
+// 1. Validates public part
+// 2. Validates private part
+// 3. Checks if public part matches private part
+func ValidatePem(pathToCert string) bool {
+
+	publicKeyFromCert, err := exec2.ExecuteWithBash(fmt.Sprintf("openssl x509 -pubkey -noout -in %s", pathToCert))
+	if log.Check(log.DebugLevel, "Validating OpenSSL x509 certificate", err) {
+		return false
+	}
+
+	publicKeyFromPrivateKey, err := exec2.ExecuteWithBash(fmt.Sprintf("openssl pkey -pubout -in %s", pathToCert))
+	if log.Check(log.DebugLevel, "Validating private key", err) {
+		return false
+	}
+
+	if strings.TrimSpace(publicKeyFromCert) != strings.TrimSpace(publicKeyFromPrivateKey) {
+		log.Debug("Certificate does not match private key")
+
+		return false
+	}
+
+	return true
 }
 
 // ParsePem return parsed OpenSSL x509 certificate.
