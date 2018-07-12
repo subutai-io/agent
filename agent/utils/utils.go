@@ -190,6 +190,19 @@ func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
 	return &http.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
 }
 
+func RetryGet(url string, clnt *http.Client, attempts int) (*http.Response, error) {
+	var response *http.Response
+	var err error
+	var attempt = 0
+
+	for response, err = clnt.Get(url); err != nil && attempt < attempts; response, err = clnt.Get(url) {
+		attempt++
+		time.Sleep(time.Duration(attempt*5) * time.Second)
+	}
+
+	return response, err
+}
+
 func CleanTemplateName(name string) string {
 	reg, err := regexp.Compile("[^a-zA-Z0-9._-]")
 	if err != nil {

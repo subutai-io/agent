@@ -19,25 +19,26 @@ import (
 // The destroy command always runs each step in "force" mode to provide reliable deletion results;
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
-func LxcDestroy(id string, vlan bool) {
+func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	var msg string
 	if len(id) == 0 {
 		log.Error("Please specify container/template name or vlan id")
 	}
 
 	if strings.HasPrefix(id, "id:") {
+		contId := strings.ToUpper(strings.TrimPrefix(id, "id:"))
 		for _, c := range container.Containers() {
-			if strings.ToUpper(strings.TrimPrefix(id, "id:")) == gpg.GetFingerprint(c) {
-				LxcDestroy(c, false)
+			if contId == gpg.GetFingerprint(c) {
+				LxcDestroy(c, false, false)
 				return
 			}
-			msg = id + " not found. Please check if a container name is correct."
 		}
+		log.Error("Container " + contId + " not found")
 	} else if vlan {
 		list, err := db.INSTANCE.ContainerByKey("vlan", id)
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 			for _, c := range list {
-				LxcDestroy(c, false)
+				LxcDestroy(c, false, true)
 			}
 			msg = "Vlan " + id + " is destroyed"
 		}
@@ -51,7 +52,7 @@ func LxcDestroy(id string, vlan bool) {
 		c, err := db.INSTANCE.ContainerByName(id)
 		log.Check(log.WarnLevel, "Reading container metadata from db", err)
 
-		msg = id + " is destroyed"
+		msg = "Container " + id + " is destroyed"
 
 		if len(c) != 0 {
 
@@ -72,6 +73,8 @@ func LxcDestroy(id string, vlan bool) {
 			err = container.DestroyContainer(id)
 
 			log.Check(log.ErrorLevel, "Destroying container", err)
+		} else if !ignoreMissing {
+			log.Error(id + " not found")
 		}
 
 	}
@@ -80,7 +83,7 @@ func LxcDestroy(id string, vlan bool) {
 		list, err := db.INSTANCE.ContainerList()
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 			for _, name := range list {
-				LxcDestroy(name, false)
+				LxcDestroy(name, false, true)
 				c, err := db.INSTANCE.ContainerByName(name)
 				if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 					if v, ok := c["vlan"]; ok {

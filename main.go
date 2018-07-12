@@ -75,13 +75,12 @@ func loadManagementIp() {
 func main() {
 	app := gcli.NewApp()
 	app.Name = "Subutai"
+	app.Version = version
+	app.Usage = "daemon and command line interface binary"
 
 	if len(os.Args) > 1 && os.Args[len(os.Args)-1] != "daemon" {
 		loadManagementIp()
 	}
-
-	app.Version = version
-	app.Usage = "daemon and command line interface binary"
 
 	app.Flags = []gcli.Flag{gcli.BoolFlag{
 		Name:  "d",
@@ -135,7 +134,7 @@ func main() {
 		Name: "cleanup", Usage: "clean Subutai environment",
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), true)
+				cli.LxcDestroy(c.Args().Get(0), true, false)
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
@@ -173,7 +172,7 @@ func main() {
 		Name: "destroy", Usage: "destroy Subutai container/template",
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
-				cli.LxcDestroy(c.Args().Get(0), false)
+				cli.LxcDestroy(c.Args().Get(0), false, false)
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
