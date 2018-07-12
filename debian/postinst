@@ -10,3 +10,9 @@ install|upgrade)
         cp /usr/lib/subutai/etc/agent.conf /etc/subutai/
     fi
 esac
+
+if systemctl is-active --quiet ipfs.service; then
+    export IPFS_PATH=/var/lib/ipfs/node
+    ipfs bootstrap add /dnsaddr/eu1.s.optdyn.com/ipfs/QmUZFuJ31ctYGxYFDtKzDBXmpmiBQWZGyqQChL7RwQNitV
+    ipfs bootstrap add /dnsaddr/us1.s.optdyn.com/ipfs/QmdL6K8gqGT2BRUEGtcnRGTCyGVV5H7QiYqPLzvgMcLpxo
+fi
