@@ -15,7 +15,6 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"path"
 	"github.com/subutai-io/agent/lib/common"
 )
 
@@ -65,7 +64,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 
 // ImportManagementKey adds GPG public key to local keyring to encrypt messages to Management server.
 func ImportManagementKey() {
-	if pk := getKey(); pk != nil {
+	if pk := utils.GetConsolePubKey(); pk != nil {
 		gpg.ImportPk(pk)
 		config.Management.GpgUser = gpg.ExtractKeyID(pk)
 	}
@@ -175,26 +174,4 @@ func LoadManagementIp() {
 			config.Management.Host = ip
 		}
 	}
-}
-
-func getKey() []byte {
-	client := utils.GetClient(config.Management.Allowinsecure, 5)
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
-
-	if err == nil {
-		defer utils.Close(resp)
-	}
-
-	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
-		return nil
-	}
-
-	if resp.StatusCode == 200 {
-		if key, err := ioutil.ReadAll(resp.Body); err == nil {
-			return key
-		}
-	}
-
-	log.Warn("Failed to fetch PK from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
-	return nil
 }

@@ -1,31 +1,15 @@
 package container
 
 import (
-	"os"
 	"time"
 
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
-	"path"
 )
-
-// temporary function to provide backward compatibility with old approach
-// Need to remove it in next release
-func compat() {
-	for _, name := range container.Containers() {
-		if _, err := os.Stat(path.Join(config.Agent.LxcPrefix, name, ".start")); !os.IsNotExist(err) {
-			os.Remove(path.Join(config.Agent.LxcPrefix, name, ".start"))
-			container.AddMetadata(name, map[string]string{"state": "RUNNING"})
-		}
-	}
-}
 
 // StateRestore checks container state and starting or stopping containers if required.
 func StateRestore(canRestore *bool) {
-	compat()
-
 	active := getRunningContainers()
 
 	for _, v := range active {
@@ -44,6 +28,7 @@ func StateRestore(canRestore *bool) {
 				startErr = container.Start(v)
 			}
 			if startErr != nil {
+				log.Warn("Failed to start container " + v + ": " + startErr.Error())
 				container.AddMetadata(v, map[string]string{"state": "STOPPED"})
 			}
 		}

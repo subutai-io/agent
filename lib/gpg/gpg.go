@@ -17,7 +17,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"time"
 	"path"
-	exec2 "github.com/subutai-io/agent/lib/exec"
 	"fmt"
 )
 
@@ -210,16 +209,15 @@ func GetFingerprint(email string) string {
 }
 
 func getMngKey(c string) {
-	client := utils.GetClient(config.Management.Allowinsecure, 5)
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
-	log.Check(log.FatalLevel, "Getting Management public key", err)
 
-	defer utils.Close(resp)
+	consolePublicKey := utils.GetConsolePubKey()
 
-	if body, err := ioutil.ReadAll(resp.Body); err == nil {
-		err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), body, 0644)
-		log.Check(log.FatalLevel, "Writing Management public key", err)
+	if consolePublicKey == nil {
+		log.Fatal("Failed to get Console public key")
 	}
+
+	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
+	log.Check(log.FatalLevel, "Saving Console public key", err)
 }
 
 func parseKeyID(s string) string {

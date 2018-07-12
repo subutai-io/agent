@@ -21,6 +21,7 @@ import (
 	"io"
 	"regexp"
 	"path"
+	"strconv"
 )
 
 var (
@@ -222,4 +223,26 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 		}
 	}
 	return
+}
+
+func GetConsolePubKey() []byte {
+	client := GetClient(config.Management.Allowinsecure, 5)
+	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
+
+	if err == nil {
+		defer Close(resp)
+	}
+
+	if log.Check(log.WarnLevel, "Getting Console public Key", err) {
+		return nil
+	}
+
+	if resp.StatusCode == 200 {
+		if key, err := ioutil.ReadAll(resp.Body); err == nil {
+			return key
+		}
+	}
+
+	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
+	return nil
 }

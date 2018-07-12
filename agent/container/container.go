@@ -102,10 +102,6 @@ func Active(details bool) []Container {
 			ip := meta["ip"]
 
 			container := Container{
-				//ID:       gpg.GetFingerprint(c),
-				//Arch: strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
-				//Parent: cont.GetConfigItem(configpath, "subutai.parent"),
-				//Interfaces: interfaces(c, ""),
 				Name:     c,
 				Hostname: strings.TrimSpace(string(hostname)),
 				Status:   cont.State(c),
@@ -158,7 +154,6 @@ func getFromCacheOrCalculate(cacheKey string, calc calculate) string {
 	}
 }
 
-//todo refactor to remove interfaces and just have ip field sent to Console
 //this should be done together with Console changes
 func interfaces(name string, staticIp string) []utils.Iface {
 
