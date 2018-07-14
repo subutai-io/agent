@@ -46,141 +46,62 @@ type heartbeat struct {
 }
 
 var (
-	lastHeartbeat        []byte
-	mutex                sync.Mutex
-	fingerprint          string
-	hostname, _          = os.Hostname()
-	client               *http.Client
-	instanceType         string
-	instanceArch         string
-	lastHeartbeatTime    time.Time
-	pool                 []container.Container
-	canRestoreContainers = true
+	lastHeartbeat     []byte
+	mutex             sync.Mutex
+	fingerprint       string
+	hostname, _       = os.Hostname()
+	client            *http.Client
+	instanceType      string
+	instanceArch      string
+	lastHeartbeatTime time.Time
+	pool              []container.Container
 )
 
 func initAgent() {
-	// move .gnupg dir to app home
-	err := os.Setenv("GNUPGHOME", path.Join(config.Agent.DataPrefix, ".gnupg"))
-	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
+
+	fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
 
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
 	client = utils.TLSConfig()
 }
 
-//HTTP server >>>>
-var mux map[string]func(http.ResponseWriter, *http.Request)
-
-type myHandler struct{}
-
-func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if h, ok := mux[r.URL.String()]; ok {
-		h(w, r)
-		return
-	}
-
-	w.WriteHeader(http.StatusForbidden)
-}
-
-func setupHttpServer() {
-	srv := &http.Server{
-		Addr:              ":7070",
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		Handler:           &myHandler{},
-	}
-	mux = make(map[string]func(http.ResponseWriter, *http.Request))
-	mux["/trigger"] = triggerHandler
-	mux["/ping"] = pingHandler
-	mux["/heartbeat"] = heartbeatHandler
-	go srv.ListenAndServe()
-}
-
-//<<<HTTP server
-
-//Start starting Subutai Agent daemon, all required goroutines and keep working during all life cycle.
+//Start Subutai Agent daemon, all required goroutines and keep working during all life cycle.
 func Start() {
 	initAgent()
 
 	setupHttpServer()
 
+	//SSDP discovery for secondary RHs
 	go discovery.Monitor()
+	//metrics
 	go monitor.Collect()
-	go connectionMonitor()
+
+	go connect.CheckRegisterWithConsole()
+
 	go alert.Processing()
-	go restoreContainers()
+
+	//restart containers that got stopped not by user
+	go container.StateRestore()
 
 	for {
+		for !connect.IsConsoleReady() {
+			time.Sleep(time.Second * 10)
+		}
+
 		if sendHeartbeat() {
 			time.Sleep(30 * time.Second)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
 
+		//todo use API call rather than CLI call
 		go exec.Command("timeout", "30", "subutai", "tunnel", "check").Run()
 
-		for !checkSS() {
-			time.Sleep(time.Second * 10)
-		}
 	}
 }
 
-func restoreContainers() {
-	for {
-		if !canRestoreContainers {
-			return
-		}
-		container.StateRestore(&canRestoreContainers)
-		time.Sleep(time.Second * 30)
-	}
-}
-
-func checkSS() (status bool) {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8443/rest/v1/peer/inited")
-	if err == nil {
-		defer utils.Close(resp)
-		if resp.StatusCode == http.StatusOK {
-			return true
-		}
-	}
-	return false
-}
-
-func connectionMonitor() {
-	for {
-
-		if !checkSS() {
-			time.Sleep(time.Second * 10)
-			continue
-		}
-
-		if fingerprint == "" || config.Management.GpgUser == "" {
-			fingerprint = gpg.GetFingerprint("rh@subutai.io")
-			connect.Request(config.Agent.GpgUser, config.Management.Secret)
-		} else {
-			doCheckConnection()
-		}
-
-		time.Sleep(time.Second * 10)
-	}
-}
-
-func doCheckConnection() {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/check/" + fingerprint)
-	if err == nil {
-		defer utils.Close(resp)
-	}
-	if err == nil && resp.StatusCode == http.StatusOK {
-		log.Debug("Connection monitor check - success")
-	} else {
-		log.Debug("Connection monitor check - failed")
-		connect.Request(config.Agent.GpgUser, config.Management.Secret)
-		lastHeartbeat = []byte{}
-		go sendHeartbeat()
-	}
-}
-
+//HEARTBEAT
 func sendHeartbeat() bool {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -229,6 +150,8 @@ func sendHeartbeat() bool {
 	lastHeartbeat = []byte{}
 	return false
 }
+
+//COMMAND EXECUTION>>>
 
 func execute(rsp executer.EncRequest) {
 	var req executer.Request
@@ -331,6 +254,46 @@ func command() {
 	}
 }
 
+func nameByID(id string) string {
+	for _, c := range pool {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	return ""
+}
+
+//<<<COMMAND EXECUTION
+
+//HTTP server >>>>
+var mux map[string]func(http.ResponseWriter, *http.Request)
+
+type myHandler struct{}
+
+func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h, ok := mux[r.URL.String()]; ok {
+		h(w, r)
+		return
+	}
+
+	w.WriteHeader(http.StatusForbidden)
+}
+
+func setupHttpServer() {
+	srv := &http.Server{
+		Addr:              ":7070",
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		Handler:           &myHandler{},
+	}
+	mux = make(map[string]func(http.ResponseWriter, *http.Request))
+	mux["/trigger"] = triggerHandler
+	mux["/ping"] = pingHandler
+	mux["/heartbeat"] = heartbeatHandler
+	go srv.ListenAndServe()
+}
+
 func pingHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusOK)
@@ -358,11 +321,4 @@ func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func nameByID(id string) string {
-	for _, c := range pool {
-		if c.ID == id {
-			return c.Name
-		}
-	}
-	return ""
-}
+//<<<HTTP server

@@ -21,7 +21,6 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"path"
@@ -288,39 +287,6 @@ func grep(str, filename string) string {
 	}
 }
 
-// Info command's purposed is to display common system information, such as
-// external IP address to access the container host quotas, its CPU model, RAM size, etc. It's mainly used for internal SS needs.
-func Info(command, host string) {
-	if command == "ipaddr" {
-		fmt.Println(net.GetIp())
-		return
-	} else if command == "ports" {
-		for k := range GetUsedPorts() {
-			fmt.Println(k)
-		}
-	} else if command == "os" {
-
-		fmt.Printf("%s\n", GetOsName())
-	} else if command == "id" {
-		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
-		defer os.Unsetenv("GNUPGHOME")
-		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
-	} else if command == "du" {
-		usage, err := fs.DatasetDiskUsage(host)
-		log.Check(log.ErrorLevel, "Checking disk usage", err)
-		fmt.Println(usage)
-	} else if command == "quota" {
-		if len(host) == 0 {
-			log.Error("Usage: subutai info <quota|system> <hostname>")
-		}
-		fmt.Println(GetContainerQuotaUsage(host))
-	} else if command == "system" {
-		host, err := os.Hostname()
-		log.Check(log.DebugLevel, "Getting hostname of the system", err)
-		fmt.Println(sysLoad(host))
-	}
-}
-
 func GetDiskUsage(lxcName string) int {
 	usage, err := fs.DatasetDiskUsage(lxcName)
 	log.Check(log.ErrorLevel, "Checking disk usage", err)
@@ -333,9 +299,9 @@ func GetSystemInfo() string {
 	return sysLoad(host)
 }
 func GetFingerprint() string {
-	os.Setenv("GNUPGHOME", config.Agent.GpgHome)
-	defer os.Unsetenv("GNUPGHOME")
-	return gpg.GetFingerprint("rh@subutai.io")
+	//os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+	//defer os.Unsetenv("GNUPGHOME")
+	return gpg.GetFingerprint(config.Agent.GpgUser)
 }
 
 func GetOsName() string {

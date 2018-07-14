@@ -223,7 +223,7 @@ func Quota(list []container.Container) (output []container.Container) {
 		if c, ok := stats[v.Name]; ok {
 			v.Quota.CPU = c.CPU.Quota
 			v.Quota.RAM = c.RAM.Quota
-			v.Quota.Disk = stats[v.Name].Disk.Quota
+			v.Quota.Disk = c.Disk.Quota
 		}
 		output = append(output, v)
 	}
