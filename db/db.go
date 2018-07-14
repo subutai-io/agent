@@ -37,7 +37,7 @@ func openDb(readOnly bool) (*bolt.DB, error) {
 	initDb()
 
 	boltDB, err := bolt.Open(dbPath,
-		0600, &bolt.Options{Timeout: 5 * time.Second, ReadOnly: readOnly})
+		0600, &bolt.Options{Timeout: 15 * time.Second, ReadOnly: readOnly})
 	if err != nil {
 		return nil, err
 	}
