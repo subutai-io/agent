@@ -7,11 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
-	"os/exec"
-	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/subutai-io/agent/agent/alert"
@@ -23,46 +19,21 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"path"
+	"github.com/subutai-io/agent/agent/heartbeat"
+	"github.com/subutai-io/agent/cli"
 )
 
-//Response covers heartbeat date because of format required by Management server.
-type response struct {
-	Beat heartbeat `json:"response"`
-}
-
-//heartbeat describes JSON formated information that Agent sends to Management server.
-type heartbeat struct {
-	Type       string                `json:"type"`
-	Hostname   string                `json:"hostname"`
-	Address    string                `json:"address"`
-	ID         string                `json:"id"`
-	Arch       string                `json:"arch"`
-	Instance   string                `json:"instance"`
-	Containers []container.Container `json:"containers,omitempty"`
-	Alert      []alert.Load          `json:"alert,omitempty"`
-}
-
 var (
-	lastHeartbeat     []byte
-	mutex             sync.Mutex
-	fingerprint       string
-	hostname, _       = os.Hostname()
-	client            *http.Client
-	instanceType      string
-	instanceArch      string
-	lastHeartbeatTime time.Time
-	pool              []container.Container
+	fingerprint string
+	client      *http.Client
 )
 
 func initAgent() {
 
 	fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
 
-	instanceType = utils.InstanceType()
-	instanceArch = strings.ToUpper(runtime.GOARCH)
 	client = utils.TLSConfig()
 }
 
@@ -74,6 +45,7 @@ func Start() {
 
 	//SSDP discovery for secondary RHs
 	go discovery.Monitor()
+
 	//metrics
 	go monitor.Collect()
 
@@ -89,68 +61,17 @@ func Start() {
 			time.Sleep(time.Second * 10)
 		}
 
-		if sendHeartbeat() {
+		if heartbeat.HeartBeat() {
 			time.Sleep(30 * time.Second)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
 
-		//todo use API call rather than CLI call
-		go exec.Command("timeout", "30", "subutai", "tunnel", "check").Run()
-
+		cli.CheckSshTunnels()
 	}
 }
 
-//HEARTBEAT
-func sendHeartbeat() bool {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if len(lastHeartbeat) > 0 && time.Since(lastHeartbeatTime) < time.Second*5 {
-		return false
-	}
-	var err error
-	hostname, err = os.Hostname()
-	if err != nil {
-		return false
-	}
-
-	pool = container.Active(false)
-	res := response{Beat: heartbeat{
-		Type:       "HEARTBEAT",
-		Hostname:   hostname,
-		Address:    net.GetIp(),
-		ID:         fingerprint,
-		Arch:       instanceArch,
-		Instance:   instanceType,
-		Containers: alert.Quota(pool),
-		Alert:      alert.Current(pool),
-	}}
-	jbeat, err := json.Marshal(&res)
-	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)
-	lastHeartbeatTime = time.Now()
-	if string(jbeat) == string(lastHeartbeat) {
-		return true
-	}
-	lastHeartbeat = jbeat
-
-	if encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat); err == nil {
-		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
-		log.Check(log.WarnLevel, "Marshal response json", err)
-
-		resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
-		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
-			defer utils.Close(resp)
-
-			if resp.StatusCode == http.StatusAccepted {
-				return true
-			}
-		}
-	}
-	go discovery.ImportManagementKey()
-	lastHeartbeat = []byte{}
-	return false
-}
-
+//todo move to executer
 //COMMAND EXECUTION>>>
 
 func execute(rsp executer.EncRequest) {
@@ -160,11 +81,10 @@ func execute(rsp executer.EncRequest) {
 	if rsp.HostID == fingerprint {
 		md = gpg.DecryptWrapper(rsp.Request)
 	} else {
-		contName = nameByID(rsp.HostID)
+		contName = heartbeat.GetContainerNameByID(rsp.HostID)
 		if contName == "" {
-			lastHeartbeat = []byte{}
-			sendHeartbeat()
-			contName = nameByID(rsp.HostID)
+			heartbeat.ForceHeartBeat()
+			contName = heartbeat.GetContainerNameByID(rsp.HostID)
 			if contName == "" {
 				return
 			}
@@ -209,7 +129,7 @@ func execute(rsp executer.EncRequest) {
 			sOut = nil
 		}
 	}
-	go sendHeartbeat()
+	go heartbeat.HeartBeat()
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
@@ -254,17 +174,9 @@ func command() {
 	}
 }
 
-func nameByID(id string) string {
-	for _, c := range pool {
-		if c.ID == id {
-			return c.Name
-		}
-	}
-	return ""
-}
-
 //<<<COMMAND EXECUTION
 
+//todo move to separate file
 //HTTP server >>>>
 var mux map[string]func(http.ResponseWriter, *http.Request)
 
@@ -314,8 +226,7 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
 		rw.WriteHeader(http.StatusOK)
-		lastHeartbeat = []byte{}
-		go sendHeartbeat()
+		go heartbeat.ForceHeartBeat()
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}
