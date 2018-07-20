@@ -45,7 +45,6 @@ type cdnConfig struct {
 	URL                 string
 	SSLport             string
 	IpfsPath            string
-	UseIpfs             bool
 	TemplateDownloadUrl string
 }
 
@@ -86,7 +85,6 @@ const defaultConfig = `
     url = bazaar.subutai.io
     sslPort = 443
     ipfsPath = /var/lib/ipfs/node
-    useIpfs = false
     templateDownloadUrl = https://ipfs.subutai.io/ipfs/{ID}
     allowInsecure = false
 

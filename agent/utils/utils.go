@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"path"
 	"net"
+	"net/url"
 )
 
 var (
@@ -251,5 +252,15 @@ func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(n
 		}
 		conn.SetDeadline(time.Now().Add(rwTimeout))
 		return conn, nil
+	}
+}
+
+
+func IsValidUrl(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	} else {
+		return true
 	}
 }

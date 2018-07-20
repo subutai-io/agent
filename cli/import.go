@@ -312,10 +312,10 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 func download(template Template) {
 
-	if config.CDN.UseIpfs {
-		downloadViaLocalIPFSNode(template)
-	} else {
+	if utils.IsValidUrl(config.CDN.TemplateDownloadUrl) {
 		downloadFromGateway(template)
+	} else {
+		downloadViaLocalIPFSNode(template)
 	}
 
 }
