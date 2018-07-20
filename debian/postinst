@@ -2,7 +2,7 @@
 
 #DEBHELPER#
 
-LASTVERSION=7.0.6~
+LASTVERSION=7.0.8~
 case "$1" in
 install|upgrade)
     if dpkg --compare-versions "$2" le "$LASTVERSION"; then
