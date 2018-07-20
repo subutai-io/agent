@@ -20,6 +20,9 @@ import (
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
 	"github.com/subutai-io/agent/lib/common"
+	"gopkg.in/cheggaaa/pb.v1"
+	"io"
+	"net/http"
 )
 
 type Template struct {
@@ -44,7 +47,7 @@ func init() {
 func getTemplateInfoById(t *Template, id string) {
 	url := config.CdnUrl + "/template?id=" + id
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
 
 	response, err := utils.RetryGet(url, clnt, 3)
 
@@ -91,7 +94,7 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 		url += "&version=" + version
 	}
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
 
 	response, err := utils.RetryGet(url, clnt, 3)
 
@@ -124,7 +127,6 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
-//TODO remove template cache
 func getTemplateInfo(template string) Template {
 
 	var t Template
@@ -310,6 +312,56 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 
 func download(template Template) {
 
+	if utils.IsValidUrl(config.CDN.TemplateDownloadUrl) {
+		downloadFromGateway(template)
+	} else {
+		downloadViaLocalIPFSNode(template)
+	}
+
+}
+
+func downloadFromGateway(template Template) {
+	templatePath := path.Join(config.Agent.CacheDir, template.Id)
+
+	out, err := os.Create(templatePath)
+	log.Check(log.FatalLevel, "Creating template archive", err)
+	defer out.Close()
+
+	client := utils.GetClientForUploadDownload()
+
+	url := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
+
+	log.Debug("Template url " + url)
+
+	response, err := client.Get(url)
+	log.Check(log.FatalLevel, "Connecting to gateway", err)
+	defer utils.Close(response)
+
+	// Check server response
+	if response.StatusCode != http.StatusOK {
+		log.Fatal("Bad http status: " + response.Status)
+	}
+
+	//!important used by Console
+	log.Info("Downloading " + template.Name)
+
+	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
+	if response.ContentLength <= 0 {
+		bar.NotPrint = true
+	}
+	bar.Start()
+	rd := bar.NewProxyReader(response.Body)
+	defer bar.Finish()
+
+	_, err = io.Copy(out, rd)
+	log.Check(log.FatalLevel, "Downloading template", err)
+
+	if template.MD5 != md5sum(templatePath) {
+		log.Fatal("File integrity verification failed")
+	}
+}
+
+func downloadViaLocalIPFSNode(template Template) {
 	log.Debug("Checking template availability in CDN network...")
 
 	//check local node

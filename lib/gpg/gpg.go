@@ -174,7 +174,7 @@ func GetFingerprint(email string) string {
 }
 
 func getMngKey(c string) {
-	client := utils.GetClient(config.Management.Allowinsecure, 5)
+	client := utils.GetClient(config.Management.AllowInsecure, 5)
 	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
