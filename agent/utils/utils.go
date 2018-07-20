@@ -21,6 +21,7 @@ import (
 	"io"
 	"regexp"
 	"path"
+	"net"
 )
 
 var (
@@ -170,7 +171,7 @@ func newTLSConfig() *tls.Config {
 		}
 	}
 
-	if config.Management.Allowinsecure {
+	if config.Management.AllowInsecure {
 		// Create tls.Config with desired tls properties
 		return &tls.Config{
 			ClientAuth:         tls.NoClientCert,
@@ -222,4 +223,33 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 		}
 	}
 	return
+}
+
+//one-shot client for one long lasting request
+//no keep-alive, 1 idle connection per client
+//new client must be used for each new request
+func GetClientForUploadDownload() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial:                  timeoutDialer(time.Second*30, time.Hour*7),
+			TLSHandshakeTimeout:   30 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+			DisableKeepAlives:     true,
+			MaxIdleConns:          1,
+			MaxIdleConnsPerHost:   1,
+			IdleConnTimeout:       time.Second * 10,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.CDN.AllowInsecure},
+		},
+	}
+}
+
+func timeoutDialer(connectTimeout time.Duration, rwTimeout time.Duration) func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		conn, err := net.DialTimeout(netw, addr, connectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		conn.SetDeadline(time.Now().Add(rwTimeout))
+		return conn, nil
+	}
 }

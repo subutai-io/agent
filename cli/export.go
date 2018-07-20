@@ -208,7 +208,7 @@ func getOwner(token string) string {
 
 	url := config.CdnUrl + "/users/username?token=" + token
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
 
 	response, err := utils.RetryGet(url, clnt, 3)
 
@@ -233,7 +233,7 @@ func addToCdn(path string) (string, error) {
 }
 
 func registerWithCdn(template Template, token string) {
-	client := utils.GetClient(config.CDN.Allowinsecure, 15)
+	client := utils.GetClient(config.CDN.AllowInsecure, 15)
 	templateMeta, err := json.Marshal(&template)
 	log.Check(log.ErrorLevel, "Serializing template metadata", err)
 
