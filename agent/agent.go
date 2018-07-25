@@ -216,7 +216,7 @@ func sendHeartbeat() bool {
 		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
-		resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		resp, err := PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 			defer utils.Close(resp)
 
@@ -290,7 +290,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -365,4 +365,14 @@ func nameByID(id string) string {
 		}
 	}
 	return ""
+}
+
+func PostForm(url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return client.Do(req)
 }
