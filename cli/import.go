@@ -20,10 +20,13 @@ import (
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/cavaliercoder/grab"
+	"fmt"
 	"gopkg.in/cheggaaa/pb.v1"
-	"io"
-	"net/http"
+	"github.com/pkg/errors"
 )
+
+const maxDownloadAttempts = 3
 
 type Template struct {
 	Id       string `json:"id"`
@@ -80,7 +83,7 @@ func getTemplateInfoById(t *Template, id string) {
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
-//TODO urlEncode the kurjun URL
+//TODO urlEncode the url
 func getTemplateInfoByName(t *Template, name string, owner string, version string) {
 	url := config.CdnUrl + "/template?name=" + name
 
@@ -321,44 +324,67 @@ func download(template Template) {
 }
 
 func downloadFromGateway(template Template) {
+	attempts := 1
+	for err := doDownload(template); err != nil && attempts < maxDownloadAttempts; err = doDownload(template) {
+		attempts++
+	}
+}
+
+func doDownload(template Template) error {
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
-
-	out, err := os.Create(templatePath)
-	log.Check(log.FatalLevel, "Creating template archive", err)
-	defer out.Close()
-
-	client := utils.GetClientForUploadDownload()
 
 	url := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
 
-	log.Debug("Template url " + url)
+	// create client
+	client := grab.NewClient()
 
-	response, err := client.Get(url)
-	log.Check(log.FatalLevel, "Connecting to gateway", err)
-	defer utils.Close(response)
+	req, err := grab.NewRequest(templatePath, url)
 
-	// Check server response
-	if response.StatusCode != http.StatusOK {
-		log.Fatal("Bad http status: " + response.Status)
+	if log.Check(log.DebugLevel, fmt.Sprintf("Preparing request %v", req.URL()), err) {
+		return err
 	}
 
 	//!important used by Console
 	log.Info("Downloading " + template.Name)
 
-	bar := pb.New(int(response.ContentLength)).SetUnits(pb.U_BYTES)
-	if response.ContentLength <= 0 {
+	// start download
+	resp := client.Do(req)
+	log.Debug("Http status ", resp.HTTPResponse.Status)
+
+	// start UI loop
+	t := time.NewTicker(100 * time.Millisecond)
+	defer t.Stop()
+
+	bar := pb.New(int(resp.Size)).SetUnits(pb.U_BYTES)
+	if resp.Size <= 0 {
 		bar.NotPrint = true
 	}
 	bar.Start()
-	rd := bar.NewProxyReader(response.Body)
 	defer bar.Finish()
+Loop:
+	for {
+		select {
+		case <-t.C:
+			bar.Set(int(resp.BytesComplete()))
 
-	_, err = io.Copy(out, rd)
-	log.Check(log.FatalLevel, "Downloading template", err)
-
-	if template.MD5 != md5sum(templatePath) {
-		log.Fatal("File integrity verification failed")
+		case <-resp.Done:
+			// download is complete
+			bar.Set(int(resp.BytesComplete()))
+			break Loop
+		}
 	}
+
+	// check for errors
+	if log.Check(log.DebugLevel, "Download completed", resp.Err()) {
+		return err
+	}
+
+	//check md5 sum
+	if template.MD5 != md5sum(templatePath) {
+		return errors.New("File integrity verification failed")
+	}
+
+	return nil
 }
 
 func downloadViaLocalIPFSNode(template Template) {
