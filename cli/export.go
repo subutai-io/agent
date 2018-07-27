@@ -254,8 +254,8 @@ func upload(template, token string) error {
 		var part io.Writer
 		defer wg.Done()
 		defer bar.Finish()
-		defer w.Close()
 		defer file.Close()
+		defer w.Close()
 
 		if err = mpw.WriteField("token", token); err != nil {
 			w.CloseWithError(err)
@@ -273,8 +273,7 @@ func upload(template, token string) error {
 		}
 	}()
 
-	theUrl := config.CdnUrl + "/uploadTemplate"
-	resp, err := http.Post(theUrl, mpw.FormDataContentType(), r)
+	resp, err := http.Post(config.CdnUrl+"/uploadTemplate", mpw.FormDataContentType(), r)
 
 	wg.Wait()
 
@@ -283,9 +282,12 @@ func upload(template, token string) error {
 	}
 	defer utils.Close(resp)
 
+	out, err := ioutil.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		out, err := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
+	} else {
+		log.Debug(string(out))
 	}
 
 	return nil
