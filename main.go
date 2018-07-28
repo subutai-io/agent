@@ -186,12 +186,11 @@ func main() {
 			gcli.StringFlag{Name: "size, s", Usage: "template preferred size"},
 			gcli.StringFlag{Name: "token, t", Usage: "mandatory CDN token"},
 			gcli.StringFlag{Name: "description, d", Usage: "template description"},
-			gcli.BoolFlag{Name: "private, p", Usage: "use private repo for uploading template"},
 			gcli.BoolFlag{Name: "local, l", Usage: "export template to local cache"}},
 		Action: func(c *gcli.Context) error {
 			if c.Args().Get(0) != "" {
 				cli.LxcExport(c.Args().Get(0), c.String("n"), c.String("v"), c.String("s"),
-					c.String("t"), c.String("d"), c.Bool("p"), c.Bool("l"))
+					c.String("t"), c.String("d"), c.Bool("l"))
 			} else {
 				gcli.ShowSubcommandHelp(c)
 			}
