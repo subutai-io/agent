@@ -28,7 +28,7 @@ import (
 	"path"
 )
 
-//Response covers heartbeat date because of format required by Management server.
+//Response wraps heartbeat because of format required by Management server.
 type response struct {
 	Beat heartbeat `json:"response"`
 }
@@ -85,7 +85,7 @@ func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func setupHttpServer() {
 	srv := &http.Server{
 		Addr:              ":7070",
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		Handler:           &myHandler{},

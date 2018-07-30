@@ -139,7 +139,7 @@ func client() {
 }
 
 func fingerprint(ip string) string {
-	client := utils.GetClient(config.Management.AllowInsecure, 5)
+	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	resp, err := client.Get("https://" + ip + ":8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
 		defer utils.Close(resp)
@@ -168,8 +168,9 @@ func save(ip string) {
 	config.Management.Host = ip
 }
 
+//TODO use single method
 func getKey() []byte {
-	client := utils.GetClient(config.Management.AllowInsecure, 5)
+	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {
