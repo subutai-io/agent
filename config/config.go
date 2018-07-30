@@ -29,6 +29,7 @@ type managementConfig struct {
 	Port          string
 	Secret        string
 	GpgUser       string
+//TODO remove
 	RestPublicKey string
 	Fingerprint   string
 	AllowInsecure bool

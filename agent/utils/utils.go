@@ -91,7 +91,7 @@ func TLSConfig() *http.Client {
 		MaxIdleConns:    10,
 	}
 
-	return &http.Client{Transport: transport, Timeout: time.Second * 10}
+	return &http.Client{Transport: transport, Timeout: time.Second * 30}
 }
 
 func x509generate() {
