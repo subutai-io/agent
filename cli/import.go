@@ -235,8 +235,6 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				log.Debug("File integrity is verified")
 			} else {
 
-				log.Warn("File integrity verification failed")
-
 				//make agent re-download verified template from CDN
 				archiveExists = false
 			}
@@ -325,9 +323,13 @@ func download(template Template) {
 
 func downloadFromGateway(template Template) {
 	attempts := 1
-	for err := doDownload(template); err != nil && attempts < maxDownloadAttempts; err = doDownload(template) {
+	var err error
+
+	for err = doDownload(template); err != nil && attempts < maxDownloadAttempts; err = doDownload(template) {
 		attempts++
 	}
+
+	log.Check(log.ErrorLevel, "Failed to download template", err)
 }
 
 func doDownload(template Template) error {
