@@ -207,7 +207,7 @@ func getOwner(token string) string {
 
 	theUrl := config.CdnUrl + "/users/username?token=" + token
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
 	response, err := utils.RetryGet(theUrl, clnt, 3)
 

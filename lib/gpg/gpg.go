@@ -173,8 +173,9 @@ func GetFingerprint(email string) string {
 	return ""
 }
 
+//TODO use single method
 func getMngKey(c string) {
-	client := utils.GetClient(config.Management.AllowInsecure, 5)
+	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
@@ -220,7 +221,7 @@ func sendData(c string) {
 	defer asc.Close()
 
 	client := utils.TLSConfig()
-	client.Timeout = time.Second * 15
+	client.Timeout = time.Second * 30
 	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
@@ -251,7 +252,7 @@ func ExchageAndEncrypt(c, t string) {
 	expkey.Stdout = &expout
 	expkey.Stderr = &experr
 	err = expkey.Run()
-	log.Check(log.FatalLevel, "Exporting armomred key", err)
+	log.Check(log.FatalLevel, "Exporting armored key", err)
 
 	writeData(c, t, expout.String(), experr.String())
 

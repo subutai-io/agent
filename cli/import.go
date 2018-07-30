@@ -50,7 +50,7 @@ func init() {
 func getTemplateInfoById(t *Template, id string) {
 	url := config.CdnUrl + "/template?id=" + id
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
 	response, err := utils.RetryGet(url, clnt, 3)
 
@@ -97,7 +97,7 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 		url += "&version=" + version
 	}
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
 	response, err := utils.RetryGet(url, clnt, 3)
 
