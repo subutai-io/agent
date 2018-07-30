@@ -299,11 +299,15 @@ func Info(command, host string) {
 		}
 	} else if command == "os" {
 
-		fmt.Printf("%s\n", getOsName())
+		fmt.Println(getOsName())
 	} else if command == "id" {
 		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 		defer os.Unsetenv("GNUPGHOME")
-		fmt.Printf("%s\n", gpg.GetFingerprint("rh@subutai.io"))
+		if len(host) == 0 {
+		    fmt.Println(gpg.GetFingerprint("rh@subutai.io"))
+		}else{
+		    fmt.Println(gpg.GetFingerprint(host))
+		}
 	} else if command == "du" {
 		usage, err := fs.DatasetDiskUsage(host)
 		log.Check(log.ErrorLevel, "Checking disk usage", err)
