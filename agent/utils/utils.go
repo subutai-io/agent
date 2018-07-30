@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"path"
 	"net/url"
+	"fmt"
 )
 
 var (
@@ -210,6 +211,22 @@ func CleanTemplateName(name string) string {
 		log.Fatal(err)
 	}
 	return reg.ReplaceAllString(name, "")
+}
+
+func VerifyLxcName(name string){
+    /*
+    The labels must follow the rules for ARPANET host names.  They must
+    start with a letter, end with a letter or digit, and have as interior
+    characters only letters, digits, and hyphen.  There are also some
+    restrictions on the length.  Labels must be 63 characters or less.
+    */
+
+	hostnameRegex := regexp.MustCompile(`^[[:alpha:]][[:alnum:]\-]{0,61}[[:alnum:]]$`)
+
+    if !hostnameRegex.MatchString(name) {
+        log.Error(fmt.Sprintf("value '%s' does not match %s",
+              			name, hostnameRegex.String()))
+    }
 }
 
 func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]string) {

@@ -29,7 +29,7 @@ var (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, consoleSecret, cdnToken string) {
-	child = utils.CleanTemplateName(child)
+	utils.VerifyLxcName(child)
 
 	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
