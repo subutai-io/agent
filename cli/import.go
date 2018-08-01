@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
-
+    "net/http"
+    "net/url"
 	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/config"
@@ -321,26 +322,54 @@ func download(template Template) {
 
 }
 
+func getTemplateUrl(template Template) string {
+
+    directUrl := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
+
+    u, err := url.Parse(directUrl)
+    log.Check(log.ErrorLevel, "Parsing template url", err)
+
+    u.Path = path.Join(u.Path, template.Name)
+    wrappedUrl := u.String()  + ".tar.gz"
+    res, err := http.Head(wrappedUrl)
+    log.Check(log.ErrorLevel, "Checking wrapped template existence", err)
+    if res.StatusCode == 200 {
+        return wrappedUrl
+    }
+
+    res, err = http.Head(directUrl)
+    log.Check(log.ErrorLevel, "Checking template existence", err)
+    if res.StatusCode == 200 {
+        return directUrl
+    }
+
+    log.Error("Template not found")
+
+    //should not reach here
+    return ""
+}
+
 func downloadFromGateway(template Template) {
+    templateUrl := getTemplateUrl(template)
 	attempts := 1
 	var err error
 
-	for err = doDownload(template); err != nil && attempts < maxDownloadAttempts; err = doDownload(template) {
-		attempts++
+	for err = doDownload(template, templateUrl);
+	    err != nil && attempts < maxDownloadAttempts;
+	    err = doDownload(template, templateUrl) {
+		    attempts++
 	}
 
-	log.Check(log.ErrorLevel, "Failed to download template", err)
+	log.Check(log.ErrorLevel, "Download completed", err)
 }
 
-func doDownload(template Template) error {
+func doDownload(template Template, templateUrl string) error {
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
-
-	url := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
 
 	// create client
 	client := grab.NewClient()
 
-	req, err := grab.NewRequest(templatePath, url)
+	req, err := grab.NewRequest(templatePath, templateUrl)
 
 	if log.Check(log.DebugLevel, fmt.Sprintf("Preparing request %v", req.URL()), err) {
 		return err
@@ -376,8 +405,10 @@ Loop:
 		}
 	}
 
+    bar.Finish()
+
 	// check for errors
-	if log.Check(log.DebugLevel, "Download completed", resp.Err()) {
+	if log.Check(log.DebugLevel, "Checking download status", resp.Err()) {
 		return err
 	}
 
@@ -389,6 +420,7 @@ Loop:
 	return nil
 }
 
+//todo check if template is wrapped
 func downloadViaLocalIPFSNode(template Template) {
 	log.Debug("Checking template availability in CDN network...")
 
