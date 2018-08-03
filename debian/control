@@ -34,7 +34,6 @@ XS-Go-Import-Path: github.com/subutai-io/agent
 Package: subutai
 Architecture: any
 Depends: gnupg1 | gnupg (<< 2.0.0~),
-         ipfs,
          lxc,
          nsexec,
          rng-tools,
@@ -45,5 +44,6 @@ Depends: gnupg1 | gnupg (<< 2.0.0~),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: uidmap
+Suggests: ipfs
 Description: intelligent P2P cloud computing
  project allows users to build their private networks.
