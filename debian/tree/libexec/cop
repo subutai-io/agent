@@ -1,0 +1,42 @@
+#!/bin/sh
+
+KNOWN_UNITS="subutai-nginx subutai-ovs subutai-dnsmasq subutai-forwarding subutai-roaming subutai-p2p subutai subutai-rng"
+
+count_service(){
+    CNT=0
+    for i in $KNOWN_UNITS; do
+        CNT=$((CNT+1))
+    done
+
+    echo $CNT
+}
+
+echo "cop engaged, checking services"
+
+check_service() {
+    RET=0
+    for i in $KNOWN_UNITS; do
+        if systemctl is-enabled --quiet "$i".service; then
+            if ! systemctl is-active --quiet "$i".service; then
+                RET=1
+		printf "${i}.service is inactive, trying to restart... "
+                systemctl restart "$i".service;
+		printf "done, will re-check everything shortly\n"
+            fi
+        else
+	    printf "${i}.service is disabled, please enable to retain functionality:\n  systemctl enable --now ${i}.service\n"
+        fi
+    done
+    if [ $RET -eq 1 ]; then
+	return 1
+    fi
+}
+
+CNT=$(count_service)
+PASS=0
+while [ $PASS -le $CNT ]; do
+    check_service && printf "cop leaving, enabled sevices are functional\n" && exit
+    sleep 1 && PASS=$((PASS+1))
+done
+
+printf "cop leaving, retry limit reached, failed to reactivate the service\n  Please contact support for more information.\n" 

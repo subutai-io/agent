@@ -1,0 +1,11 @@
+[Unit]
+Description=Subutai Service Healthcheck
+After=subutai.service
+After=subutai-p2p.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/subutai/libexec/cop
+
+[Install]
+WantedBy=multi-user.target
