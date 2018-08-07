@@ -35,3 +35,4 @@ override_dh_auto_install:
 	cp debian/tree/sbin/* debian/subutai/usr/sbin/
 	cp debian/tree/bash-completion/* debian/subutai/usr/share/bash-completion/completions/
 	cp debian/subutai-*.service debian/subutai/lib/systemd/system/
+	cp debian/subutai-*.timer debian/subutai/lib/systemd/system/
