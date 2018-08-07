@@ -35,7 +35,7 @@ check_service() {
 CNT=$(count_service)
 PASS=0
 while [ $PASS -le $CNT ]; do
-    check_service && printf "cop leaving, enabled sevices are functional\n" && exit
+    check_service && printf "cop leaving, enabled services are functional\n" && exit
     sleep 1 && PASS=$((PASS+1))
 done
 
