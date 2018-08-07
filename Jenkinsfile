@@ -20,19 +20,19 @@ try {
                 switch (env.BRANCH_NAME) {
                     case ~/master/: 
                         cdnHost = "masterbazaar.subutai.io";
-                        sshJumpServer = "mastercdn.subutai.io";
+                        sshJumpServer = "mastertun.subutai.io";
                         break;
                     case ~/dev/: 
                         cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "devcdn.subutai.io";
+                        sshJumpServer = "devtun.subutai.io";
                         break;
                     case ~/sysnet/:
                         cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "sysnetcdn.subutai.io";
+                        sshJumpServer = "devtun.subutai.io";
                         break;
                     default:
                         cdnHost = "bazaar.subutai.io";
-                        sshJumpServer = "cdn.subutai.io";
+                        sshJumpServer = "tun.subutai.io";
                 }
                 def release = env.BRANCH_NAME
 
