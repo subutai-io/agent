@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
-    "net/http"
-    "net/url"
+	"net/http"
+	"net/url"
 	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/config"
@@ -29,6 +29,8 @@ import (
 
 const maxDownloadAttempts = 3
 
+const wrappedTemplateSuffix = ".tar.gz"
+
 type Template struct {
 	Id       string `json:"id"`
 	Name     string `json:"name"`
@@ -49,13 +51,13 @@ func init() {
 
 // getTemplateInfoById retrieves template name from global repository by passed id string
 func getTemplateInfoById(t *Template, id string) {
-	url := config.CdnUrl + "/template?id=" + id
+	theUrl := config.CdnUrl + "/template?id=" + id
 
 	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(url, clnt, 3)
+	response, err := utils.RetryGet(theUrl, clnt, 3)
 
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
@@ -86,23 +88,23 @@ func getTemplateInfoById(t *Template, id string) {
 
 //TODO urlEncode the url
 func getTemplateInfoByName(t *Template, name string, owner string, version string) {
-	url := config.CdnUrl + "/template?name=" + name
+	theUrl := config.CdnUrl + "/template?name=" + name
 
 	if owner != "" {
-		url += "&owner=" + owner
+		theUrl += "&owner=" + owner
 	}
 
 	if version == "" {
-		url += "&version=latest"
+		theUrl += "&version=latest"
 	} else {
-		url += "&version=" + version
+		theUrl += "&version=" + version
 	}
 
 	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(url, clnt, 3)
+	response, err := utils.RetryGet(theUrl, clnt, 3)
 
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
@@ -266,7 +268,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	if local {
 		//rename template directory to follow full reference convention
 		templateRef = strings.Join([]string{templateName, templateOwner, templateVersion}, ":")
-		os.Rename(extractDir, path.Join(config.Agent.CacheDir, templateRef))
+		log.Check(log.ErrorLevel, "Renaming template", os.Rename(extractDir, path.Join(config.Agent.CacheDir, templateRef)))
 		extractDir = path.Join(config.Agent.CacheDir, templateRef)
 	}
 
@@ -324,40 +326,44 @@ func download(template Template) {
 
 func getTemplateUrl(template Template) string {
 
-    directUrl := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
+	directUrl := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
 
-    u, err := url.Parse(directUrl)
-    log.Check(log.ErrorLevel, "Parsing template url", err)
+	u, err := url.Parse(directUrl)
+	log.Check(log.ErrorLevel, "Parsing template url", err)
 
-    u.Path = path.Join(u.Path, template.Name)
-    wrappedUrl := u.String()  + ".tar.gz"
-    res, err := http.Head(wrappedUrl)
-    log.Check(log.ErrorLevel, "Checking wrapped template existence", err)
-    if res.StatusCode == 200 {
-        return wrappedUrl
-    }
+	u.Path = path.Join(u.Path, template.Name)
+	wrappedUrl := u.String() + wrappedTemplateSuffix
+	res, err := http.Head(wrappedUrl)
+	log.Check(log.ErrorLevel, "Checking wrapped template existence", err)
+	if res.StatusCode == 200 {
+		return wrappedUrl
+	}
 
-    res, err = http.Head(directUrl)
-    log.Check(log.ErrorLevel, "Checking template existence", err)
-    if res.StatusCode == 200 {
-        return directUrl
-    }
+	res, err = http.Head(directUrl)
+	log.Check(log.ErrorLevel, "Checking template existence", err)
+	if res.StatusCode == 200 {
+		return directUrl
+	}
 
-    log.Error("Template not found")
+	log.Error("Template not found")
 
-    //should not reach here
-    return ""
+	//should not reach here
+	return ""
+}
+
+func isWrappedTemplateUrl(url string) bool {
+	return strings.HasSuffix(url, wrappedTemplateSuffix)
 }
 
 func downloadFromGateway(template Template) {
-    templateUrl := getTemplateUrl(template)
+	templateUrl := getTemplateUrl(template)
 	attempts := 1
 	var err error
 
 	for err = doDownload(template, templateUrl);
-	    err != nil && attempts < maxDownloadAttempts;
-	    err = doDownload(template, templateUrl) {
-		    attempts++
+		err != nil && attempts < maxDownloadAttempts;
+	err = doDownload(template, templateUrl) {
+		attempts++
 	}
 
 	log.Check(log.ErrorLevel, "Download completed", err)
@@ -366,10 +372,16 @@ func downloadFromGateway(template Template) {
 func doDownload(template Template, templateUrl string) error {
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
 
+	isWrapped := isWrappedTemplateUrl(templateUrl)
+	wrappedSuffix := ""
+	if isWrapped {
+		wrappedSuffix = "_wrap"
+	}
+
 	// create client
 	client := grab.NewClient()
 
-	req, err := grab.NewRequest(templatePath, templateUrl)
+	req, err := grab.NewRequest(templatePath+wrappedSuffix, templateUrl)
 
 	if log.Check(log.DebugLevel, fmt.Sprintf("Preparing request %v", req.URL()), err) {
 		return err
@@ -405,11 +417,17 @@ Loop:
 		}
 	}
 
-    bar.Finish()
+	bar.Finish()
 
 	// check for errors
 	if log.Check(log.DebugLevel, "Checking download status", resp.Err()) {
 		return err
+	}
+
+	if isWrapped {
+		//rename template
+		os.RemoveAll(templatePath)
+		log.Check(log.ErrorLevel, "Renaming template", os.Rename(templatePath+wrappedSuffix, templatePath))
 	}
 
 	//check md5 sum
