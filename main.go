@@ -64,10 +64,14 @@ func checkGPG() {
 }
 
 func loadManagementIp() {
-	if len(strings.TrimSpace(config.Management.Host)) == 0 {
-		ip, err := db.INSTANCE.DiscoveryLoad()
-		if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
-			config.Management.Host = ip
+	if len(strings.TrimSpace(config.ManagementIP)) == 0 {
+		if strings.TrimSpace(config.Management.Host) == "" {
+			ip, err := db.INSTANCE.DiscoveryLoad()
+			if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
+				config.ManagementIP = ip
+			}
+		} else {
+			config.ManagementIP = config.Management.Host
 		}
 	}
 }

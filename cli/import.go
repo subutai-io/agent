@@ -240,7 +240,7 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 				archiveExists = false
 			}
 		} else {
-			log.Warn("Skipping file integrity verification since -local flag was passed")
+			log.Warn("Skipping file integrity verification since --local flag was passed")
 		}
 
 	} else {

@@ -137,7 +137,7 @@ func restoreContainers() {
 }
 
 func checkSS() (status bool) {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8443/rest/v1/peer/inited")
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
 	if err == nil {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusOK {
@@ -167,7 +167,7 @@ func connectionMonitor() {
 }
 
 func doCheckConnection() {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/check/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + fingerprint)
 	if err == nil {
 		defer utils.Close(resp)
 	}
@@ -178,6 +178,11 @@ func doCheckConnection() {
 		connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		lastHeartbeat = []byte{}
 		go sendHeartbeat()
+
+		//reset config.ManagementIP to enable rediscovery
+		if strings.TrimSpace(config.Management.Host) == "" {
+			config.ManagementIP = ""
+		}
 	}
 }
 
@@ -216,7 +221,7 @@ func sendHeartbeat() bool {
 		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
-		resp, err := PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		resp, err := PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 			defer utils.Close(resp)
 
@@ -290,7 +295,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -308,7 +313,7 @@ func sendResponse(msg []byte, deadline time.Time) {
 func command() {
 	var rsp []executer.EncRequest
 
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/requests/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + fingerprint)
 
 	if err == nil {
 		defer utils.Close(resp)
@@ -332,7 +337,7 @@ func command() {
 }
 
 func pingHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
@@ -340,7 +345,7 @@ func pingHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 func triggerHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodPost && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodPost && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusAccepted)
 		go command()
 	} else {
@@ -349,7 +354,7 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
 		lastHeartbeat = []byte{}
 		go sendHeartbeat()
