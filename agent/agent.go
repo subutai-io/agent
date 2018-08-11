@@ -177,7 +177,7 @@ func doCheckConnection() {
 		log.Debug("Connection monitor check - failed")
 		connect.Request(config.Agent.GpgUser, config.Management.Secret)
 		lastHeartbeat = []byte{}
-		go sendHeartbeat()
+		sendHeartbeat()
 
 		//reset config.ManagementIP to enable rediscovery
 		if strings.TrimSpace(config.Management.Host) == "" {
