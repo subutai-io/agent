@@ -461,7 +461,23 @@ func downloadViaLocalIPFSNode(template Template) {
 
 	//download template
 	_, err = exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
-	log.Check(log.FatalLevel, "Downloading template", err)
+	log.Check(log.FatalLevel, "Checking download status", err)
+
+	//check if download is a directory
+	isDir, err := fs.IsDir(templatePath)
+	log.Check(log.ErrorLevel, "Checking if file is directory", err)
+
+	if isDir {
+		//move template archive outside
+		archivePath := path.Join(templatePath, template.Name+wrappedTemplateSuffix)
+		tmpPath := path.Join(config.Agent.CacheDir, template.Name+wrappedTemplateSuffix)
+		os.RemoveAll(tmpPath)
+		log.Check(log.ErrorLevel, "Moving template archive out of wrapping directory", os.Rename(archivePath, tmpPath))
+		//remove directory and rename archive
+		os.RemoveAll(templatePath)
+		log.Check(log.ErrorLevel, "Restoring template archive path", os.Rename(tmpPath, templatePath))
+
+	}
 
 	//verify its md5 sum
 	if template.MD5 != md5sum(templatePath) {
