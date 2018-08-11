@@ -20,19 +20,19 @@ try {
                 switch (env.BRANCH_NAME) {
                     case ~/master/: 
                         cdnHost = "masterbazaar.subutai.io";
-                        sshJumpServer = "mastercdn.subutai.io";
+                        sshJumpServer = "mastertun.subutai.io";
                         break;
                     case ~/dev/: 
                         cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "devcdn.subutai.io";
+                        sshJumpServer = "devtun.subutai.io";
                         break;
                     case ~/sysnet/:
                         cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "sysnetcdn.subutai.io";
+                        sshJumpServer = "devtun.subutai.io";
                         break;
                     default:
                         cdnHost = "bazaar.subutai.io";
-                        sshJumpServer = "cdn.subutai.io";
+                        sshJumpServer = "tun.subutai.io";
                 }
                 def release = env.BRANCH_NAME
 
@@ -79,8 +79,8 @@ try {
 		sh """
 			cd ${CWD}
 			touch uploading_agent
-			scp uploading_agent subutai*.deb dak@deb.subutai.io:incoming/${release}/
-			ssh dak@deb.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
+			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
+			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
 		"""
 	}
 
