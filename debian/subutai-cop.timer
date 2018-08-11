@@ -1,0 +1,10 @@
+[Unit]
+Description=Subutai Service Healthcheck
+
+[Timer]
+OnUnitActiveSec=1h
+RandomizedDelaySec=120
+Unit=subutai-cop.service
+
+[Install]
+WantedBy=multi-user.target
