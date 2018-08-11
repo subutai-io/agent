@@ -55,6 +55,16 @@ func FileSize(path string) (int64, error) {
 	return stat.Size(), nil
 }
 
+func IsDir(path string) (bool, error) {
+	stat, err := os.Stat(path)
+
+	if err != nil {
+		return false, err
+	}
+
+	return stat.IsDir(), nil
+}
+
 // md5sum returns MD5 hash sum of specified file
 func Md5Sum(filePath string) (string, error) {
 	file, err := os.Open(filePath)
