@@ -1,42 +1,73 @@
 #!/bin/sh
 
 KNOWN_UNITS="subutai-nginx subutai-ovs subutai-dnsmasq subutai-forwarding subutai-roaming subutai-p2p subutai subutai-rng"
+LOG_DIR=/var/log/subutai
+LOG_FILE=$LOG_DIR/cop.log
+NAME=subutai-cop
+
+clog() {
+    DATIUM=$(date +"%b %d %T")
+    HOST=$(hostname)
+    case $2 in
+        ERR|ERROR) LV="ERROR";;
+        WARN|WARNING) LV="WARN";;
+        DBG|DEBUG) LV="DEBUG";;
+        *) LV="INFO";;
+    esac
+    printf "$1" 1>&2
+    [ -d "$LOG_DIR" ] || mkdir -p $LOG_DIR
+    [ -w "$LOG_FILE" ] || rm -f $LOG_FILE
+    printf "$DATIUM ${HOST} ${NAME}[$$]: [$LV] $1" >> "$LOG_FILE"
+}
 
 count_service(){
     CNT=0
     for i in $KNOWN_UNITS; do
         CNT=$((CNT+1))
     done
-
     echo $CNT
 }
 
-echo "cop engaged, checking services"
+clog "cop engaged, checking services\\n"
 
 check_service() {
+    TGT=$1
     RET=0
     for i in $KNOWN_UNITS; do
         if systemctl is-enabled --quiet "$i".service; then
             if ! systemctl is-active --quiet "$i".service; then
                 RET=1
-		printf "${i}.service is inactive, trying to restart... "
-                systemctl restart "$i".service;
-		printf "done, will re-check everything shortly\n"
+                if [ -z "$TGT" ]; then
+                    TGT="${i}.service"
+                    clog "${i}.service is inactive, restart queued\\n" "ERROR"
+                elif [ -z "${TGT##*${i}.service*}" ]; then
+                    clog "${i} is inactive after restart, queuing again\\n" "ERROR"
+                else
+                    TGT="$TGT ${i}.service"
+                    clog "${i}.service is inactive, restart queued\\n" "ERROR"
+                fi
+                systemctl restart --no-block "$i".service;
+            elif [ ! -z "$TGT" ] && [ -z "${TGT##*${i}.service*}" ]; then
+		    TGT=$(echo "$TGT" | sed "s/${i}.service//")
+                clog "${i}.service is active after restart\\n" "WARN"
             fi
-        else
-	    printf "${i}.service is disabled, please enable to retain functionality:\n  systemctl enable --now ${i}.service\n"
+        elif [ -z "$TGT" ]; then
+            clog "${i}.service is disabled, enable with:\\n  systemctl enable --now ${i}.service\\n" "ERROR"
         fi
     done
     if [ $RET -eq 1 ]; then
-	return 1
+        echo "$TGT"
+        return 1
     fi
 }
 
+
 CNT=$(count_service)
 PASS=0
+TGT=""
 while [ $PASS -le $CNT ]; do
-    check_service && printf "cop leaving, enabled sevices are functional\n" && exit
-    sleep 1 && PASS=$((PASS+1))
+    TGT=$(check_service $TGT) && clog "cop leaving, enabled services are functional\\n" && exit
+    PASS=$((PASS+1)) && clog "scheduling recheck of services ($PASS/$CNT)...\\n" && sleep 3
 done
 
-printf "cop leaving, retry limit reached, failed to reactivate the service\n  Please contact support for more information.\n" 
+clog "cop leaving, retry limit reached, failed to reactivate some service(s): $TGT\\n  Please contact support for more information.\\n" "WARN"
