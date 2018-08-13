@@ -38,7 +38,7 @@ type Iface struct {
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + path.Join(config.Management.Host) + ":8086",
+		Addr:               "https://" + path.Join(config.ManagementIP) + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		Timeout:            time.Second * 60,

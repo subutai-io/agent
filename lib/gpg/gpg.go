@@ -176,7 +176,7 @@ func GetFingerprint(email string) string {
 //TODO use single method
 func getMngKey(c string) {
 	client := utils.GetClient(config.Management.AllowInsecure, 30)
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
 	log.Check(log.FatalLevel, "Getting Management public key", err)
 
 	defer utils.Close(resp)
@@ -222,7 +222,7 @@ func sendData(c string) {
 
 	client := utils.TLSConfig()
 	client.Timeout = time.Second * 30
-	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
+	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
 	log.Check(log.FatalLevel, "Sending registration request to management", err)
