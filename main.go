@@ -68,10 +68,10 @@ func loadManagementIp() {
 		if strings.TrimSpace(config.Management.Host) == "" {
 			ip, err := db.INSTANCE.DiscoveryLoad()
 			if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
-				config.ManagementIP = ip
+				config.ManagementIP = strings.TrimSpace(ip)
 			}
 		} else {
-			config.ManagementIP = config.Management.Host
+			config.ManagementIP = strings.TrimSpace(config.Management.Host)
 		}
 	}
 }

@@ -46,16 +46,15 @@ type heartbeat struct {
 }
 
 var (
-	lastHeartbeat        []byte
-	mutex                sync.Mutex
-	fingerprint          string
-	hostname, _          = os.Hostname()
-	client               *http.Client
-	instanceType         string
-	instanceArch         string
-	lastHeartbeatTime    time.Time
-	pool                 []container.Container
-	canRestoreContainers = true
+	lastHeartbeat     []byte
+	mutex             sync.Mutex
+	fingerprint       string
+	hostname, _       = os.Hostname()
+	client            *http.Client
+	instanceType      string
+	instanceArch      string
+	lastHeartbeatTime time.Time
+	pool              []container.Container
 )
 
 func initAgent() {
@@ -128,15 +127,16 @@ func Start() {
 
 func restoreContainers() {
 	for {
-		if !canRestoreContainers {
-			return
-		}
-		container.StateRestore(&canRestoreContainers)
+		container.StateRestore()
 		time.Sleep(time.Second * 30)
 	}
 }
 
 func checkSS() (status bool) {
+	if config.ManagementIP == "" {
+		return false
+	}
+
 	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
 	if err == nil {
 		defer utils.Close(resp)

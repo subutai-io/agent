@@ -80,7 +80,7 @@ func Monitor() {
 		} else {
 			go common.RunNRecover(client)
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -111,7 +111,8 @@ func server() {
 			Location:    net.GetIp(),
 			MaxAge:      3600,
 		})
-		for len(fingerprint(config.ManagementIP)) > 0 {
+
+		for len(config.ManagementIP) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
 			time.Sleep(30 * time.Second)
 		}
 	} else {
@@ -161,6 +162,8 @@ func fingerprint(ip string) string {
 }
 
 func save(ip string) {
+	ip = strings.TrimSpace(ip)
+
 	log.Debug("Saving management host IP " + ip)
 
 	db.INSTANCE.DiscoverySave(ip)
