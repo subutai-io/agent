@@ -8,7 +8,6 @@ import (
 	"time"
 	"net/http"
 	"net/url"
-	"code.cloudfoundry.org/archiver/extractor"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
@@ -257,9 +256,8 @@ func LxcImport(name, token string, local bool, auxDepList ...string) {
 	//!important used by Console
 	log.Info("Unpacking template " + t.Name)
 	log.Debug(localArchive + " to " + templateRef)
-	tgz := extractor.NewTgz()
 	extractDir := path.Join(config.Agent.CacheDir, templateRef)
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(localArchive, extractDir))
+	log.Check(log.FatalLevel, "Extracting tgz", fs.Decompress(localArchive, extractDir))
 
 	templateName := container.GetConfigItem(extractDir+"/config", "subutai.template")
 	templateOwner := container.GetConfigItem(extractDir+"/config", "subutai.template.owner")
