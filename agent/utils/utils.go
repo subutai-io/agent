@@ -237,7 +237,7 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 
 func GetConsolePubKey() []byte {
 	clnt := GetClient(config.Management.AllowInsecure, 30)
-	resp, err := clnt.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
+	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {
 		defer Close(resp)

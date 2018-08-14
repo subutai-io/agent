@@ -83,7 +83,8 @@ var (
 
 	//info command
 	infoCmd            = app.Command("info", "System information")
-	infoIdCmd          = infoCmd.Command("id", "host id")
+	infoIdCmd          = infoCmd.Command("id", "host/container id")
+	infoIdContainer    = infoIdCmd.Arg("container", "container name").String()
 	infoSystemCmd      = infoCmd.Command("system", "host info").Alias("sys")
 	infoOsCmd          = infoCmd.Command("os", "host os")
 	infoIpCmd          = infoCmd.Command("ipaddr", "host ip address").Alias("ip")
@@ -268,7 +269,7 @@ func main() {
 	case importCmd.FullCommand():
 		cli.LxcImport(*importName, *importSecret)
 	case infoIdCmd.FullCommand():
-		fmt.Println(cli.GetFingerprint())
+		fmt.Println(cli.GetFingerprint(*infoIdContainer))
 	case infoSystemCmd.FullCommand():
 		fmt.Println(cli.GetSystemInfo())
 	case infoOsCmd.FullCommand():

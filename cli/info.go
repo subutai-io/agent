@@ -298,11 +298,16 @@ func GetSystemInfo() string {
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	return sysLoad(host)
 }
+
 //TODO add host parameter
-func GetFingerprint() string {
+func GetFingerprint(container string) string {
 	//os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	//defer os.Unsetenv("GNUPGHOME")
-	return gpg.GetFingerprint(config.Agent.GpgUser)
+	if container == "" {
+		return gpg.GetFingerprint(config.Agent.GpgUser)
+	} else {
+		return gpg.GetFingerprint(container)
+	}
 }
 
 func GetOsName() string {

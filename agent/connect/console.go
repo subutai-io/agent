@@ -17,6 +17,7 @@ import (
 	"path"
 	"time"
 	"net/http"
+	"github.com/subutai-io/agent/agent/heartbeat"
 )
 
 type rHost struct {
@@ -66,7 +67,7 @@ func sendRegistrationRequest(user, pass string) {
 }
 
 func IsConsoleReady() (status bool) {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8443/rest/v1/peer/ready")
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
 	if err == nil {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusOK {
@@ -105,5 +106,11 @@ func doCheckConnection() {
 	} else {
 		log.Debug("Connection monitor check - failed")
 		sendRegistrationRequest(config.Agent.GpgUser, config.Management.Secret)
+		heartbeat.ForceHeartBeat()
+
+		//reset config.ManagementIP to enable rediscovery
+		if strings.TrimSpace(config.Management.Host) == "" {
+			config.ManagementIP = ""
+		}
 	}
 }
