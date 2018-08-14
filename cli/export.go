@@ -13,10 +13,15 @@ import (
 	"github.com/subutai-io/agent/agent/utils"
 	"strings"
 	"path"
-	"github.com/subutai-io/agent/lib/exec"
 	"regexp"
-	"net/url"
 	"encoding/json"
+	"mime/multipart"
+	"gopkg.in/cheggaaa/pb.v1"
+	"io"
+	"fmt"
+	"net/http"
+	"time"
+	"sync"
 )
 
 var (
@@ -31,6 +36,10 @@ var (
 // The template's version can also specified on export so the import command can use it to request specific versions.
 
 func LxcExport(name, newname, version, prefsize, token string, local bool) {
+    //check new template name
+    if newname != "" {
+        utils.VerifyLxcName(newname)
+    }
 
 	if !container.IsContainer(name) {
 		log.Error("Container " + name + " not found")
@@ -148,7 +157,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//archive template contents
 	templateArchive := dst + ".tar.gz"
-	fs.Tar(dst, templateArchive)
+	fs.Compress(dst, templateArchive)
 	log.Check(log.FatalLevel, "Removing temporary file", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
@@ -173,17 +182,11 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//upload to CDN
 	if !local {
-
-		if hash, err := addToCdn(templateArchive); err != nil {
+		if err := upload(templateArchive, token); err != nil {
 			log.Error("Failed to upload template: " + err.Error())
 		} else {
-			templateInfo.Id = strings.TrimSpace(hash)
-
-			registerWithCdn(templateInfo, token)
-
-			templateJson, _ := json.Marshal(templateInfo)
 			//IMPORTANT: used by Console
-			log.Info("Template uploaded, " + string(templateJson))
+			log.Info("Template uploaded")
 		}
 	} else {
 		templateJson, _ := json.Marshal(templateInfo)
@@ -200,13 +203,13 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 func getOwner(token string) string {
 
-	cdnUrl := config.CdnUrl + "/users/username?token=" + token
+	theUrl := config.CdnUrl + "/users/username?token=" + token
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(cdnUrl, clnt, 3)
+	response, err := utils.RetryGet(theUrl, clnt, 3)
 
-	log.Check(log.ErrorLevel, "Getting owner, get: "+cdnUrl, err)
+	log.Check(log.ErrorLevel, "Getting owner, get: "+theUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode != 200 {
@@ -222,18 +225,70 @@ func getOwner(token string) string {
 
 }
 
-func addToCdn(path string) (string, error) {
-	return exec.ExecuteOutput("ipfs", "add", "--progress", "-Q", path)
-}
+func upload(template, token string) error {
 
-func registerWithCdn(template Template, token string) {
-	client := utils.GetClient(config.CDN.Allowinsecure, 15)
-	templateMeta, err := json.Marshal(&template)
-	log.Check(log.ErrorLevel, "Serializing template metadata", err)
+	file, err := os.Open(template)
+	if log.Check(log.DebugLevel, "Opening template for upload", err) {
+		return err
+	}
+	defer file.Close()
 
-	resp, err := client.PostForm(config.CdnUrl+"/templates", url.Values{"token": {token}, "template": {string(templateMeta)}})
-	log.Check(log.ErrorLevel, "Registering template with CDN", err)
-	utils.Close(resp)
+	fStat, err := file.Stat()
+	if log.Check(log.DebugLevel, "Getting template size", err) {
+		return err
+	}
+
+	bar := pb.New64(fStat.Size()).SetUnits(pb.U_BYTES).SetRefreshRate(time.Millisecond * 10)
+	bar.Start()
+	defer bar.Finish()
+
+	r, w := io.Pipe()
+	mpw := multipart.NewWriter(w)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	//feed file in a routine
+	go func() {
+		var part io.Writer
+		defer wg.Done()
+		defer bar.Finish()
+		defer file.Close()
+		defer w.Close()
+
+		if err = mpw.WriteField("token", token); err != nil {
+			w.CloseWithError(err)
+		}
+
+		if part, err = mpw.CreateFormFile("file", fStat.Name()); err != nil {
+			w.CloseWithError(err)
+		}
+		part = io.MultiWriter(part, bar)
+		if _, err = io.Copy(part, file); err != nil {
+			w.CloseWithError(err)
+		}
+		if err = mpw.Close(); err != nil {
+			w.CloseWithError(err)
+		}
+	}()
+
+	resp, err := http.Post(config.CdnUrl+"/uploadTemplate", mpw.FormDataContentType(), r)
+
+	wg.Wait()
+
+	if log.Check(log.DebugLevel, "Uploading template", err) {
+		return err
+	}
+	defer utils.Close(resp)
+
+	out, err := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
+	} else {
+		log.Debug(string(out))
+	}
+
+	return nil
 }
 
 func updateTemplateConfig(path string, params [][]string) error {

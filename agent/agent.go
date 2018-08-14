@@ -133,7 +133,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := client.PostForm("https://"+path.Join(config.Management.Host)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -151,7 +151,7 @@ func sendResponse(msg []byte, deadline time.Time) {
 func command() {
 	var rsp []executer.EncRequest
 
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/requests/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + fingerprint)
 
 	if err == nil {
 		defer utils.Close(resp)
@@ -194,7 +194,7 @@ func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func setupHttpServer() {
 	srv := &http.Server{
 		Addr:              ":7070",
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		Handler:           &myHandler{},
@@ -207,7 +207,7 @@ func setupHttpServer() {
 }
 
 func pingHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
@@ -215,7 +215,7 @@ func pingHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 func triggerHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodPost && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodPost && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusAccepted)
 		go command()
 	} else {
@@ -224,7 +224,7 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.Management.Host {
+	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
 		go heartbeat.ForceHeartBeat()
 	} else {
@@ -233,3 +233,13 @@ func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 //<<<HTTP server
+
+func PostForm(url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return client.Do(req)
+}

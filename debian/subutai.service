@@ -5,7 +5,8 @@ Description=Subutai Daemon
 Type=simple
 ExecStart=/usr/bin/subutai daemon
 KillMode=process
-Restart=on-abnormal
+Restart=always
+OnFailure=subutai-cop.service
 
 [Install]
 WantedBy=multi-user.target

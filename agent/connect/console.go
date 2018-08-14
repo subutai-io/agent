@@ -38,7 +38,7 @@ var (
 )
 //sendRegistrationRequest collecting connection request and sends to the Management server.
 func sendRegistrationRequest(user, pass string) {
-	log.Debug("Connecting to " + config.Management.Host + ":" + config.Management.Port)
+	log.Debug("Connecting to " + config.ManagementIP + ":" + config.Management.Port)
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
 
@@ -55,9 +55,9 @@ func sendRegistrationRequest(user, pass string) {
 	})
 	log.Check(log.WarnLevel, "Marshal Resource host json: "+string(rh), err)
 
-	client := utils.GetClient(config.Management.Allowinsecure, 15)
+	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
-	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
+	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
@@ -96,7 +96,7 @@ func CheckRegisterWithConsole() {
 }
 
 func doCheckConnection() {
-	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":8444/rest/v1/agent/check/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + fingerprint)
 	if err == nil {
 		defer utils.Close(resp)
 	}

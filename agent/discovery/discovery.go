@@ -30,7 +30,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 
-	managementHostIp := config.Management.Host
+	managementHostIp := config.ManagementIP
 	if managementHostIp == "10.10.10.1" {
 		managementHostIp = ""
 	}
@@ -79,7 +79,7 @@ func Monitor() {
 		} else {
 			go common.RunNRecover(client)
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(10 * time.Second)
 	}
 }
 
@@ -106,11 +106,12 @@ func server() {
 		log.Debug("Launching SSDP server on " + address)
 		s.AdvertiseServer(gossdp.AdvertisableServer{
 			ServiceType: address,
-			DeviceUuid:  fingerprint(config.Management.Host),
+			DeviceUuid:  fingerprint(config.ManagementIP),
 			Location:    net.GetIp(),
 			MaxAge:      3600,
 		})
-		for len(fingerprint(config.Management.Host)) > 0 {
+
+		for len(config.ManagementIP) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
 			time.Sleep(30 * time.Second)
 		}
 	} else {
@@ -119,7 +120,7 @@ func server() {
 }
 
 func client() {
-	if len(strings.TrimSpace(config.Management.Host)) > 0 && len(fingerprint(config.Management.Host)) > 0 {
+	if len(strings.TrimSpace(config.ManagementIP)) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
 		return
 	}
 
@@ -138,7 +139,7 @@ func client() {
 }
 
 func fingerprint(ip string) string {
-	client := utils.GetClient(config.Management.Allowinsecure, 5)
+	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	resp, err := client.Get("https://" + ip + ":8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
 		defer utils.Close(resp)
@@ -160,11 +161,13 @@ func fingerprint(ip string) string {
 }
 
 func save(ip string) {
+	ip = strings.TrimSpace(ip)
+
 	log.Debug("Saving management host IP " + ip)
 
 	db.INSTANCE.DiscoverySave(ip)
 
-	config.Management.Host = ip
+	config.ManagementIP = ip
 }
 
 func LoadManagementIp() {

@@ -298,6 +298,7 @@ func GetSystemInfo() string {
 	log.Check(log.DebugLevel, "Getting hostname of the system", err)
 	return sysLoad(host)
 }
+//TODO add host parameter
 func GetFingerprint() string {
 	//os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	//defer os.Unsetenv("GNUPGHOME")

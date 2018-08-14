@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"code.cloudfoundry.org/archiver/extractor"
+	"net/http"
+	"net/url"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
@@ -20,7 +20,15 @@ import (
 	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/cavaliercoder/grab"
+	"fmt"
+	"gopkg.in/cheggaaa/pb.v1"
+	"github.com/pkg/errors"
 )
+
+const maxDownloadAttempts = 3
+
+const wrappedTemplateSuffix = ".tar.gz"
 
 type Template struct {
 	Id       string `json:"id"`
@@ -42,13 +50,13 @@ func init() {
 
 // getTemplateInfoById retrieves template name from global repository by passed id string
 func getTemplateInfoById(t *Template, id string) {
-	url := config.CdnUrl + "/template?id=" + id
+	theUrl := config.CdnUrl + "/template?id=" + id
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(url, clnt, 3)
+	response, err := utils.RetryGet(theUrl, clnt, 3)
 
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
@@ -79,23 +87,23 @@ func getTemplateInfoById(t *Template, id string) {
 
 //TODO urlEncode the kurjun URL
 func getTemplateInfoByName(t *Template, name string, owner string, version string) {
-	url := config.CdnUrl + "/template?name=" + name
+	theUrl := config.CdnUrl + "/template?name=" + name
 
 	if owner != "" {
-		url += "&owner=" + owner
+		theUrl += "&owner=" + owner
 	}
 
 	if version == "" {
-		url += "&version=latest"
+		theUrl += "&version=latest"
 	} else {
-		url += "&version=" + version
+		theUrl += "&version=" + version
 	}
 
-	clnt := utils.GetClient(config.CDN.Allowinsecure, 15)
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(url, clnt, 3)
+	response, err := utils.RetryGet(theUrl, clnt, 3)
 
-	log.Check(log.ErrorLevel, "Retrieving template info, get: "+url, err)
+	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
 	defer utils.Close(response)
 
 	if response.StatusCode == 404 {
@@ -124,7 +132,6 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
-//TODO remove template cache
 func getTemplateInfo(template string) Template {
 
 	var t Template
@@ -232,13 +239,11 @@ func LxcImport(name, token string, auxDepList ...string) {
 				log.Debug("File integrity is verified")
 			} else {
 
-				log.Warn("File integrity verification failed")
-
 				//make agent re-download verified template from CDN
 				archiveExists = false
 			}
 		} else {
-			log.Warn("Skipping file integrity verification for local import")
+			log.Warn("Skipping file integrity verification since --local flag was passed")
 		}
 
 	} else {
@@ -253,9 +258,8 @@ func LxcImport(name, token string, auxDepList ...string) {
 	//!important used by Console
 	log.Info("Unpacking template " + t.Name)
 	log.Debug(localArchive + " to " + templateRef)
-	tgz := extractor.NewTgz()
 	extractDir := path.Join(config.Agent.CacheDir, templateRef)
-	log.Check(log.FatalLevel, "Extracting tgz", tgz.Extract(localArchive, extractDir))
+	log.Check(log.FatalLevel, "Extracting tgz", fs.Decompress(localArchive, extractDir))
 
 	templateName := container.GetConfigItem(extractDir+"/config", "subutai.template")
 	templateOwner := container.GetConfigItem(extractDir+"/config", "subutai.template.owner")
@@ -264,7 +268,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	if local {
 		//rename template directory to follow full reference convention
 		templateRef = strings.Join([]string{templateName, templateOwner, templateVersion}, ":")
-		os.Rename(extractDir, path.Join(config.Agent.CacheDir, templateRef))
+		log.Check(log.ErrorLevel, "Renaming template", os.Rename(extractDir, path.Join(config.Agent.CacheDir, templateRef)))
 		extractDir = path.Join(config.Agent.CacheDir, templateRef)
 	}
 
@@ -312,6 +316,130 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 func download(template Template) {
 
+	if utils.IsValidUrl(config.CDN.TemplateDownloadUrl) {
+		downloadFromGateway(template)
+	} else {
+		downloadViaLocalIPFSNode(template)
+	}
+
+}
+
+func getTemplateUrl(template Template) string {
+
+	directUrl := strings.Replace(config.CDN.TemplateDownloadUrl, "{ID}", template.Id, 1)
+
+	u, err := url.Parse(directUrl)
+	log.Check(log.ErrorLevel, "Parsing template url", err)
+
+	u.Path = path.Join(u.Path, template.Name)
+	wrappedUrl := u.String() + wrappedTemplateSuffix
+	res, err := http.Head(wrappedUrl)
+	log.Check(log.ErrorLevel, "Checking wrapped template existence", err)
+	if res.StatusCode == 200 {
+		return wrappedUrl
+	}
+
+	res, err = http.Head(directUrl)
+	log.Check(log.ErrorLevel, "Checking template existence", err)
+	if res.StatusCode == 200 {
+		return directUrl
+	}
+
+	log.Error("Template not found")
+
+	//should not reach here
+	return ""
+}
+
+func isWrappedTemplateUrl(url string) bool {
+	return strings.HasSuffix(url, wrappedTemplateSuffix)
+}
+
+func downloadFromGateway(template Template) {
+	templateUrl := getTemplateUrl(template)
+	attempts := 1
+	var err error
+
+	for err = doDownload(template, templateUrl);
+		err != nil && attempts < maxDownloadAttempts;
+	err = doDownload(template, templateUrl) {
+		attempts++
+	}
+
+	log.Check(log.ErrorLevel, "Download completed", err)
+}
+
+func doDownload(template Template, templateUrl string) error {
+	templatePath := path.Join(config.Agent.CacheDir, template.Id)
+
+	isWrapped := isWrappedTemplateUrl(templateUrl)
+	wrappedSuffix := ""
+	if isWrapped {
+		wrappedSuffix = "_wrap"
+	}
+
+	// create client
+	client := grab.NewClient()
+
+	req, err := grab.NewRequest(templatePath+wrappedSuffix, templateUrl)
+
+	if log.Check(log.DebugLevel, fmt.Sprintf("Preparing request %v", req.URL()), err) {
+		return err
+	}
+
+	//!important used by Console
+	log.Info("Downloading " + template.Name)
+
+	// start download
+	resp := client.Do(req)
+	log.Debug("Http status ", resp.HTTPResponse.Status)
+
+	// start UI loop
+	t := time.NewTicker(100 * time.Millisecond)
+	defer t.Stop()
+
+	bar := pb.New(int(resp.Size)).SetUnits(pb.U_BYTES)
+	if resp.Size <= 0 {
+		bar.NotPrint = true
+	}
+	bar.Start()
+	defer bar.Finish()
+Loop:
+	for {
+		select {
+		case <-t.C:
+			bar.Set(int(resp.BytesComplete()))
+
+		case <-resp.Done:
+			// download is complete
+			bar.Set(int(resp.BytesComplete()))
+			break Loop
+		}
+	}
+
+	bar.Finish()
+
+	// check for errors
+	if log.Check(log.DebugLevel, "Checking download status", resp.Err()) {
+		return err
+	}
+
+	if isWrapped {
+		//rename template
+		os.RemoveAll(templatePath)
+		log.Check(log.ErrorLevel, "Renaming template", os.Rename(templatePath+wrappedSuffix, templatePath))
+	}
+
+	//check md5 sum
+	if template.MD5 != md5sum(templatePath) {
+		return errors.New("File integrity verification failed")
+	}
+
+	return nil
+}
+
+//todo check if template is wrapped
+func downloadViaLocalIPFSNode(template Template) {
 	log.Debug("Checking template availability in CDN network...")
 
 	//check local node
@@ -333,7 +461,23 @@ func download(template Template) {
 
 	//download template
 	_, err = exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
-	log.Check(log.FatalLevel, "Downloading template", err)
+	log.Check(log.FatalLevel, "Checking download status", err)
+
+	//check if download is a directory
+	isDir, err := fs.IsDir(templatePath)
+	log.Check(log.ErrorLevel, "Checking if file is directory", err)
+
+	if isDir {
+		//move template archive outside
+		archivePath := path.Join(templatePath, template.Name+wrappedTemplateSuffix)
+		tmpPath := path.Join(config.Agent.CacheDir, template.Name+wrappedTemplateSuffix)
+		os.RemoveAll(tmpPath)
+		log.Check(log.ErrorLevel, "Moving template archive out of wrapping directory", os.Rename(archivePath, tmpPath))
+		//remove directory and rename archive
+		os.RemoveAll(templatePath)
+		log.Check(log.ErrorLevel, "Restoring template archive path", os.Rename(tmpPath, templatePath))
+
+	}
 
 	//verify its md5 sum
 	if template.MD5 != md5sum(templatePath) {

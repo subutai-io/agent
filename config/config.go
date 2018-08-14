@@ -29,9 +29,10 @@ type managementConfig struct {
 	Port          string
 	Secret        string
 	GpgUser       string
+//TODO remove
 	RestPublicKey string
 	Fingerprint   string
-	Allowinsecure bool
+	AllowInsecure bool
 }
 
 type influxdbConfig struct {
@@ -41,10 +42,11 @@ type influxdbConfig struct {
 }
 
 type cdnConfig struct {
-	Allowinsecure bool
-	URL           string
-	SSLport       string
-	IpfsPath      string
+	AllowInsecure       bool
+	URL                 string
+	SSLport             string
+	IpfsPath            string
+	TemplateDownloadUrl string
 }
 
 type configFile struct {
@@ -56,10 +58,10 @@ type configFile struct {
 
 const defaultConfig = `
 	[agent]
+	debug = true
 	gpgUser =
 	gpgPassword = 12345678
 	gpgHome =
-	debug = true
 	dataPrefix = /var/lib/subutai/
 	lxcPrefix = /var/lib/lxc/
     dataset = subutai/fs
@@ -67,24 +69,25 @@ const defaultConfig = `
     sshJumpServer = cdn.subutai.io
 
 	[management]
-	gpgUser =
-	port = 8443
 	host =
+	port = 8443
 	secret = secret
+	gpgUser =
 	restPublicKey = /rest/v1/security/keyman/getpublickeyring
     fingerprint =
-	allowinsecure = true
+	allowInsecure = true
+
+	[influxdb]
+	db = metrics
+	user = root
+	pass = root
 
     [cdn]
     url = bazaar.subutai.io
-    sslport = 443
-    allowinsecure = false
+    sslPort = 443
     ipfsPath = /var/lib/ipfs/node
-
-	[influxdb]
-	user = root
-	pass = root
-	db = metrics
+    templateDownloadUrl = https://ipfs.subutai.io/ipfs/{ID}
+    allowInsecure = false
 
 `
 
@@ -98,7 +101,9 @@ var (
 	Influxdb influxdbConfig
 	// CDN url and port
 	CDN    cdnConfig
+
 	CdnUrl string
+	ManagementIP string
 )
 
 func init() {

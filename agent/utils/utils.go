@@ -21,6 +21,8 @@ import (
 	"io"
 	"regexp"
 	"path"
+	"net/url"
+	"fmt"
 	"strconv"
 )
 
@@ -37,7 +39,7 @@ type Iface struct {
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
 	return client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://" + path.Join(config.Management.Host) + ":8086",
+		Addr:               "https://" + path.Join(config.ManagementIP) + ":8086",
 		Username:           config.Influxdb.User,
 		Password:           config.Influxdb.Pass,
 		Timeout:            time.Second * 60,
@@ -91,7 +93,7 @@ func TLSConfig() *http.Client {
 		MaxIdleConns:    10,
 	}
 
-	return &http.Client{Transport: transport, Timeout: time.Second * 10}
+	return &http.Client{Transport: transport, Timeout: time.Second * 30}
 }
 
 func x509generate() {
@@ -171,7 +173,7 @@ func newTLSConfig() *tls.Config {
 		}
 	}
 
-	if config.Management.Allowinsecure {
+	if config.Management.AllowInsecure {
 		// Create tls.Config with desired tls properties
 		return &tls.Config{
 			ClientAuth:         tls.NoClientCert,
@@ -212,6 +214,22 @@ func CleanTemplateName(name string) string {
 	return reg.ReplaceAllString(name, "")
 }
 
+func VerifyLxcName(name string){
+    /*
+    The labels must follow the rules for ARPANET host names.  They must
+    start with a letter, end with a letter or digit, and have as interior
+    characters only letters, digits, and hyphen.  There are also some
+    restrictions on the length.  Labels must be 63 characters or less.
+    */
+
+	hostnameRegex := regexp.MustCompile(`^[[:alpha:]][[:alnum:]\-]{0,61}[[:alnum:]]$`)
+
+    if !hostnameRegex.MatchString(name) {
+        log.Error(fmt.Sprintf("value '%s' does not match %s",
+              			name, hostnameRegex.String()))
+    }
+}
+
 func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]string) {
 
 	match := regEx.FindStringSubmatch(url)
@@ -226,7 +244,7 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 }
 
 func GetConsolePubKey() []byte {
-	client := GetClient(config.Management.Allowinsecure, 5)
+	client := GetClient(config.Management.AllowInsecure, 30)
 	resp, err := client.Get("https://" + path.Join(config.Management.Host) + ":" + config.Management.Port + config.Management.RestPublicKey)
 
 	if err == nil {
@@ -245,4 +263,13 @@ func GetConsolePubKey() []byte {
 
 	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
 	return nil
+}
+
+func IsValidUrl(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }
