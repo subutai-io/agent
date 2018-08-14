@@ -15,8 +15,6 @@ import (
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/agent/discovery"
-	"strings"
-	"github.com/subutai-io/agent/db"
 )
 
 var version = "unknown"
@@ -228,20 +226,6 @@ func init() {
 	app.Version(version)
 	app.HelpFlag.Short('h')
 	app.VersionFlag.Hidden().Short('v')
-}
-
-
-func loadManagementIp() {
-	if len(strings.TrimSpace(config.ManagementIP)) == 0 {
-		if strings.TrimSpace(config.Management.Host) == "" {
-			ip, err := db.INSTANCE.DiscoveryLoad()
-			if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
-				config.ManagementIP = strings.TrimSpace(ip)
-			}
-		} else {
-			config.ManagementIP = strings.TrimSpace(config.Management.Host)
-		}
-	}
 }
 
 func main() {
