@@ -101,7 +101,9 @@ var (
 	Influxdb influxdbConfig
 	// CDN url and port
 	CDN    cdnConfig
+
 	CdnUrl string
+	ManagementIP string
 )
 
 func init() {

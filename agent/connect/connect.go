@@ -31,7 +31,7 @@ type rHost struct {
 
 //Request collecting connection request and sends to the Management server.
 func Request(user, pass string) {
-	log.Debug("Connecting to " + config.Management.Host + ":" + config.Management.Port)
+	log.Debug("Connecting to " + config.ManagementIP + ":" + config.Management.Port)
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
 
@@ -50,7 +50,7 @@ func Request(user, pass string) {
 
 	client := utils.GetClient(config.Management.AllowInsecure, 30)
 	msg, _ := gpg.EncryptWrapper(user, config.Management.GpgUser, rh)
-	resp, err := client.Post("https://"+path.Join(config.Management.Host)+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
+	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":"+config.Management.Port+"/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {

@@ -3,8 +3,6 @@ package fs
 import (
 	"io"
 	"os"
-	"github.com/jhoonb/archivex"
-
 	"github.com/subutai-io/agent/log"
 	"os/exec"
 	"crypto/md5"
@@ -23,14 +21,6 @@ func Copy(source string, dest string) {
 
 	_, err = io.Copy(df, sf)
 	log.Check(log.FatalLevel, "Copying file "+source+" to "+dest, err)
-}
-
-// Tar function creates archive file of specified folder
-func Tar(folder, file string) {
-	archive := new(archivex.TarFile)
-	archive.Create(file)
-	log.Check(log.FatalLevel, "Packing file "+folder, archive.AddAll(folder, false))
-	archive.Close()
 }
 
 func FileExists(name string) bool {
