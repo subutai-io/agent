@@ -85,6 +85,7 @@ func getTemplateInfoById(t *Template, id string) {
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
 
+//TODO extract all BZR CDN related functionality to own package
 //TODO urlEncode the url
 func getTemplateInfoByName(t *Template, name string, owner string, version string) {
 	theUrl := config.CdnUrl + "/template?name=" + name
