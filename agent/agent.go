@@ -57,9 +57,6 @@ func Start() {
 	go container.StateRestore()
 
 	for {
-		for !connect.IsConsoleReady() {
-			time.Sleep(time.Second * 10)
-		}
 
 		if heartbeat.HeartBeat() {
 			time.Sleep(30 * time.Second)
@@ -68,6 +65,10 @@ func Start() {
 		}
 
 		cli.CheckSshTunnels()
+
+		for !connect.IsConsoleReady() {
+			time.Sleep(time.Second * 10)
+		}
 	}
 }
 

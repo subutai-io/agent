@@ -65,6 +65,7 @@ func HeartBeat() bool {
 
 //send heartbeat immediately
 func ForceHeartBeat() bool {
+	lastHeartbeat = []byte{}
 	return sendHeartbeat()
 }
 
