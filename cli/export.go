@@ -36,10 +36,10 @@ var (
 // The template's version can also specified on export so the import command can use it to request specific versions.
 
 func LxcExport(name, newname, version, prefsize, token string, local bool) {
-    //check new template name
-    if newname != "" {
-        utils.VerifyLxcName(newname)
-    }
+	//check new template name
+	if newname != "" {
+		utils.VerifyLxcName(newname)
+	}
 
 	if !container.IsContainer(name) {
 		log.Error("Container " + name + " not found")
@@ -67,8 +67,8 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	}
 
 	//check template reference uniqueness
-	var theOwner string = owner
-	var theVersion string = version
+	var theOwner = owner
+	var theVersion = version
 	var theName string
 	if newname != "" {
 		theName = newname

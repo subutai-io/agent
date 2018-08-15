@@ -439,7 +439,6 @@ Loop:
 	return nil
 }
 
-//todo check if template is wrapped
 func downloadViaLocalIPFSNode(template Template) {
 	log.Debug("Checking template availability in CDN network...")
 
