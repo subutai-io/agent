@@ -57,19 +57,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	owner := getOwner(token)
 
-	wasRunning := false
-	if container.State(name) == "RUNNING" {
-		LxcStop(name)
-		wasRunning = true
-	}
-
-	pSize := "tiny"
-	for _, s := range allsizes {
-		if prefsize == s {
-			pSize = prefsize
-		}
-	}
-
 	parent := container.GetProperty(name, "subutai.parent")
 	parentOwner := container.GetProperty(name, "subutai.parent.owner")
 	parentVersion := container.GetProperty(name, "subutai.parent.version")
@@ -77,6 +64,34 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	if version == "" {
 		version = parentVersion
+	}
+
+	//check template reference uniqueness
+	var theOwner string = owner
+	var theVersion string = version
+	var theName string
+	if newname != "" {
+		theName = newname
+	} else {
+		theName = name
+	}
+
+	if templateExists(theName, theOwner, theVersion) {
+		log.Error(fmt.Sprintf("Template %s@%s:%s already exists on CDN", theName, theOwner, theVersion))
+	}
+
+	wasRunning := false
+	if container.State(name) == "RUNNING" {
+		LxcStop(name)
+		wasRunning = true
+	}
+
+	//preferred size
+	pSize := "tiny"
+	for _, s := range allsizes {
+		if prefsize == s {
+			pSize = prefsize
+		}
 	}
 
 	//cleanup files
@@ -114,7 +129,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//update template config
 	templateConf := [][]string{
-		//{"subutai.template", name},
 		{"subutai.template.owner", owner},
 		{"subutai.template.version", version},
 		{"subutai.template.size", pSize},
@@ -199,6 +213,23 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 		LxcStop(name)
 	}
 
+}
+
+func templateExists(name, owner, version string) bool {
+	theUrl := config.CdnUrl + "/template?name=" + name + "&owner=" + owner + "&version=" + version
+
+	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
+	resp, err := clnt.Get(theUrl)
+
+	log.Check(log.ErrorLevel, "Checking template", err)
+
+	defer utils.Close(resp)
+
+	if resp.StatusCode == http.StatusOK {
+		return true
+	}
+
+	return false
 }
 
 func getOwner(token string) string {
