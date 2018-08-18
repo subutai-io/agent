@@ -28,6 +28,7 @@ func LxcQuota(name, res, size, threshold string) {
 	case "network":
 		quota = container.QuotaNet(name, size)
 	case "disk":
+		//todo move to container.QuotaDisk
 		if len(size) > 0 {
 			vs, _ := strconv.Atoi(size)
 			fs.SetQuota(name, vs)

@@ -35,6 +35,14 @@ var (
 	daemonCmd = app.Command("daemon", "Run subutai agent daemon")
 
 	//subutai list command
+	/*
+	subutai list templates
+	subutai list containers
+	subutai list all
+	subutai list info
+	subutai list containers -n foo
+	subutai list all -p
+	 */
 	listCmd               = app.Command("list", "List containers/templates").Alias("ls")
 	listContainers        = listCmd.Command("containers", "List containers").Alias("c")
 	listTemplates         = listCmd.Command("templates", "List templates").Alias("t")
@@ -44,11 +52,18 @@ var (
 	listParents           = listCmd.Flag("parents", "list parents").Short('p').Bool()
 
 	//attach command
+	/*
+	subutai attach foo
+	subutai attach foo "ping localhost"
+	*/
 	attachCmd     = app.Command("attach", "Attach to Subutai container")
 	attachName    = attachCmd.Arg("name", "running container name").Required().String()
 	attachCommand = attachCmd.Arg("command", "ad-hoc command to execute").String()
 
 	//clone command
+	/*
+	subutai clone master foo [-e {env-id} -n {net-settings} -s {secret}]
+	*/
 	cloneCmd       = app.Command("clone", "Create Subutai container")
 	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
 	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
@@ -57,17 +72,29 @@ var (
 	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
 
 	//cleanup command
+	/*
+	subutai cleanup 123
+	*/
 	cleanupCmd  = app.Command("cleanup", "Cleanup environment")
 	cleanupVlan = cleanupCmd.Arg("vlan", "environment vlan").Required().String()
 
 	//prune templates command
+	/*
+	subutai prune
+	*/
 	pruneCmd = app.Command("prune", "Prune templates with no child containers")
 
 	//destroy command
+	/*
+	subutai destroy foo
+	*/
 	destroyCmd  = app.Command("destroy", "Destroy Subutai container/template").Alias("rm").Alias("del")
 	destroyName = destroyCmd.Arg("name", "container/template name").Required().String()
 
 	//export command
+	/*
+	subutai export foo -t {token} [-n {template-name} -s tiny -r 1.0.0 --local]
+	*/
 	exportCmd       = app.Command("export", "Export container as a template")
 	exportContainer = exportCmd.Arg("container", "source container").Required().String()
 	exportToken     = exportCmd.Flag("token", "CDN token").Required().Short('t').String()
@@ -77,24 +104,48 @@ var (
 	exportVersion   = exportCmd.Flag("ver", "template version").Short('r').String()
 
 	//import command
+	/*
+	subutai import debian-stretch
+
+	#special case for management container:
+	subutai import management -s {secret}
+	*/
 	importCmd    = app.Command("import", "Import Subutai template")
 	importName   = importCmd.Arg("template", "template name/path to template archive").Required().String()
 	importSecret = importCmd.Flag("secret", "console secret").Short('s').String()
 
 	//info command
-	infoCmd            = app.Command("info", "System information")
-	infoIdCmd          = infoCmd.Command("id", "host/container id")
-	infoIdContainer    = infoIdCmd.Arg("container", "container name").String()
-	infoSystemCmd      = infoCmd.Command("system", "host info").Alias("sys")
-	infoOsCmd          = infoCmd.Command("os", "host os")
-	infoIpCmd          = infoCmd.Command("ipaddr", "host ip address").Alias("ip")
-	infoPortsCmd       = infoCmd.Command("ports", "host used ports").Alias("p")
-	infoDUCmd          = infoCmd.Command("du", "container disk usage")
-	infoDUContainer    = infoDUCmd.Arg("container", "container name").Required().String()
+	infoCmd = app.Command("info", "System information")
+	/*
+	#RH id
+	subutai info id
+
+	#container id
+	subutai info id foo
+	*/
+	infoIdCmd       = infoCmd.Command("id", "host/container id")
+	infoIdContainer = infoIdCmd.Arg("container", "container name").String()
+	//subutai info system
+	infoSystemCmd = infoCmd.Command("system", "host info").Alias("sys")
+	//subutai info os
+	infoOsCmd = infoCmd.Command("os", "host os")
+	//subutai info ip
+	infoIpCmd = infoCmd.Command("ipaddr", "host ip address").Alias("ip")
+	//subutai info ports
+	infoPortsCmd = infoCmd.Command("ports", "host used ports").Alias("p")
+	//subutai info du foo
+	infoDUCmd       = infoCmd.Command("du", "container disk usage")
+	infoDUContainer = infoDUCmd.Arg("container", "container name").Required().String()
+	//subutai info qu foo
 	infoQuotaCmd       = infoCmd.Command("qu", "container quota usage")
 	infoQuotaContainer = infoQuotaCmd.Arg("container", "container name").Required().String()
 
 	//hostname command
+	//TODO add hostname read commands e.g. subutai hostname rh, subutai hostname con foo [no-console-change]
+	/*
+	subutai hostname rh new-rh-hostname
+	subutai hostname container foo new-container-hostname
+	*/
 	hostnameCmd           = app.Command("hostname", "Set host/container hostname")
 	hostnameRh            = hostnameCmd.Command("rh", "Set RH hostname")
 	hostnameRhNewHostname = hostnameRh.Arg("hostname", "new hostname").Required().String()
@@ -105,26 +156,37 @@ var (
 
 	//map command
 	//e.g. subutai map list, subutai map add .., subutai map del ..
+	/*
+	subutai map add ...
+	*/
 	mapCmd               = app.Command("map", "Map ports")
 	mapAddCmd            = mapCmd.Command("add", "Add port mapping")
-	mapAddProtocol       = mapAddCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
+	mapAddProtocol       = mapAddCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
 	mapAddInternalSocket = mapAddCmd.Flag("internal", "internal socket").Short('i').Required().String()
 	mapAddExternalSocket = mapAddCmd.Flag("external", "external socket").Short('e').String()
 	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('n').String()
 	mapAddCert           = mapAddCmd.Flag("cert", "https certificate").Short('c').String()
-	mapAddPolicy         = mapAddCmd.Flag("policy", "balancing policy").Short('p').String()
+	mapAddPolicy         = mapAddCmd.Flag("policy", "balancing policy").Short('l').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
 
+	/*
+	subutai map rm tcp ...
+	*/
 	mapRemoveCmd            = mapCmd.Command("rm", "Remove port mapping").Alias("del")
-	mapRemoveProtocol       = mapRemoveCmd.Arg("protocol", "http, https, tcp or udp").Required().String()
+	mapRemoveProtocol       = mapRemoveCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
 	mapRemoveExternalSocket = mapRemoveCmd.Flag("external", "external socket").Short('e').Required().String()
 	mapRemoveInternalSocket = mapRemoveCmd.Flag("internal", "internal socket").Short('i').String()
 	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('n').String()
 
+	/*
+	subutai map list
+	subutai map list tcp
+	*/
 	mapList         = mapCmd.Command("list", "list mapped ports").Alias("ls")
-	mapListProtocol = mapList.Arg("protocol", "http, https, tcp or udp").String()
+	mapListProtocol = mapList.Flag("protocol", "http, https, tcp or udp").Short('p').String()
 
 	//metrics command
+	//subutai metrics -s "2018-08-17 02:26:11" -e "2018-08-17 03:26:11"
 	metricsCmd   = app.Command("metrics", "Print host/container metrics")
 	metricsHost  = metricsCmd.Arg("name", "host/container name").Required().String()
 	metricsStart = metricsCmd.Flag("start", "metrics start time 'yyyy-mm-dd hh:mi:ss'").Short('s').Required().String()
@@ -135,27 +197,27 @@ var (
 	proxyDomainCmd = proxyCmd.Command("domain", "Manage vlan-domain mappings").Alias("dom")
 	proxyHostCmd   = proxyCmd.Command("host", "Manage domain hosts")
 
-	//proxy dom add command
+	//proxy dom add 123 test.com ...
 	proxyDomainAddCmd    = proxyDomainCmd.Command("add", "Add vlan-domain mapping")
 	proxyDomainAddVlan   = proxyDomainAddCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyDomainAddDomain = proxyDomainAddCmd.Arg("domain", "environment domain").Required().String()
 	proxyDomainAddCert   = proxyDomainAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
 	proxyDomainAddPolicy = proxyDomainAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('p').String()
 
-	//proxy dom del {vlan} command
+	//proxy dom del 123
 	proxyDomainDelCmd  = proxyDomainCmd.Command("del", "Remove vlan-domain mapping").Alias("rm")
 	proxyDomainDelVlan = proxyDomainDelCmd.Arg("vlan", "environment vlan").Required().String()
 
-	//proxy dom check {vlan} command
+	//proxy dom check 123
 	proxyDomainCheckCmd  = proxyDomainCmd.Command("check", "Check vlan-domain mapping")
 	proxyDomainCheckVlan = proxyDomainCheckCmd.Arg("vlan", "environment vlan").Required().String()
 
-	//proxy host add {vlan} {ip} command
+	//proxy host add 123 {container ip[:port]}
 	proxyHostAddCmd  = proxyHostCmd.Command("add", "Add host to domain")
 	proxyHostAddVlan = proxyHostAddCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyHostAddHost = proxyHostAddCmd.Arg("host", "container ip[:port]").Required().String()
 
-	//proxy host del {vlan} {ip} command
+	//proxy host del 123 {container ip[:port]}
 	proxyHostDelCmd  = proxyHostCmd.Command("del", "Remove host from domain").Alias("rm")
 	proxyHostDelVlan = proxyHostDelCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyHostDelHost = proxyHostDelCmd.Arg("host", "container ip[:port]").Required().String()
@@ -165,13 +227,21 @@ var (
 	proxyHostCheckVlan = proxyHostCheckCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyHostCheckHost = proxyHostCheckCmd.Arg("host", "container ip[:port]").Required().String()
 
-	//e.g. subutai quota ram foo -s 123
-	//subutai quota cpu foo
 	//quota command
-	quotaCmd       = app.Command("quota", "Manage container quotas")
-	quotaResource  = quotaCmd.Arg("resource", "resource type (cpu, cpuset, ram, disk, network)").Required().String()
-	quotaContainer = quotaCmd.Arg("container", "container name").Required().String()
-	quotaLimit     = quotaCmd.Flag("set", "limit (% for cpu, # for cpuset, b for network, mb for ram, gb for disk )").Short('s').String()
+	quotaCmd    = app.Command("quota", "Manage container quotas")
+	quotaGetCmd = quotaCmd.Command("get", "Print container resource quota")
+	quotaSetCmd = quotaCmd.Command("set", "Set container resource quota")
+
+	//subutai quota get -c foo -r cpu
+	quotaGetResource = quotaGetCmd.Flag("resource", "resource type (cpu, cpuset, ram, disk, network)").
+		Short('r').Required().String()
+	quotaGetContainer = quotaGetCmd.Flag("container", "container name").Short('c').Required().String()
+
+	//subutai quota set -c foo -r cpu 123
+	quotaSetResource = quotaSetCmd.Flag("resource", "resource type (cpu, cpuset, ram, disk, network)").
+		Short('r').Required().String()
+	quotaSetContainer = quotaSetCmd.Flag("container", "container name").Short('c').Required().String()
+	quotaSetLimit     = quotaSetCmd.Arg("limit", "limit (% for cpu, # for cpuset, b for network, mb for ram, gb for disk )").Required().String()
 
 	//start command
 	startCmd          = app.Command("start", "Start Subutai container")
@@ -186,22 +256,24 @@ var (
 	restartCmdContainer = restartCmd.Arg("name", "container name").Required().String()
 
 	//update command
+	//subutai update rh
+	//subutai update management -c
 	updateCmd          = app.Command("update", "Update peer components")
 	updateCmdComponent = updateCmd.Arg("component", "component to update (rh, management)").Required().String()
 	updateCheck        = updateCmd.Flag("check", "check for updates without installation").Short('c').Bool()
 
 	//tunnel command
 	tunnelCmd = app.Command("tunnel", "Manage ssh tunnels")
-	//tunnel add command
+	//tunnel add ip[:port] [ttl]
 	tunnelAddCmd     = tunnelCmd.Command("add", "Create ssh tunnel")
 	tunneAddSocket   = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
-	//tunnel del command
+	//tunnel del ip[:port
 	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
 	tunnelDelSocket = tunnelDelCmd.Arg("socket", "socket in form ip[:port]").Required().String()
-	//tunnel list command
+	//tunnel list
 	tunnelListCmd = tunnelCmd.Command("list", "List ssh tunnels").Alias("ls")
-	//tunnel check command
+	//tunnel check
 	tunnelCheckCmd = tunnelCmd.Command("check", "for internal usage").Hidden()
 
 	//vxlan command
@@ -212,10 +284,10 @@ var (
 	vxlanAddRemoteIp = vxlanAddCmd.Flag("remoteip", "remote ip").Required().Short('r').String()
 	vxlanAddVni      = vxlanAddCmd.Flag("vni", "environment vni").Required().Short('n').String()
 	vxlanAddVlan     = vxlanAddCmd.Flag("vlan", "environment vlan").Required().Short('l').String()
-	//vxlan del command
+	//vxlan del {tunnel-name}
 	vxlanDelCmd  = vxlanCmd.Command("del", "Delete vxlan tunnel").Alias("rm")
 	vxlanDelName = vxlanDelCmd.Arg("name", "tunnel name").Required().String()
-	//vxlan list command
+	//vxlan list
 	vxlanListCmd = vxlanCmd.Command("list", "List vxlan tunnels").Alias("ls")
 
 	//batch command
@@ -325,8 +397,10 @@ func main() {
 		} else {
 			log.Info("Host is not in domain")
 		}
-	case quotaCmd.FullCommand():
-		cli.LxcQuota(*quotaContainer, *quotaResource, *quotaLimit, "")
+	case quotaGetCmd.FullCommand():
+		cli.LxcQuota(*quotaGetContainer, *quotaGetResource, "", "")
+	case quotaSetCmd.FullCommand():
+		cli.LxcQuota(*quotaSetContainer, *quotaSetResource, *quotaSetLimit, "")
 	case startCmd.FullCommand():
 		cli.LxcStart(*startCmdContainer)
 	case stopCmd.FullCommand():

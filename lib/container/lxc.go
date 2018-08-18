@@ -331,23 +331,27 @@ func Clone(parent, child string) error {
 
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, it's just return current value.
-func QuotaRAM(name string, size ...string) int {
+func QuotaRAM(name string, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
 		defer lxc.Release(c)
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
-	i, err := strconv.Atoi(size[0])
-	log.Check(log.DebugLevel, "Parsing quota size", err)
-	if i > 0 {
-		log.Check(log.DebugLevel, "Setting memory limit", c.SetMemoryLimit(lxc.ByteSize(i*1024*1024)))
-		SetContainerConf(name, [][]string{{"lxc.cgroup.memory.limit_in_bytes", size[0] + "M"}})
+
+	//set limit
+	if size != "" {
+		setLimit, err := strconv.Atoi(size)
+		log.Check(log.DebugLevel, "Parsing quota size", err)
+		log.Check(log.DebugLevel, "Setting memory limit", c.SetMemoryLimit(lxc.ByteSize(setLimit*1024*1024)))
+		SetContainerConf(name, [][]string{{"lxc.cgroup.memory.limit_in_bytes", size + "M"}})
 	}
+
 	limit, err := c.MemoryLimit()
 	log.Check(log.DebugLevel, "Getting memory limit of container: "+name, err)
 	return int(limit / 1024 / 1024)
 }
 
+//todo remove MHz just leave %
 // QuotaCPU sets container CPU limitation and return current value in percents.
 // If passed value < 100, we assume that this value mean percents.
 // If passed value > 100, we assume that this value mean MHz.
@@ -397,31 +401,31 @@ func QuotaCPU(name string, size string) int {
 }
 
 // QuotaCPUset sets particular cores that can be used by the Subutai container.
-func QuotaCPUset(name string, size ...string) string {
+func QuotaCPUset(name string, size string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
 		defer lxc.Release(c)
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
-	if size[0] != "" {
-		log.Check(log.DebugLevel, "Setting cpuset.cpus", c.SetCgroupItem("cpuset.cpus", size[0]))
-		SetContainerConf(name, [][]string{{"lxc.cgroup.cpuset.cpus", size[0]}})
+	if size != "" {
+		log.Check(log.DebugLevel, "Setting cpuset.cpus", c.SetCgroupItem("cpuset.cpus", size))
+		SetContainerConf(name, [][]string{{"lxc.cgroup.cpuset.cpus", size}})
 	}
 	return c.CgroupItem("cpuset.cpus")[0]
 }
 
 // QuotaNet sets network bandwidth for the Subutai container.
-func QuotaNet(name string, size ...string) string {
+func QuotaNet(name string, size string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
 		defer lxc.Release(c)
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	nic := GetConfigItem(c.ConfigFileName(), "lxc.network.veth.pair")
-	if size[0] != "" {
-		SetContainerConf(name, [][]string{{"subutai.network.ratelimit", size[0]}})
+	if size != "" {
+		SetContainerConf(name, [][]string{{"subutai.network.ratelimit", size}})
 	}
-	return net.RateLimit(nic, size[0])
+	return net.RateLimit(nic, size)
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.

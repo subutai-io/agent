@@ -12,13 +12,13 @@ import (
 )
 
 // RateLimit sets throughput limits for container's network interfaces if "quota" is specified
-func RateLimit(nic string, rate ...string) string {
-	if rate[0] != "" {
-		burst, _ := strconv.Atoi(rate[0])
+func RateLimit(nic string, rate string) string {
+	if rate != "" {
+		burst, _ := strconv.Atoi(rate)
 		burst = burst / 10
 
 		exec.Command("ovs-vsctl", "set", "interface", nic,
-			"ingress_policing_rate="+rate[0]).Run()
+			"ingress_policing_rate="+rate).Run()
 
 		exec.Command("ovs-vsctl", "set", "interface", nic,
 			"ingress_policing_burst="+strconv.Itoa(burst)).Run()
