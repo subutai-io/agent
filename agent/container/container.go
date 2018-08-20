@@ -50,7 +50,7 @@ type Quota struct {
 
 func init() {
 	//initialize cache
-	cache = ttlcache.NewCache(time.Minute * 30)
+	cache = utils.GetCache(time.Minute * 60)
 }
 
 // Credentials returns information about IDs from container. This informations is user for command execution only.
@@ -102,10 +102,6 @@ func Active(details bool) []Container {
 			ip := meta["ip"]
 
 			container := Container{
-				//ID:       gpg.GetFingerprint(c),
-				//Arch: strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch")),
-				//Parent: cont.GetConfigItem(configpath, "subutai.parent"),
-				//Interfaces: interfaces(c, ""),
 				Name:     c,
 				Hostname: strings.TrimSpace(string(hostname)),
 				Status:   cont.State(c),
@@ -117,15 +113,15 @@ func Active(details bool) []Container {
 
 			//cacheable properties>>>
 
-			container.ID = getFromCacheOrCalculate(c+"_fingerprint", func() string {
+			container.ID = utils.GetFromCacheOrCalculate(cache, c+"_fingerprint", func() string {
 				return gpg.GetFingerprint(c)
 			})
 
-			container.Arch = getFromCacheOrCalculate(c+"_arch", func() string {
+			container.Arch = utils.GetFromCacheOrCalculate(cache, c+"_arch", func() string {
 				return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
 			})
 
-			container.Parent = getFromCacheOrCalculate(c+"_parent", func() string {
+			container.Parent = utils.GetFromCacheOrCalculate(cache, c+"_parent", func() string {
 				return cont.GetConfigItem(configpath, "subutai.parent")
 			})
 
@@ -142,23 +138,6 @@ func Active(details bool) []Container {
 	return contArr
 }
 
-type calculate func() string
-
-func getFromCacheOrCalculate(cacheKey string, calc calculate) string {
-	value, exists := cache.Get(cacheKey)
-
-	if exists {
-		return value
-	} else {
-		value = calc()
-		if value != "" {
-			cache.Set(cacheKey, value)
-		}
-		return value
-	}
-}
-
-//todo refactor to remove interfaces and just have ip field sent to Console
 //this should be done together with Console changes
 func interfaces(name string, staticIp string) []utils.Iface {
 

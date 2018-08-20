@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	exec2 "github.com/subutai-io/agent/lib/exec"
 
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
@@ -16,13 +17,53 @@ import (
 	"github.com/subutai-io/agent/log"
 	"time"
 	"path"
-	exec2 "github.com/subutai-io/agent/lib/exec"
 	"fmt"
 )
 
 var (
 	GPG = "gpg1"
 )
+
+func init(){
+	// move .gnupg dir to app home
+	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
+}
+
+func DetermineGPGVersion() {
+	out, err := exec2.Execute("gpg1", "--version")
+	if err != nil {
+		out, err = exec2.Execute("gpg", "--version")
+
+		if err != nil {
+			log.Fatal("GPG not found " + out)
+		} else {
+			lines := strings.Split(out, "\n")
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+				version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+				if strings.HasPrefix(version, "1.4") {
+					GPG = "gpg"
+				} else {
+					log.Fatal("GPG version " + version + " is not compatible with subutai")
+				}
+			} else {
+				log.Fatal("Failed to determine GPG version " + out)
+			}
+		}
+	} else {
+		lines := strings.Split(out, "\n")
+		if len(lines) > 0 && strings.HasPrefix(lines[0], "gpg (GnuPG) ") {
+			version := strings.TrimSpace(strings.TrimPrefix(lines[0], "gpg (GnuPG)"))
+			if strings.HasPrefix(version, "1.4") {
+				GPG = "gpg1"
+			} else {
+				log.Fatal("GPG version " + version + " is not compatible with subutai")
+			}
+		} else {
+			log.Fatal("Failed to determine GPG version " + out)
+		}
+	}
+}
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
 func ImportPk(k []byte) string {
@@ -175,16 +216,15 @@ func GetFingerprint(email string) string {
 
 //TODO use single method
 func getMngKey(c string) {
-	client := utils.GetClient(config.Management.AllowInsecure, 30)
-	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
-	log.Check(log.FatalLevel, "Getting Management public key", err)
 
-	defer utils.Close(resp)
+	consolePublicKey := utils.GetConsolePubKey()
 
-	if body, err := ioutil.ReadAll(resp.Body); err == nil {
-		err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), body, 0644)
-		log.Check(log.FatalLevel, "Writing Management public key", err)
+	if consolePublicKey == nil {
+		log.Fatal("Failed to get Console public key")
 	}
+
+	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
+	log.Check(log.FatalLevel, "Saving Console public key", err)
 }
 
 func parseKeyID(s string) string {

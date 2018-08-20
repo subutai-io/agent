@@ -23,6 +23,7 @@ import (
 	"path"
 	"net/url"
 	"fmt"
+	"strconv"
 )
 
 var (
@@ -205,28 +206,20 @@ func RetryGet(url string, clnt *http.Client, attempts int) (*http.Response, erro
 	return response, err
 }
 
-func CleanTemplateName(name string) string {
-	reg, err := regexp.Compile("[^a-zA-Z0-9._-]")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return reg.ReplaceAllString(name, "")
-}
-
-func VerifyLxcName(name string){
-    /*
-    The labels must follow the rules for ARPANET host names.  They must
-    start with a letter, end with a letter or digit, and have as interior
-    characters only letters, digits, and hyphen.  There are also some
-    restrictions on the length.  Labels must be 63 characters or less.
-    */
+func VerifyLxcName(name string) {
+	/*
+	The labels must follow the rules for ARPANET host names.  They must
+	start with a letter, end with a letter or digit, and have as interior
+	characters only letters, digits, and hyphen.  There are also some
+	restrictions on the length.  Labels must be 63 characters or less.
+	*/
 
 	hostnameRegex := regexp.MustCompile(`^[[:alpha:]][[:alnum:]\-]{0,61}[[:alnum:]]$`)
 
-    if !hostnameRegex.MatchString(name) {
-        log.Error(fmt.Sprintf("value '%s' does not match %s",
-              			name, hostnameRegex.String()))
-    }
+	if !hostnameRegex.MatchString(name) {
+		log.Error(fmt.Sprintf("value '%s' does not match %s",
+			name, hostnameRegex.String()))
+	}
 }
 
 func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]string) {
@@ -240,6 +233,28 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 		}
 	}
 	return
+}
+
+func GetConsolePubKey() []byte {
+	clnt := GetClient(config.Management.AllowInsecure, 30)
+	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
+
+	if err == nil {
+		defer Close(resp)
+	}
+
+	if log.Check(log.WarnLevel, "Getting Console public Key", err) {
+		return nil
+	}
+
+	if resp.StatusCode == 200 {
+		if key, err := ioutil.ReadAll(resp.Body); err == nil {
+			return key
+		}
+	}
+
+	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
+	return nil
 }
 
 func IsValidUrl(toTest string) bool {

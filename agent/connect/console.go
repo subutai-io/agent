@@ -15,6 +15,9 @@ import (
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"path"
+	"time"
+	"net/http"
+	"github.com/subutai-io/agent/agent/heartbeat"
 )
 
 type rHost struct {
@@ -29,8 +32,13 @@ type rHost struct {
 	Containers   []container.Container `json:"hostInfos"`
 }
 
-//Request collecting connection request and sends to the Management server.
-func Request(user, pass string) {
+var (
+	client = utils.TLSConfig()
+
+	fingerprint string
+)
+//sendRegistrationRequest collecting connection request and sends to the Management server.
+func sendRegistrationRequest(user, pass string) {
 	log.Debug("Connecting to " + config.ManagementIP + ":" + config.Management.Port)
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
@@ -55,5 +63,54 @@ func Request(user, pass string) {
 
 	if !log.Check(log.WarnLevel, "POSTing registration request to SS", err) {
 		defer utils.Close(resp)
+	}
+}
+
+func IsConsoleReady() (status bool) {
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
+	if err == nil {
+		defer utils.Close(resp)
+		if resp.StatusCode == http.StatusOK {
+			return true
+		}
+	}
+	return false
+}
+
+func CheckRegisterWithConsole() {
+	for {
+
+		if !IsConsoleReady() {
+			time.Sleep(time.Second * 10)
+			continue
+		}
+
+		if fingerprint == "" {
+			fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
+			sendRegistrationRequest(config.Agent.GpgUser, config.Management.Secret)
+		} else {
+			doCheckConnection()
+		}
+
+		time.Sleep(time.Second * 10)
+	}
+}
+
+func doCheckConnection() {
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + fingerprint)
+	if err == nil {
+		defer utils.Close(resp)
+	}
+	if err == nil && resp.StatusCode == http.StatusOK {
+		log.Debug("Connection monitor check - success")
+	} else {
+		log.Debug("Connection monitor check - failed")
+		sendRegistrationRequest(config.Agent.GpgUser, config.Management.Secret)
+		heartbeat.ForceHeartBeat()
+
+		//reset config.ManagementIP to enable rediscovery
+		if strings.TrimSpace(config.Management.Host) == "" {
+			config.ManagementIP = ""
+		}
 	}
 }

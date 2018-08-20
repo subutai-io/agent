@@ -18,6 +18,12 @@ import (
 	"path"
 )
 
+type SshTunnel struct {
+	Remote string
+	Local  string
+	Ttl    string
+}
+
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
 // In Subutai, tunnels are used to access the SS management server's web UI from the Hub, and open direct connection to containers, etc.
 // There are two types of channels - local (default), which is created from destination address to host and global (-g flag), from destination to Subutai Helper node.
@@ -26,7 +32,7 @@ import (
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
 
 // TunAdd adds tunnel to specified network socket
-func TunAdd(socket, timeout string) {
+func AddSshTunnel(socket, timeout string) {
 	if len(socket) == 0 {
 		log.Error("Please specify socket")
 	}
@@ -86,20 +92,20 @@ func TunAdd(socket, timeout string) {
 	log.Error("Cannot get tunnel port")
 }
 
-// TunList performs tunnel check and shows "alive" tunnels
-func TunList() {
-	TunCheck()
 
+func GetSshTunnels() []SshTunnel {
+	res := []SshTunnel{}
 	list, err := db.INSTANCE.GetTunList()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
-			fmt.Printf("%s\t%s\t%s\n", item["remote"], item["local"], item["ttl"])
+			res = append(res, SshTunnel{Remote: item["remote"], Local: item["local"], Ttl: item["ttl"]})
 		}
 	}
+	return res
 }
 
 // TunDel removes tunnel entry from list and kills running tunnel process
-func TunDel(socket string, pid ...string) {
+func DelSshTunnel(socket string, pid ...string) {
 	list, err := db.INSTANCE.GetTunList()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
@@ -117,21 +123,21 @@ func TunDel(socket string, pid ...string) {
 }
 
 // TunCheck reads list, checks tunnel ttl, its state and then adds or removes required tunnels
-func TunCheck() {
+func CheckSshTunnels() {
 	list, err := db.INSTANCE.GetTunList()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
 			ttl, err := strconv.Atoi(item["ttl"])
 			log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
 			if ttl <= int(time.Now().Unix()) && ttl != -1 {
-				TunDel(item["local"], item["pid"])
+				DelSshTunnel(item["local"], item["pid"])
 			} else if !tunOpen(item["remote"], item["local"]) {
-				TunDel(item["local"], item["pid"])
+				DelSshTunnel(item["local"], item["pid"])
 				newttl := ""
 				if ttl-int(time.Now().Unix()) > 0 {
 					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
 				}
-				TunAdd(item["local"], newttl)
+				AddSshTunnel(item["local"], newttl)
 			}
 		}
 	}
