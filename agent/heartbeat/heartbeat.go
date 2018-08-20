@@ -45,14 +45,12 @@ var (
 	instanceArch      string
 	lastHeartbeatTime time.Time
 	pool              []container.Container
-	fingerprint       string
 )
 
 func init() {
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
 	client = utils.TLSConfig()
-	fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
 }
 
 //send heartbeat not more than once in 5 sec
@@ -80,7 +78,7 @@ func sendHeartbeat() bool {
 		Type:       "HEARTBEAT",
 		Hostname:   hostname,
 		Address:    net.GetIp(),
-		ID:         fingerprint,
+		ID:         gpg.GetRhFingerprint(),
 		Arch:       instanceArch,
 		Instance:   instanceType,
 		Containers: alert.Quota(pool),
@@ -95,7 +93,7 @@ func sendHeartbeat() bool {
 	lastHeartbeat = jbeat
 
 	if encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat); err == nil {
-		message, err := json.Marshal(map[string]string{"hostId": fingerprint, "response": string(encryptedMessage)})
+		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
 		resp, err := client.PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})

@@ -24,7 +24,7 @@ var (
 	GPG = "gpg1"
 )
 
-func init(){
+func init() {
 	// move .gnupg dir to app home
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
@@ -188,6 +188,22 @@ func GenerateKey(name string) {
 			}
 		}
 	}
+}
+
+var rhFingeprint string
+
+func GetRhFingerprint() string {
+	if rhFingeprint != "" {
+		return rhFingeprint
+	}
+
+	if config.Agent.GpgUser == "" {
+		rhFingeprint = GetFingerprint(config.RhGpgUser)
+	} else {
+		rhFingeprint = GetFingerprint(config.Agent.GpgUser)
+	}
+
+	return rhFingeprint
 }
 
 // GetFingerprint returns fingerprint of the Subutai container.
