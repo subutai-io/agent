@@ -26,13 +26,10 @@ import (
 )
 
 var (
-	fingerprint string
-	client      *http.Client
+	client *http.Client
 )
 
 func initAgent() {
-
-	fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
 
 	client = utils.TLSConfig()
 }
@@ -79,7 +76,7 @@ func execute(rsp executer.EncRequest) {
 	var req executer.Request
 	var md, contName, pub, keyring string
 
-	if rsp.HostID == fingerprint {
+	if rsp.HostID == gpg.GetRhFingerprint() {
 		md = gpg.DecryptWrapper(rsp.Request)
 	} else {
 		contName = heartbeat.GetContainerNameByID(rsp.HostID)
@@ -103,7 +100,7 @@ func execute(rsp executer.EncRequest) {
 
 	//create channels for stdout and stderr
 	sOut := make(chan executer.ResponseOptions)
-	if rsp.HostID == fingerprint {
+	if rsp.HostID == gpg.GetRhFingerprint() {
 		go executer.ExecHost(req.Request, sOut)
 	} else {
 		go executer.AttachContainer(contName, req.Request, sOut)
@@ -116,7 +113,7 @@ func execute(rsp executer.EncRequest) {
 			log.Check(log.WarnLevel, "Marshal response", err)
 
 			var payload []byte
-			if rsp.HostID == fingerprint {
+			if rsp.HostID == gpg.GetRhFingerprint() {
 				payload, err = gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jsonR)
 			} else {
 				payload, err = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
@@ -134,7 +131,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := postForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -152,7 +149,7 @@ func sendResponse(msg []byte, deadline time.Time) {
 func command() {
 	var rsp []executer.EncRequest
 
-	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + fingerprint)
+	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + gpg.GetRhFingerprint())
 
 	if err == nil {
 		defer utils.Close(resp)
@@ -235,7 +232,7 @@ func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 
 //<<<HTTP server
 
-func PostForm(url string, data url.Values) (resp *http.Response, err error) {
+func postForm(url string, data url.Values) (resp *http.Response, err error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
