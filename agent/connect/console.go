@@ -86,7 +86,7 @@ func CheckRegisterWithConsole() {
 		}
 
 		if fingerprint == "" {
-			fingerprint = gpg.GetFingerprint(config.Agent.GpgUser)
+			fingerprint = gpg.GetRhFingerprint()
 			sendRegistrationRequest(config.Agent.GpgUser, config.Management.Secret)
 		} else {
 			doCheckConnection()
