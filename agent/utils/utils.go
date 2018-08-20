@@ -24,10 +24,12 @@ import (
 	"net/url"
 	"fmt"
 	"strconv"
+	"sync"
 )
 
 var (
 	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
+	mutex   sync.Mutex
 )
 
 // Iface describes network interfaces of the Resource Host.
@@ -78,6 +80,7 @@ func InstanceType() string {
 
 // TLSConfig provides HTTP client for Bi-directional SSL connection with Management server.
 func TLSConfig() *http.Client {
+
 	tlsconfig := newTLSConfig()
 	for tlsconfig == nil || len(tlsconfig.Certificates[0].Certificate) == 0 {
 		time.Sleep(time.Second * 2)
@@ -97,6 +100,9 @@ func TLSConfig() *http.Client {
 }
 
 func x509generate() {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
 	host := []string{hostname}
