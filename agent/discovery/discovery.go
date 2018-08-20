@@ -15,7 +15,6 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"path"
 	"github.com/subutai-io/agent/lib/common"
 )
 
@@ -65,7 +64,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 
 // ImportManagementKey adds GPG public key to local keyring to encrypt messages to Management server.
 func ImportManagementKey() {
-	if pk := getKey(); pk != nil {
+	if pk := utils.GetConsolePubKey(); pk != nil {
 		gpg.ImportPk(pk)
 		config.Management.GpgUser = gpg.ExtractKeyID(pk)
 	}
@@ -171,25 +170,15 @@ func save(ip string) {
 	config.ManagementIP = ip
 }
 
-//TODO use single method
-func getKey() []byte {
-	client := utils.GetClient(config.Management.AllowInsecure, 30)
-	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
-
-	if err == nil {
-		defer utils.Close(resp)
-	}
-
-	if log.Check(log.WarnLevel, "Getting Management host Public Key", err) {
-		return nil
-	}
-
-	if resp.StatusCode == 200 {
-		if key, err := ioutil.ReadAll(resp.Body); err == nil {
-			return key
+func LoadManagementIp() {
+	if len(strings.TrimSpace(config.ManagementIP)) == 0 {
+		if strings.TrimSpace(config.Management.Host) == "" {
+			ip, err := db.INSTANCE.DiscoveryLoad()
+			if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
+				config.ManagementIP = strings.TrimSpace(ip)
+			}
+		} else {
+			config.ManagementIP = strings.TrimSpace(config.Management.Host)
 		}
 	}
-
-	log.Warn("Failed to fetch PK from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
-	return nil
 }

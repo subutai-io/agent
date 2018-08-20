@@ -21,12 +21,12 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"path"
 )
 
+//TODO convert to util and move to lib package
 type hostStat struct {
 	Host string `json:"host"`
 	CPU struct {
@@ -221,7 +221,7 @@ func diskQuotaUsage(path string) int {
 }
 
 // quota returns Json string with container's resource quota information
-func quota(h string) string {
+func GetContainerQuotaUsage(h string) string {
 	usage := new(quotaUsage)
 	usage.Container = h
 	usage.CPU = cpuQuotaUsage(h)
@@ -287,44 +287,30 @@ func grep(str, filename string) string {
 	}
 }
 
-// Info command's purposed is to display common system information, such as
-// external IP address to access the container host quotas, its CPU model, RAM size, etc. It's mainly used for internal SS needs.
-func Info(command, host string) {
-	if command == "ipaddr" {
-		fmt.Println(net.GetIp())
-		return
-	} else if command == "ports" {
-		for k := range usedPorts() {
-			fmt.Println(k)
-		}
-	} else if command == "os" {
+func GetDiskUsage(lxcName string) int {
+	usage, err := fs.DatasetDiskUsage(lxcName)
+	log.Check(log.ErrorLevel, "Checking disk usage", err)
+	return usage
+}
 
-		fmt.Println(getOsName())
-	} else if command == "id" {
-		os.Setenv("GNUPGHOME", config.Agent.GpgHome)
-		defer os.Unsetenv("GNUPGHOME")
-		if len(host) == 0 {
-		    fmt.Println(gpg.GetFingerprint("rh@subutai.io"))
-		}else{
-		    fmt.Println(gpg.GetFingerprint(host))
-		}
-	} else if command == "du" {
-		usage, err := fs.DatasetDiskUsage(host)
-		log.Check(log.ErrorLevel, "Checking disk usage", err)
-		fmt.Println(usage)
-	} else if command == "quota" {
-		if len(host) == 0 {
-			log.Error("Usage: subutai info <quota|system> <hostname>")
-		}
-		fmt.Println(quota(host))
-	} else if command == "system" {
-		host, err := os.Hostname()
-		log.Check(log.DebugLevel, "Getting hostname of the system", err)
-		fmt.Println(sysLoad(host))
+func GetSystemInfo() string {
+	host, err := os.Hostname()
+	log.Check(log.DebugLevel, "Getting hostname of the system", err)
+	return sysLoad(host)
+}
+
+//TODO add host parameter
+func GetFingerprint(container string) string {
+	//os.Setenv("GNUPGHOME", config.Agent.GpgHome)
+	//defer os.Unsetenv("GNUPGHOME")
+	if container == "" {
+		return gpg.GetFingerprint(config.Agent.GpgUser)
+	} else {
+		return gpg.GetFingerprint(container)
 	}
 }
 
-func getOsName() string {
+func GetOsName() string {
 
 	out, err := exec.Command("/bin/bash", "-c", "cat /etc/*release").Output()
 
@@ -357,7 +343,7 @@ func getOsName() string {
 	}
 }
 
-func usedPorts() map[string]bool {
+func GetUsedPorts() map[string]bool {
 	ports := make(map[string]bool)
 
 	out, _ := exec.Command("ss", "-ltun").Output()

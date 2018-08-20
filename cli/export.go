@@ -35,7 +35,7 @@ var (
 // Configuration values for template metadata parameters can be overridden on export, like the recommended container size when the template is cloned using `-s` option.
 // The template's version can also specified on export so the import command can use it to request specific versions.
 
-func LxcExport(name, newname, version, prefsize, token, description string, local bool) {
+func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	//check new template name
 	if newname != "" {
 		utils.VerifyLxcName(newname)
@@ -67,8 +67,8 @@ func LxcExport(name, newname, version, prefsize, token, description string, loca
 	}
 
 	//check template reference uniqueness
-	var theOwner string = owner
-	var theVersion string = version
+	var theOwner = owner
+	var theVersion = version
 	var theName string
 	if newname != "" {
 		theName = newname
@@ -138,12 +138,6 @@ func LxcExport(name, newname, version, prefsize, token, description string, loca
 		{"lxc.network.hwaddr"},
 		{"lxc.network.mtu"},
 		{"#vlan_id"},
-	}
-
-	if len(description) != 0 {
-		templateConf = append(templateConf, []string{"subutai.template.description", "\"" + description + "\""})
-	} else {
-		templateConf = append(templateConf, []string{"subutai.template.description"})
 	}
 
 	if newname != "" {

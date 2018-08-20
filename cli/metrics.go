@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 
@@ -50,7 +49,7 @@ func queryInfluxDB(clnt client.Client, cmd string) (res []client.Result, err err
 //	last day data aggregates to 1 minute interval,
 //	last week is in 5 minute intervals,
 // After 7 days all statistics is are overwritten by new incoming data.
-func HostMetrics(host, start, end string) {
+func GetHostMetrics(host, start, end string) string {
 	c, err := utils.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
@@ -77,7 +76,6 @@ func HostMetrics(host, start, end string) {
 		timeGroup = "20m"
 	}
 
-	fmt.Print("{\"Metrics\":")
 	res, _ := queryInfluxDB(c, `
 			SELECT non_negative_derivative(mean(value),1s) as value
 			FROM `+ timeRange+ `.`+ tableCPU+ `
@@ -100,6 +98,6 @@ func HostMetrics(host, start, end string) {
 			GROUP BY time(`+ timeGroup+ `), mount, type fill(none);
 		`)
 	out, _ := json.Marshal(res)
-	fmt.Print(string(out))
-	fmt.Println("}")
+
+	return "{\"Metrics\":" + string(out) + "}"
 }

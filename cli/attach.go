@@ -13,7 +13,7 @@ import (
 //
 // `name` should be available running Subutai container,
 // otherwise command will return error message and non-zero exit code.
-func LxcAttach(name string, cmd []string) {
+func LxcAttach(name string, cmd string) {
 	log.Debug("Attaching to container " + name)
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	log.Check(log.ErrorLevel, "Creating container object", err)
@@ -26,7 +26,7 @@ func LxcAttach(name string, cmd []string) {
 	options.ClearEnv = true
 
 	if len(cmd) > 0 {
-		_, err = c.RunCommand([]string{"/bin/bash", "-c", cmd[0]}, options)
+		_, err = c.RunCommand([]string{"/bin/bash", "-c", cmd}, options)
 		log.Check(log.ErrorLevel, "Attaching shell", err)
 	} else {
 		log.Check(log.ErrorLevel, "Attaching shell", c.AttachShell(options))
