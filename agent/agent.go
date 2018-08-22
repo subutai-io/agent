@@ -31,7 +31,7 @@ var (
 
 func initAgent() {
 
-	client = utils.TLSConfig()
+	client = utils.GetSecureClient()
 }
 
 //Start Subutai Agent daemon, all required goroutines and keep working during all life cycle.

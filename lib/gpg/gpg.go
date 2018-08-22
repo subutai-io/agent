@@ -276,7 +276,7 @@ func sendData(c string) {
 	log.Check(log.FatalLevel, "Reading encrypted stdin.txt.asc", err)
 	defer asc.Close()
 
-	client := utils.TLSConfig()
+	client := utils.GetSecureClient()
 	client.Timeout = time.Second * 30
 	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
