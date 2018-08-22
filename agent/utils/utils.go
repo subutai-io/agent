@@ -289,3 +289,14 @@ func IsValidUrl(toTest string) bool {
 		return true
 	}
 }
+
+
+func PostForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return client.Do(req)
+}
