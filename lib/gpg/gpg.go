@@ -281,7 +281,7 @@ func sendData(c string) {
 	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
-	log.Check(log.FatalLevel, "Sending registration request to management", err)
+	log.Check(log.FatalLevel, "Sending container registration request to management", err)
 	defer utils.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)

@@ -131,7 +131,7 @@ func execute(rsp executer.EncRequest) {
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := postForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := utils.PostForm(client, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -232,12 +232,3 @@ func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 
 //<<<HTTP server
 
-func postForm(url string, data url.Values) (resp *http.Response, err error) {
-	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return client.Do(req)
-}
