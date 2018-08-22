@@ -50,7 +50,7 @@ var (
 func init() {
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
-	client = utils.TLSConfig()
+	client = utils.GetSecureClient()
 }
 
 //send heartbeat not more than once in 5 sec

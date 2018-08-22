@@ -33,7 +33,7 @@ type rHost struct {
 }
 
 var (
-	client = utils.TLSConfig()
+	client = utils.GetSecureClient()
 
 	fingerprint string
 )
