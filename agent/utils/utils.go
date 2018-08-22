@@ -86,30 +86,28 @@ func GetSecureClient() *http.Client {
 		return secureClient
 	}
 
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	tlsConfig := newTLSConfig()
-	for tlsConfig == nil || len(tlsConfig.Certificates[0].Certificate) == 0 {
-		time.Sleep(time.Second * 2)
-		for PublicCert() == "" {
-			x509generate()
-		}
+	for tlsConfig == nil || len(tlsConfig.Certificates[0].Certificate) == 0 || PublicCert() == "" {
+		x509generate()
+		time.Sleep(time.Second * 1)
 		tlsConfig = newTLSConfig()
 	}
 
 	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
-		IdleConnTimeout: time.Minute,
-		MaxIdleConns:    10,
+		TLSClientConfig:   tlsConfig,
+		IdleConnTimeout:   time.Minute,
+		MaxIdleConns:      10,
+		DisableKeepAlives: true,
 	}
-
 	secureClient = &http.Client{Transport: transport, Timeout: time.Second * 30}
 
 	return secureClient
 }
 
 func x509generate() {
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	hostname, err := os.Hostname()
 	if log.Check(log.DebugLevel, "Getting Resource Host hostname", err) {
 		return
@@ -162,6 +160,7 @@ func x509generate() {
 
 	keyOut, err := os.OpenFile(path.Join(sslPath, "key.pem"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if log.Check(log.WarnLevel, "Opening key.pem for writing", err) {
+		os.Remove(path.Join(sslPath, "cert.pem"))
 		return
 	}
 	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
@@ -289,7 +288,6 @@ func IsValidUrl(toTest string) bool {
 		return true
 	}
 }
-
 
 func PostForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
 	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
