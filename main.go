@@ -268,7 +268,7 @@ var (
 	tunnelAddCmd     = tunnelCmd.Command("add", "Create ssh tunnel")
 	tunneAddSocket   = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
-	//tunnel del ip[:port
+	//tunnel del ip[:port]
 	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
 	tunnelDelSocket = tunnelDelCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	//tunnel list

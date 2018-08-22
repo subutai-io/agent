@@ -50,7 +50,7 @@ var (
 func init() {
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
-	client = utils.TLSConfig()
+	client = utils.GetSecureClient()
 }
 
 //send heartbeat not more than once in 5 sec
@@ -96,7 +96,7 @@ func sendHeartbeat() bool {
 		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
-		resp, err := client.PostForm("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		resp, err := utils.PostForm(client, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 			defer utils.Close(resp)
 
