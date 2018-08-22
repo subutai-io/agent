@@ -55,6 +55,10 @@ func Start() {
 
 	for {
 
+		for !connect.IsConsoleReady() {
+			time.Sleep(time.Second * 10)
+		}
+
 		if heartbeat.HeartBeat() {
 			time.Sleep(30 * time.Second)
 		} else {
@@ -63,9 +67,6 @@ func Start() {
 
 		cli.CheckSshTunnels()
 
-		for !connect.IsConsoleReady() {
-			time.Sleep(time.Second * 10)
-		}
 	}
 }
 
@@ -231,4 +232,3 @@ func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 //<<<HTTP server
-

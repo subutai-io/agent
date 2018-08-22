@@ -27,6 +27,9 @@ func init() {
 	gpg.DetermineGPGVersion()
 }
 
+
+//TODO make balancing policy option consistent between map and proxy commands, use -b
+//TODO update wiki
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
 	debugFlag = app.Flag("debug", "Set log level to DEBUG").Short('d').Bool()
