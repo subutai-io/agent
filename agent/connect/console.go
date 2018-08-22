@@ -80,9 +80,8 @@ func IsConsoleReady() (status bool) {
 func CheckRegisterWithConsole() {
 	for {
 
-		if !IsConsoleReady() {
+		for !IsConsoleReady() {
 			time.Sleep(time.Second * 10)
-			continue
 		}
 
 		if fingerprint == "" {
