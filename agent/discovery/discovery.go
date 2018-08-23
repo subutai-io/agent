@@ -111,6 +111,7 @@ func server() {
 			MaxAge:      3600,
 		})
 
+		//TODO when IP changes , announced server ip stays old
 		for len(config.ManagementIP) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
 			time.Sleep(30 * time.Second)
 		}

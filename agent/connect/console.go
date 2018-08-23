@@ -80,9 +80,9 @@ func IsConsoleReady() (status bool) {
 func CheckRegisterWithConsole() {
 	for {
 
-		if !IsConsoleReady() {
+		//TODO if config.ManagementIP is wrong this line does not pass
+		for !IsConsoleReady() {
 			time.Sleep(time.Second * 10)
-			continue
 		}
 
 		if fingerprint == "" {
@@ -108,6 +108,7 @@ func doCheckConnection() {
 		sendRegistrationRequest(config.Agent.GpgUser, config.Management.Secret)
 		heartbeat.ForceHeartBeat()
 
+		//TODO connection is not reset if config.ManagementIP is wrong
 		//reset config.ManagementIP to enable rediscovery
 		if strings.TrimSpace(config.Management.Host) == "" {
 			config.ManagementIP = ""
