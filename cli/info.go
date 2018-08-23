@@ -299,12 +299,9 @@ func GetSystemInfo() string {
 	return sysLoad(host)
 }
 
-//TODO add host parameter
 func GetFingerprint(container string) string {
-	//os.Setenv("GNUPGHOME", config.Agent.GpgHome)
-	//defer os.Unsetenv("GNUPGHOME")
 	if container == "" {
-		return gpg.GetFingerprint(config.Agent.GpgUser)
+		return gpg.GetRhFingerprint()
 	} else {
 		return gpg.GetFingerprint(container)
 	}

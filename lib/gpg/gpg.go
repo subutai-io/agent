@@ -24,7 +24,7 @@ var (
 	GPG = "gpg1"
 )
 
-func init(){
+func init() {
 	// move .gnupg dir to app home
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
@@ -190,6 +190,22 @@ func GenerateKey(name string) {
 	}
 }
 
+var rhFingeprint string
+
+func GetRhFingerprint() string {
+	if rhFingeprint != "" {
+		return rhFingeprint
+	}
+
+	if config.Agent.GpgUser == "" {
+		rhFingeprint = GetFingerprint(config.RhGpgUser)
+	} else {
+		rhFingeprint = GetFingerprint(config.Agent.GpgUser)
+	}
+
+	return rhFingeprint
+}
+
 // GetFingerprint returns fingerprint of the Subutai container.
 func GetFingerprint(email string) string {
 	var out []byte
@@ -260,12 +276,12 @@ func sendData(c string) {
 	log.Check(log.FatalLevel, "Reading encrypted stdin.txt.asc", err)
 	defer asc.Close()
 
-	client := utils.TLSConfig()
+	client := utils.GetSecureClient()
 	client.Timeout = time.Second * 30
 	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
-	log.Check(log.FatalLevel, "Sending registration request to management", err)
+	log.Check(log.FatalLevel, "Sending container registration request to management", err)
 	defer utils.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)

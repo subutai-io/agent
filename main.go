@@ -27,6 +27,9 @@ func init() {
 	gpg.DetermineGPGVersion()
 }
 
+
+//TODO make balancing policy option consistent between map and proxy commands, use -b
+//TODO update wiki
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
 	debugFlag = app.Flag("debug", "Set log level to DEBUG").Short('d').Bool()
@@ -166,7 +169,7 @@ var (
 	mapAddExternalSocket = mapAddCmd.Flag("external", "external socket").Short('e').String()
 	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('n').String()
 	mapAddCert           = mapAddCmd.Flag("cert", "https certificate").Short('c').String()
-	mapAddPolicy         = mapAddCmd.Flag("policy", "balancing policy").Short('l').String()
+	mapAddPolicy         = mapAddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
 
 	/*
@@ -202,7 +205,7 @@ var (
 	proxyDomainAddVlan   = proxyDomainAddCmd.Arg("vlan", "environment vlan").Required().String()
 	proxyDomainAddDomain = proxyDomainAddCmd.Arg("domain", "environment domain").Required().String()
 	proxyDomainAddCert   = proxyDomainAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
-	proxyDomainAddPolicy = proxyDomainAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('p').String()
+	proxyDomainAddPolicy = proxyDomainAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('b').String()
 
 	//proxy dom del 123
 	proxyDomainDelCmd  = proxyDomainCmd.Command("del", "Remove vlan-domain mapping").Alias("rm")
@@ -268,7 +271,7 @@ var (
 	tunnelAddCmd     = tunnelCmd.Command("add", "Create ssh tunnel")
 	tunneAddSocket   = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
-	//tunnel del ip[:port
+	//tunnel del ip[:port]
 	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
 	tunnelDelSocket = tunnelDelCmd.Arg("socket", "socket in form ip[:port]").Required().String()
 	//tunnel list

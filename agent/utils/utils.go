@@ -24,10 +24,13 @@ import (
 	"net/url"
 	"fmt"
 	"strconv"
+	"sync"
 )
 
 var (
-	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
+	sslPath      = path.Join(config.Agent.DataPrefix, "ssl")
+	mutex        sync.Mutex
+	secureClient *http.Client
 )
 
 // Iface describes network interfaces of the Resource Host.
@@ -76,29 +79,39 @@ func InstanceType() string {
 	return "LOCAL"
 }
 
-// TLSConfig provides HTTP client for Bi-directional SSL connection with Management server.
-func TLSConfig() *http.Client {
-	tlsconfig := newTLSConfig()
-	for tlsconfig == nil || len(tlsconfig.Certificates[0].Certificate) == 0 {
-		time.Sleep(time.Second * 2)
-		for PublicCert() == "" {
-			x509generate()
-		}
-		tlsconfig = newTLSConfig()
+// GetSecureClient provides HTTP client for Bi-directional SSL connection with Management server.
+func GetSecureClient() *http.Client {
+
+	if secureClient != nil {
+		return secureClient
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	tlsConfig := newTLSConfig()
+	for tlsConfig == nil || len(tlsConfig.Certificates[0].Certificate) == 0 || PublicCert() == "" {
+		x509generate()
+		time.Sleep(time.Second * 1)
+		tlsConfig = newTLSConfig()
 	}
 
 	transport := &http.Transport{
-		TLSClientConfig: tlsconfig,
-		IdleConnTimeout: time.Minute,
-		MaxIdleConns:    10,
+		TLSClientConfig:   tlsConfig,
+		IdleConnTimeout:   time.Minute,
+		MaxIdleConns:      10,
+		DisableKeepAlives: true,
 	}
+	secureClient = &http.Client{Transport: transport, Timeout: time.Second * 30}
 
-	return &http.Client{Transport: transport, Timeout: time.Second * 30}
+	return secureClient
 }
 
 func x509generate() {
 	hostname, err := os.Hostname()
-	log.Check(log.DebugLevel, "Getting Resource Host hostname", err)
+	if log.Check(log.DebugLevel, "Getting Resource Host hostname", err) {
+		return
+	}
 	host := []string{hostname}
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if log.Check(log.WarnLevel, "Generating private key", err) {
@@ -130,22 +143,32 @@ func x509generate() {
 		return
 	}
 
-	log.Check(log.DebugLevel, "Creating directory for SSL certificates", os.MkdirAll(sslPath, 0700))
+	if log.Check(log.DebugLevel, "Creating directory for SSL certificates", os.MkdirAll(sslPath, 0700)) {
+		return
+	}
 
 	certOut, err := os.Create(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Opening cert.pem for writing", err) {
 		return
 	}
 	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	log.Check(log.DebugLevel, "Encoding certificate", err)
+	if log.Check(log.DebugLevel, "Encoding certificate", err) {
+		os.Remove(path.Join(sslPath, "cert.pem"))
+		return
+	}
 	log.Check(log.DebugLevel, "Closing certificate", certOut.Close())
 
 	keyOut, err := os.OpenFile(path.Join(sslPath, "key.pem"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if log.Check(log.WarnLevel, "Opening key.pem for writing", err) {
+		os.Remove(path.Join(sslPath, "cert.pem"))
 		return
 	}
 	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-	log.Check(log.DebugLevel, "Encoding certificate key", err)
+	if log.Check(log.DebugLevel, "Encoding certificate key", err) {
+		os.Remove(path.Join(sslPath, "cert.pem"))
+		os.Remove(path.Join(sslPath, "key.pem"))
+		return
+	}
 	log.Check(log.DebugLevel, "Closing certificate key", keyOut.Close())
 
 }
@@ -264,4 +287,14 @@ func IsValidUrl(toTest string) bool {
 	} else {
 		return true
 	}
+}
+
+func PostForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return client.Do(req)
 }

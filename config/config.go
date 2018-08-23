@@ -12,6 +12,8 @@ import (
 	"path"
 )
 
+const RhGpgUser = "rh@subutai.io"
+
 type agentConfig struct {
 	Debug         bool
 	GpgUser       string
@@ -25,11 +27,11 @@ type agentConfig struct {
 }
 
 type managementConfig struct {
-	Host          string
-	Port          string
-	Secret        string
-	GpgUser       string
-//TODO remove
+	Host    string
+	Port    string
+	Secret  string
+	GpgUser string
+	//TODO remove
 	RestPublicKey string
 	Fingerprint   string
 	AllowInsecure bool
@@ -100,9 +102,9 @@ var (
 	// Influxdb describes configuration options for InluxDB server
 	Influxdb influxdbConfig
 	// CDN url and port
-	CDN    cdnConfig
+	CDN cdnConfig
 
-	CdnUrl string
+	CdnUrl       string
 	ManagementIP string
 )
 
@@ -121,7 +123,7 @@ func init() {
 	log.Check(log.DebugLevel, "Opening Agent configuration file "+confpath, gcfg.ReadFileInto(&config, confpath))
 
 	if config.Agent.GpgUser == "" {
-		config.Agent.GpgUser = "rh@subutai.io"
+		config.Agent.GpgUser = RhGpgUser
 	}
 
 	if config.Agent.GpgHome == "" {
