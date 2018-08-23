@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/agent/agent/alert"
 	"github.com/subutai-io/agent/agent/connect"
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/agent/discovery"
@@ -47,8 +46,6 @@ func Start() {
 	go monitor.Collect()
 
 	go connect.CheckRegisterWithConsole()
-
-	go alert.Processing()
 
 	//restart containers that got stopped not by user
 	go container.StateRestore()

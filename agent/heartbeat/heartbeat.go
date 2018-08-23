@@ -3,7 +3,6 @@ package heartbeat
 import (
 	"time"
 	"os"
-	"github.com/subutai-io/agent/agent/alert"
 	"github.com/subutai-io/agent/lib/gpg"
 	"net/url"
 	"sync"
@@ -34,7 +33,6 @@ type heartbeat struct {
 	Arch       string                `json:"arch"`
 	Instance   string                `json:"instance"`
 	Containers []container.Container `json:"containers,omitempty"`
-	Alert      []alert.Load          `json:"alert,omitempty"`
 }
 
 var (
@@ -81,8 +79,7 @@ func sendHeartbeat() bool {
 		ID:         gpg.GetRhFingerprint(),
 		Arch:       instanceArch,
 		Instance:   instanceType,
-		Containers: alert.Quota(pool),
-		Alert:      alert.Current(pool),
+		Containers: pool,
 	}}
 	jbeat, err := json.Marshal(&res)
 	log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err)

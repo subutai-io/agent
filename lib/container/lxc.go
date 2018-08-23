@@ -329,6 +329,18 @@ func Clone(parent, child string) error {
 	return nil
 }
 
+func QuotaDisk(name, size string) int {
+	if len(size) > 0 {
+		vs, _ := strconv.Atoi(size)
+		fs.SetQuota(name, vs)
+	}
+	vr, _ := fs.GetQuota(name)
+	//convert bytes to GB
+	vr /= 1024 * 1024 * 1024
+
+	return vr
+}
+
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, it's just return current value.
 func QuotaRAM(name string, size string) int {

@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
 )
 
@@ -28,15 +27,7 @@ func LxcQuota(name, res, size, threshold string) {
 	case "network":
 		quota = container.QuotaNet(name, size)
 	case "disk":
-		//todo move to container.QuotaDisk
-		if len(size) > 0 {
-			vs, _ := strconv.Atoi(size)
-			fs.SetQuota(name, vs)
-		}
-		vr, _ := fs.GetQuota(name)
-		//convert bytes to GB
-		vr /= 1024 * 1024 * 1024
-		quota = strconv.Itoa(vr)
+		quota = strconv.Itoa(container.QuotaDisk(name, size))
 	case "cpuset":
 		quota = container.QuotaCPUset(name, size)
 	case "ram":

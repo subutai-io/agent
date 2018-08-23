@@ -53,6 +53,7 @@ func init() {
 	cache = utils.GetCache(time.Minute * 60)
 }
 
+//todo move to executor.go
 // Credentials returns information about IDs from container. This informations is user for command execution only.
 func Credentials(name, container string) (uid int, gid int) {
 	thePath := path.Join(config.Agent.LxcPrefix, container, "/rootfs/etc/passwd")
@@ -64,6 +65,7 @@ func Credentials(name, container string) (uid int, gid int) {
 	return uid, gid
 }
 
+//todo move to executor.go
 func parsePasswd(path, name string) (uid string, gid string) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -84,6 +86,7 @@ func parsePasswd(path, name string) (uid string, gid string) {
 	return "", ""
 }
 
+//todo move to heartbeat.go
 // Active provides list of active Subutai containers.
 func Active(details bool) []Container {
 	var contArr []Container
@@ -126,6 +129,11 @@ func Active(details bool) []Container {
 			})
 
 			//<<<cacheable properties
+
+			//TODO cache quotas
+			container.Quota.RAM = cont.QuotaRAM(c, "")
+			container.Quota.CPU = cont.QuotaCPU(c, "")
+			container.Quota.Disk = cont.QuotaDisk(c, "")
 
 			if details {
 				container.Pk = gpg.GetContainerPk(c)
