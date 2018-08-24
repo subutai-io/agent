@@ -2,8 +2,6 @@ package discovery
 
 import (
 	"fmt"
-	"io/ioutil"
-	"strconv"
 	"strings"
 	"time"
 
@@ -11,12 +9,13 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/agent/console"
 )
+
+const MhIp = "10.10.10.1"
 
 type handler struct {
 }
@@ -31,7 +30,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 
 	managementHostIp := config.ManagementIP
-	if managementHostIp == "10.10.10.1" {
+	if managementHostIp == MhIp {
 		managementHostIp = ""
 	}
 
@@ -62,12 +61,11 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	}
 }
 
-// ImportManagementKey adds GPG public key to local keyring to encrypt messages to Management server.
-func ImportManagementKey() {
-	if pk := utils.GetConsolePubKey(); pk != nil {
-		gpg.ImportPk(pk)
-		config.Management.GpgUser = gpg.ExtractKeyID(pk)
-	}
+var consol console.Console
+
+func init() {
+	consol = console.GetConsole()
+	loadManagementIp()
 }
 
 // Monitor provides service for auto discovery based on SSDP protocol.
@@ -96,7 +94,7 @@ func server() {
 		ssdpServerRunning = false
 	}()
 
-	save("10.10.10.1")
+	save(MhIp)
 
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
@@ -104,15 +102,20 @@ func server() {
 		go common.RunNRecover(s.Start)
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP server on " + address)
+		location := net.GetIp()
+		fp, err := consol.GetFingerprint()
+		if log.Check(log.WarnLevel, "Getting Console fingerprint", err) {
+			return
+		}
 		s.AdvertiseServer(gossdp.AdvertisableServer{
 			ServiceType: address,
-			DeviceUuid:  fingerprint(config.ManagementIP),
-			Location:    net.GetIp(),
+			DeviceUuid:  fp,
+			Location:    location,
 			MaxAge:      3600,
 		})
 
-		//TODO when IP changes , announced server ip stays old
-		for len(config.ManagementIP) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
+		//stay as ssdp server while registration with Console is valid and MH IP has not changed
+		for consol.IsRegistered() && location == net.GetIp() {
 			time.Sleep(30 * time.Second)
 		}
 	} else {
@@ -121,8 +124,17 @@ func server() {
 }
 
 func client() {
-	if len(strings.TrimSpace(config.ManagementIP)) > 0 && len(fingerprint(config.ManagementIP)) > 0 {
-		return
+	//don't search new peers while registration with Console is valid
+	if consol.IsRegistered() {
+		if config.Management.GpgUser == "" {
+			consol.ImportPubKey()
+		}
+	} else {
+		//reset config.ManagementIP to enable rediscovery
+		if strings.TrimSpace(config.Management.Host) == "" {
+			log.Debug("Resetting MH IP")
+			config.ManagementIP = ""
+		}
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
@@ -133,53 +145,31 @@ func client() {
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
 		err = c.ListenFor(address)
-		time.Sleep(10 * time.Second)
+		time.Sleep(9 * time.Second)
 	} else {
 		log.Warn(err)
 	}
 }
 
-func fingerprint(ip string) string {
-	client := utils.GetClient(config.Management.AllowInsecure, 30)
-	resp, err := client.Get("https://" + ip + ":8443/rest/v1/security/keyman/getpublickeyfingerprint")
-	if err == nil {
-		defer utils.Close(resp)
-	}
-
-	if log.Check(log.WarnLevel, "Getting Management host GPG fingerprint", err) {
-		return ""
-	}
-
-	if resp.StatusCode == 200 {
-		key, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			return string(key)
-		}
-	}
-
-	log.Warn("Failed to fetch GPG fingerprint from Management Server. Status Code " + strconv.Itoa(resp.StatusCode))
-	return ""
-}
-
 func save(ip string) {
 	ip = strings.TrimSpace(ip)
 
-	log.Debug("Saving management host IP " + ip)
-
-	db.INSTANCE.DiscoverySave(ip)
+	log.Check(log.WarnLevel, "Saving Console IP "+ip, db.INSTANCE.DiscoverySave(ip))
 
 	config.ManagementIP = ip
+
+	log.Check(log.WarnLevel, "Importing Console key", consol.ImportPubKey())
+	log.Check(log.WarnLevel, "Sending registration request to Console", consol.Register())
+	log.Check(log.WarnLevel, "Sending heartbeat to Console", consol.SendHeartBeat())
 }
 
-func LoadManagementIp() {
-	if len(strings.TrimSpace(config.ManagementIP)) == 0 {
-		if strings.TrimSpace(config.Management.Host) == "" {
-			ip, err := db.INSTANCE.DiscoveryLoad()
-			if !log.Check(log.WarnLevel, "Loading discovered ip from db", err) {
-				config.ManagementIP = strings.TrimSpace(ip)
-			}
-		} else {
-			config.ManagementIP = strings.TrimSpace(config.Management.Host)
+func loadManagementIp() {
+	if strings.TrimSpace(config.Management.Host) == "" {
+		ip, err := db.INSTANCE.DiscoveryLoad()
+		if !log.Check(log.ErrorLevel, "Loading discovered Console ip from db", err) {
+			config.ManagementIP = strings.TrimSpace(ip)
 		}
+	} else {
+		config.ManagementIP = strings.TrimSpace(config.Management.Host)
 	}
 }

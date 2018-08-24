@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/subutai-io/agent/agent/connect"
 	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/agent/discovery"
 	"github.com/subutai-io/agent/agent/executer"
@@ -20,50 +19,59 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
 	"path"
-	"github.com/subutai-io/agent/agent/heartbeat"
 	"github.com/subutai-io/agent/cli"
+	"github.com/subutai-io/agent/agent/console"
+	"github.com/subutai-io/agent/agent/util"
 )
 
 var (
-	client *http.Client
+	secureClient *http.Client
+	consol       console.Console
 )
 
 func initAgent() {
 
-	client = utils.GetSecureClient()
+	//todo remove
+	secureClient, _ = util.GetUtil().GetBiSslClient(30)
+	consol = console.GetConsole()
+
 }
 
 //Start Subutai Agent daemon, all required goroutines and keep working during all life cycle.
 func Start() {
+
 	initAgent()
 
-	setupHttpServer()
-
-	//SSDP discovery for secondary RHs
 	go discovery.Monitor()
-
-	//metrics
-	go monitor.Collect()
-
-	go connect.CheckRegisterWithConsole()
 
 	//restart containers that got stopped not by user
 	go container.StateRestore()
 
+	//wait till Console is loaded
+	for !consol.IsReady() {
+		time.Sleep(time.Second * 3)
+	}
+
+	//wait till RH gets registered with Console
+	for !consol.IsRegistered() {
+		time.Sleep(time.Second * 5)
+	}
+
+	//below routines should start only when registration with Console is established
+	setupHttpServer()
+
+	go monitor.Collect()
+
+	//todo refactor below
 	for {
 
-		for !connect.IsConsoleReady() {
-			time.Sleep(time.Second * 10)
-		}
-
-		if heartbeat.HeartBeat() {
+		if consol.SendHeartBeat() == nil {
 			time.Sleep(30 * time.Second)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
 
 		cli.CheckSshTunnels()
-
 	}
 }
 
@@ -77,10 +85,10 @@ func execute(rsp executer.EncRequest) {
 	if rsp.HostID == gpg.GetRhFingerprint() {
 		md = gpg.DecryptWrapper(rsp.Request)
 	} else {
-		contName = heartbeat.GetContainerNameByID(rsp.HostID)
+		contName = consol.GetContainerNameByID(rsp.HostID)
 		if contName == "" {
-			heartbeat.ForceHeartBeat()
-			contName = heartbeat.GetContainerNameByID(rsp.HostID)
+			consol.SendHeartBeat()
+			contName = consol.GetContainerNameByID(rsp.HostID)
 			if contName == "" {
 				return
 			}
@@ -125,11 +133,12 @@ func execute(rsp executer.EncRequest) {
 			sOut = nil
 		}
 	}
-	go heartbeat.HeartBeat()
+
+	go consol.SendHeartBeat()
 }
 
 func sendResponse(msg []byte, deadline time.Time) {
-	resp, err := utils.PostForm(client, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := utils.PostForm(secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -147,7 +156,9 @@ func sendResponse(msg []byte, deadline time.Time) {
 func command() {
 	var rsp []executer.EncRequest
 
-	resp, err := client.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + gpg.GetRhFingerprint())
+	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + gpg.GetRhFingerprint()
+
+	resp, err := secureClient.Get(theUrl)
 
 	if err == nil {
 		defer utils.Close(resp)
@@ -222,7 +233,7 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
-		go heartbeat.ForceHeartBeat()
+		go consol.SendHeartBeat()
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}

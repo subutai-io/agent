@@ -1,6 +1,7 @@
 package console
 
 
+
 //TODO
 
 //put here all console related functionality:

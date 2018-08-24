@@ -43,9 +43,10 @@ func GetIp() string {
 
 	out, err := exc.ExecuteWithBash("ip route get 1.1.1.1 | grep -oP 'src \\K\\S+'")
 
-	if log.Check(log.WarnLevel, "Getting RH ip "+out, err) {
+	ip := strings.TrimSpace(out)
+	if log.Check(log.WarnLevel, "Getting RH IP "+ip, err) {
 		return ""
 	}
 
-	return strings.TrimSpace(out)
+	return ip
 }
