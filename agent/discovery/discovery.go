@@ -160,7 +160,6 @@ func save(ip string) {
 
 	log.Check(log.WarnLevel, "Importing Console key", consol.ImportPubKey())
 	log.Check(log.WarnLevel, "Sending registration request to Console", consol.Register())
-	log.Check(log.WarnLevel, "Sending heartbeat to Console", consol.SendHeartBeat())
 }
 
 func loadManagementIp() {

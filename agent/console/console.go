@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"github.com/pkg/errors"
 	"fmt"
-	"github.com/subutai-io/agent/agent/container"
 	"os"
 	"strings"
 	"bytes"
@@ -20,42 +19,13 @@ import (
 	"github.com/subutai-io/agent/log"
 	"net/url"
 	"sync"
+	"github.com/subutai-io/agent/agent/executer"
+	"time"
+	"gopkg.in/lxc/go-lxc.v2"
+	"github.com/subutai-io/agent/db"
+	cont "github.com/subutai-io/agent/lib/container"
+	"github.com/wunderlist/ttlcache"
 )
-
-type Console struct {
-	fingerprint  string
-	httpUtil     util.HttpUtil
-	client       *http.Client
-	secureClient *http.Client
-}
-
-type rHost struct {
-	Id           string                `json:"id"`
-	Hostname     string                `json:"hostname"`
-	Pk           string                `json:"publicKey"`
-	Cert         string                `json:"cert"`
-	Secret       string                `json:"secret"`
-	Address      string                `json:"address"`
-	Arch         string                `json:"arch"`
-	InstanceType string                `json:"instanceType"`
-	Containers   []container.Container `json:"hostInfos"`
-}
-
-//Response covers heartbeat date because of format required by Management server.
-type response struct {
-	Beat heartbeat `json:"response"`
-}
-
-//heartbeat describes JSON formated information that Agent sends to Management server.
-type heartbeat struct {
-	Type       string                `json:"type"`
-	Hostname   string                `json:"hostname"`
-	Address    string                `json:"address"`
-	ID         string                `json:"id"`
-	Arch       string                `json:"arch"`
-	Instance   string                `json:"instance"`
-	Containers []container.Container `json:"containers,omitempty"`
-}
 
 var (
 	//todo move variables to Console instance
@@ -63,13 +33,15 @@ var (
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
 	mutex        sync.Mutex
-	pool         []container.Container
+	pool         []Container
+	cache        *ttlcache.Cache
 )
 
 func init() {
 	httpUtil := util.GetUtil()
 	sc, err := httpUtil.GetBiSslClient(30)
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
+	cache = utils.GetCache(time.Minute * 60)
 	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
 }
 
@@ -123,7 +95,7 @@ func (c Console) Register() error {
 		Cert:         utils.PublicCert(),
 		Address:      net.GetIp(),
 		InstanceType: utils.InstanceType(),
-		Containers:   container.Active(true),
+		Containers:   containers(true),
 	})
 	if err != nil {
 		return err
@@ -171,7 +143,7 @@ func (c Console) SendHeartBeat() error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	pool = container.Active(false)
+	pool = containers(false)
 	hostname, err := os.Hostname()
 	log.Check(log.DebugLevel, "Obtaining RH hostname", err)
 	res := response{Beat: heartbeat{
@@ -187,7 +159,7 @@ func (c Console) SendHeartBeat() error {
 	if log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err) {
 		return err
 	}
-	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat);
+	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat)
 	if !log.Check(log.WarnLevel, "Encrypting message for Console", err) {
 		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
@@ -222,6 +194,13 @@ func (c Console) ImportPubKey() error {
 	return nil
 }
 
+func (c Console) ExecuteConsoleCommands() {
+	commands := c.getCommands()
+	for _, cmd := range commands {
+		go c.execute(cmd)
+	}
+}
+
 //fetches Console public GPG key
 func (c Console) getPubKey() ([]byte, error) {
 	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/security/keyman/getpublickeyring")
@@ -243,11 +222,150 @@ func (c Console) getPubKey() ([]byte, error) {
 	}
 }
 
-func (c Console) GetContainerNameByID(id string) string {
-	for _, c := range pool {
+//returns container name by container id
+func (c Console) getContainerNameByID(id string) string {
+	thePool := pool
+	for _, c := range thePool {
 		if c.ID == id {
 			return c.Name
 		}
 	}
+
 	return ""
+}
+
+//fetch commands to execute from Console
+func (c Console) getCommands() []executer.EncRequest {
+	var rsp []executer.EncRequest
+
+	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/requests/" + gpg.GetRhFingerprint()
+
+	resp, err := c.secureClient.Get(theUrl)
+	if err == nil {
+		defer utils.Close(resp)
+	}
+
+	if log.Check(log.WarnLevel, "Fetching commands from Console", err) {
+		return rsp
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		return rsp
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if log.Check(log.WarnLevel, "Reading commands from Console", err) {
+		return rsp
+	}
+
+	if log.Check(log.WarnLevel, "Parsing commands from Console", json.Unmarshal(data, &rsp)) {
+		return rsp
+	}
+
+	return rsp
+}
+
+//send a single command execution result to Console
+func (c Console) sendResponse(msg []byte, deadline time.Time) {
+	resp, err := utils.PostForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
+		defer utils.Close(resp)
+		if resp.StatusCode == http.StatusAccepted {
+			return
+		}
+	}
+
+	//retry sending a response
+	if deadline.After(time.Now()) {
+		time.Sleep(time.Second * 5)
+		go c.sendResponse(msg, deadline)
+	}
+}
+
+func (c Console) execute(cmd executer.EncRequest) {
+	executer.Execute(cmd, c.sendResponse, c.getContainerNameByID(cmd.HostID))
+	c.SendHeartBeat()
+}
+
+// containers provides list of active Subutai containers.
+func containers(details bool) []Container {
+	var contArr []Container
+
+	for _, c := range cont.Containers() {
+		hostname, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hostname"))
+		if err != nil {
+			continue
+		}
+		configpath := path.Join(config.Agent.LxcPrefix, c, "config")
+
+		if meta, err := db.INSTANCE.ContainerByName(c); err == nil {
+
+			vlan := meta["vlan"]
+			envId := meta["environment"]
+			ip := meta["ip"]
+
+			aContainer := Container{
+				Name:     c,
+				Hostname: strings.TrimSpace(string(hostname)),
+				Status:   cont.State(c),
+				Vlan:     vlan,
+				EnvId:    envId,
+			}
+
+			aContainer.Interfaces = interfaces(c, ip)
+
+			//cacheable properties>>>
+
+			aContainer.ID = utils.GetFromCacheOrCalculate(cache, c+"_fingerprint", func() string {
+				return gpg.GetFingerprint(c)
+			})
+
+			aContainer.Arch = utils.GetFromCacheOrCalculate(cache, c+"_arch", func() string {
+				return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
+			})
+
+			aContainer.Parent = utils.GetFromCacheOrCalculate(cache, c+"_parent", func() string {
+				return cont.GetConfigItem(configpath, "subutai.parent")
+			})
+
+			//<<<cacheable properties
+
+			//TODO cache quotas
+			aContainer.Quota.RAM = cont.QuotaRAM(c, "")
+			aContainer.Quota.CPU = cont.QuotaCPU(c, "")
+			aContainer.Quota.Disk = cont.QuotaDisk(c, "")
+
+			if details {
+				aContainer.Pk = gpg.GetContainerPk(c)
+			}
+
+			contArr = append(contArr, aContainer)
+
+		}
+	}
+	return contArr
+}
+
+//this should be done together with Console changes
+func interfaces(name string, staticIp string) []Iface {
+
+	iface := new(Iface)
+
+	iface.InterfaceName = "eth0"
+
+	if staticIp != "" {
+		iface.IP = staticIp
+	} else {
+		c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+		if err == nil {
+			defer lxc.Release(c)
+
+			listip, err := c.IPAddress(iface.InterfaceName)
+			if err == nil {
+				iface.IP = strings.Join(listip, " ")
+			}
+		}
+	}
+
+	return []Iface{*iface}
 }

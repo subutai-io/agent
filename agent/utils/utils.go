@@ -23,12 +23,6 @@ var (
 	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
 )
 
-// Iface describes network interfaces of the Resource Host.
-type Iface struct {
-	InterfaceName string `json:"interfaceName"`
-	IP            string `json:"ip"`
-}
-
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
 	return client.NewHTTPClient(client.HTTPConfig{

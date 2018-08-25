@@ -28,6 +28,7 @@ type agentConfig struct {
 
 type managementConfig struct {
 	Host    string
+	//TODO remove or add securePort
 	Port    string
 	Secret  string
 	GpgUser string
