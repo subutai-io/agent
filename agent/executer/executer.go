@@ -16,61 +16,71 @@ import (
 
 	"gopkg.in/lxc/go-lxc.v2"
 
-	"github.com/subutai-io/agent/agent/container"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/gpg"
+	"path"
+	"encoding/json"
 )
 
-// EncRequest describes encrypted JSON request from Management server.
-type EncRequest struct {
-	HostID  string `json:"hostid"`
-	Request string `json:"request"`
+func Execute(rsp EncRequest, responseCallback func(msg []byte, deadline time.Time), contName string) {
+	var req Request
+	var md, pub, keyring string
+
+	if rsp.HostID == gpg.GetRhFingerprint() {
+		md = gpg.DecryptWrapper(rsp.Request)
+	} else {
+
+		if contName == "" {
+			return
+		}
+
+		pub = path.Join(config.Agent.LxcPrefix, contName, "public.pub")
+		keyring = path.Join(config.Agent.LxcPrefix, contName, "secret.sec")
+		log.Info("Getting public keyring", "keyring", keyring)
+		md = gpg.DecryptWrapper(rsp.Request, keyring, pub)
+	}
+
+	if log.Check(log.WarnLevel, "Decrypting request", json.Unmarshal([]byte(md), &req.Request)) {
+		return
+	}
+
+	//create channels for stdout and stderr
+	sOut := make(chan ResponseOptions)
+	if rsp.HostID == gpg.GetRhFingerprint() {
+		go execInHost(req.Request, sOut)
+	} else {
+		go execInContainer(contName, req.Request, sOut)
+	}
+
+	for sOut != nil {
+		if elem, ok := <-sOut; ok {
+			resp := Response{ResponseOpts: elem}
+			jsonR, err := json.Marshal(resp)
+			log.Check(log.WarnLevel, "Marshal response", err)
+
+			var payload []byte
+			if rsp.HostID == gpg.GetRhFingerprint() {
+				payload, err = gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jsonR)
+			} else {
+				payload, err = gpg.EncryptWrapper(contName, config.Management.GpgUser, jsonR, pub, keyring)
+			}
+			if err == nil && len(payload) > 0 {
+				message, err := json.Marshal(map[string]string{"hostId": elem.ID, "response": string(payload)})
+				log.Check(log.WarnLevel, "Marshal response json "+elem.CommandID, err)
+				go responseCallback(message, time.Now().Add(time.Second*time.Duration(req.Request.Timeout)))
+			}
+		} else {
+			sOut = nil
+		}
+	}
+
 }
 
-// Request is a encapsulation for RequestOptions required by the Management server.
-type Request struct {
-	ID      string         `json:"id"`
-	Request RequestOptions `json:"request"`
-}
-
-// RequestOptions describes parameters of the request for command execution.
-type RequestOptions struct {
-	Type        string            `json:"type"`
-	ID          string            `json:"id"`
-	CommandID   string            `json:"commandId"`
-	WorkingDir  string            `json:"workingDirectory"`
-	Command     string            `json:"command"`
-	Args        []string          `json:"args"`
-	Environment map[string]string `json:"environment"`
-	StdOut      string            `json:"stdOut"`
-	StdErr      string            `json:"stdErr"`
-	RunAs       string            `json:"runAs"`
-	Timeout     int               `json:"timeout"`
-	IsDaemon    int               `json:"isDaemon"`
-}
-
-// Response is a encapsulation for ResponseOptions required by the Management server.
-type Response struct {
-	ResponseOpts ResponseOptions `json:"response"`
-	ID           string          `json:"id"`
-}
-
-// ResponseOptions describes parameters of the response for command execution.
-type ResponseOptions struct {
-	Type           string `json:"type"`
-	ID             string `json:"id"`
-	CommandID      string `json:"commandId"`
-	Pid            int    `json:"pid"`
-	ResponseNumber int    `json:"responseNumber,omitempty"`
-	StdOut         string `json:"stdOut,omitempty"`
-	StdErr         string `json:"stdErr,omitempty"`
-	ExitCode       string `json:"exitCode,omitempty"`
-}
-
-// ExecHost executes request inside Resource host
+// execInHost executes request inside Resource host
 // and sends output as response.
-func ExecHost(req RequestOptions, outCh chan<- ResponseOptions) {
+func execInHost(req RequestOptions, outCh chan<- ResponseOptions) {
 	defer close(outCh)
 
 	cmd := buildCmd(&req)
@@ -245,9 +255,9 @@ func genericResponse(req RequestOptions) ResponseOptions {
 	}
 }
 
-// AttachContainer executes request inside Container host
+// execInContainer executes request inside Container host
 // and sends output as response.
-func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptions) error {
+func execInContainer(name string, req RequestOptions, outCh chan<- ResponseOptions) error {
 	defer close(outCh)
 
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -269,7 +279,7 @@ func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 	defer rep.Close()
 
 	opts := lxc.DefaultAttachOptions
-	opts.UID, opts.GID = container.Credentials(req.RunAs, name)
+	opts.UID, opts.GID = credentials(req.RunAs, name)
 	opts.StdoutFd = wop.Fd()
 	opts.StderrFd = wep.Fd()
 	opts.Cwd = req.WorkingDir
@@ -318,4 +328,35 @@ func AttachContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 	outCh <- response
 
 	return nil
+}
+
+// Credentials returns information about IDs from container. This informations is user for command execution only.
+func credentials(name, container string) (uid int, gid int) {
+	thePath := path.Join(config.Agent.LxcPrefix, container, "/rootfs/etc/passwd")
+	u, g := parsePasswd(thePath, name)
+	uid, err := strconv.Atoi(u)
+	log.Check(log.DebugLevel, "Parsing user UID from container", err)
+	gid, err = strconv.Atoi(g)
+	log.Check(log.DebugLevel, "Parsing user GID from container", err)
+	return uid, gid
+}
+
+func parsePasswd(path, name string) (uid string, gid string) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", ""
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), name) {
+			arr := strings.Split(scanner.Text(), ":")
+			if len(arr) > 3 {
+				return arr[2], arr[3]
+			}
+		}
+	}
+	return "", ""
 }

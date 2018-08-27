@@ -97,7 +97,7 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 		msg = id + " is destroyed"
 	}
 
-	if id == "management" {
+	if id == container.Management {
 		template.MngDel()
 	}
 

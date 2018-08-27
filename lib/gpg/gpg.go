@@ -15,22 +15,26 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
-	"time"
 	"path"
 	"fmt"
+	"github.com/subutai-io/agent/agent/util"
+	"net/http"
 )
 
 var (
 	GPG = "gpg1"
+
+	secureClient *http.Client
 )
 
 func init() {
 	// move .gnupg dir to app home
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
+	secureClient, _ = util.GetUtil().GetBiSslClient(30)
 }
 
-func DetermineGPGVersion() {
+func EnsureGPGVersion() {
 	out, err := exec2.Execute("gpg1", "--version")
 	if err != nil {
 		out, err = exec2.Execute("gpg", "--version")
@@ -66,20 +70,23 @@ func DetermineGPGVersion() {
 }
 
 //ImportPk imports Public Key "gpg2 --import pubkey.key".
-func ImportPk(k []byte) string {
+func ImportPk(k []byte) error {
 	tmpfile, err := ioutil.TempFile("", "subutai-epub")
-	if !log.Check(log.WarnLevel, "Creating Public key file", err) {
-
-		_, err = tmpfile.Write(k)
-		log.Check(log.WarnLevel, "Writing Management server Public key to "+tmpfile.Name(), err)
-		log.Check(log.WarnLevel, "Closing "+tmpfile.Name(), tmpfile.Close())
-
-		out, err := exec.Command(GPG, "--import", tmpfile.Name()).CombinedOutput()
-		log.Check(log.WarnLevel, "Importing MH Public key from "+tmpfile.Name(), err)
-		log.Check(log.WarnLevel, "Removing temp file", os.Remove(tmpfile.Name()))
-		return string(out)
+	if log.Check(log.WarnLevel, "Creating gpg public key file", err) {
+		return err
 	}
-	return err.Error()
+	_, err = tmpfile.Write(k)
+	if log.Check(log.WarnLevel, "Writing gpg public key to "+tmpfile.Name(), err) {
+		return err
+	}
+	log.Check(log.WarnLevel, "Closing "+tmpfile.Name(), tmpfile.Close())
+
+	_, err = exec.Command(GPG, "--import", tmpfile.Name()).CombinedOutput()
+	if log.Check(log.WarnLevel, "Importing gpg public key from "+tmpfile.Name(), err) {
+		return err
+	}
+	log.Check(log.WarnLevel, "Removing temp file", os.Remove(tmpfile.Name()))
+	return nil
 }
 
 // GetContainerPk returns GPG Public Key for container.
@@ -230,9 +237,9 @@ func GetFingerprint(email string) string {
 	return ""
 }
 
-//TODO use single method
 func getMngKey(c string) {
 
+	//TODO possibly use console
 	consolePublicKey := utils.GetConsolePubKey()
 
 	if consolePublicKey == nil {
@@ -276,9 +283,7 @@ func sendData(c string) {
 	log.Check(log.FatalLevel, "Reading encrypted stdin.txt.asc", err)
 	defer asc.Close()
 
-	client := utils.GetSecureClient()
-	client.Timeout = time.Second * 30
-	resp, err := client.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
+	resp, err := secureClient.Post("https://"+path.Join(config.ManagementIP)+":8444/rest/v1/registration/verify/container-token", "text/plain", asc)
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
 	log.Check(log.FatalLevel, "Sending container registration request to management", err)
@@ -318,6 +323,8 @@ func ExchageAndEncrypt(c, t string) {
 	sendData(c)
 }
 
+
+//todo move to ssl
 // ValidatePem checks if OpenSSL x509 certificate valid.
 // 1. Validates public part
 // 2. Validates private part
@@ -343,6 +350,7 @@ func ValidatePem(pathToCert string) bool {
 	return true
 }
 
+//todo move to ssl
 // ParsePem return parsed OpenSSL x509 certificate.
 func ParsePem(cert string) (crt, key []byte) {
 	var err error

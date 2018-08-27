@@ -39,7 +39,7 @@ func LxcHostname(c, name string) {
 	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "/rootfs/etc/hosts"), []byte(hosts), 0644)
 	log.Check(log.FatalLevel, "Fixing /etc/hosts for "+c, err)
 
-	if container.State(c) == "RUNNING" {
+	if container.State(c) == container.Running {
 		container.AttachExec(c, []string{"/bin/hostname", name})
 	}
 

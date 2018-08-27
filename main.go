@@ -14,7 +14,7 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
-	"github.com/subutai-io/agent/agent/discovery"
+	"github.com/subutai-io/agent/agent/vars"
 )
 
 var version = "unknown"
@@ -24,12 +24,10 @@ func init() {
 		log.Error("Please run as root")
 	}
 
-	gpg.DetermineGPGVersion()
+	gpg.EnsureGPGVersion()
+
 }
 
-
-//TODO make balancing policy option consistent between map and proxy commands, use -b
-//TODO update wiki
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
 	debugFlag = app.Flag("debug", "Set log level to DEBUG").Short('d').Bool()
@@ -302,6 +300,8 @@ func init() {
 	app.Version(version)
 	app.HelpFlag.Short('h')
 	app.VersionFlag.Hidden().Short('v')
+
+	vars.Version = version
 }
 
 func main() {
@@ -312,9 +312,7 @@ func main() {
 		log.Level(log.DebugLevel)
 	}
 
-	if input != daemonCmd.FullCommand() {
-		discovery.LoadManagementIp()
-	}
+	vars.IsDaemon = input == daemonCmd.FullCommand()
 
 	switch input {
 

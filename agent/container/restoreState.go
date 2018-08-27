@@ -15,12 +15,11 @@ func StateRestore() {
 	}
 }
 
-
-func doRestore(){
+func doRestore() {
 	active := getRunningContainers()
 
 	for _, v := range active {
-		if container.State(v) != "RUNNING" {
+		if container.State(v) != container.Running {
 			log.Debug("Starting container " + v)
 			startErr := container.Start(v)
 			for i := 0; i < 5 && startErr != nil; i++ {
@@ -30,14 +29,14 @@ func doRestore(){
 			}
 			if startErr != nil {
 				log.Warn("Failed to start container " + v + ": " + startErr.Error())
-				container.AddMetadata(v, map[string]string{"state": "STOPPED"})
+				container.AddMetadata(v, map[string]string{"state": container.Stopped})
 			}
 		}
 	}
 }
 
 func getRunningContainers() []string {
-	list, err := db.INSTANCE.ContainerByKey("state", "RUNNING")
+	list, err := db.INSTANCE.ContainerByKey("state", container.Running)
 
 	if !log.Check(log.WarnLevel, "Getting list of running containers", err) {
 		return list

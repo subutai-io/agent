@@ -81,7 +81,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	}
 
 	wasRunning := false
-	if container.State(name) == "RUNNING" {
+	if container.State(name) == container.Running {
 		LxcStop(name)
 		wasRunning = true
 	}
@@ -160,7 +160,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	}
 
 	// check: write package list to packages
-	if container.State(name) != "RUNNING" {
+	if container.State(name) != container.Running {
 		LxcStart(name)
 	}
 	pkgCmdResult, _ := container.AttachExec(name, []string{"timeout", "60", "dpkg", "-l"})
