@@ -55,7 +55,7 @@ func (http HttpUtil) GetClient(timeoutSec int) *http2.Client {
 	return &http2.Client{Transport: tr, Timeout: time.Second * time.Duration(timeoutSec)}
 }
 
-func (http HttpUtil) GetBiSslClient(timeoutSec int) (*http2.Client, error) {
+func (http HttpUtil) GetSecureClient(timeoutSec int) (*http2.Client, error) {
 
 	tlsConfig, err := newTLSConfig()
 
@@ -64,9 +64,10 @@ func (http HttpUtil) GetBiSslClient(timeoutSec int) (*http2.Client, error) {
 	}
 
 	transport := &http2.Transport{
-		TLSClientConfig: tlsConfig,
-		IdleConnTimeout: time.Minute,
-		MaxIdleConns:    MaxIdleConnections,
+		TLSClientConfig:   tlsConfig,
+		IdleConnTimeout:   time.Minute,
+		MaxIdleConns:      MaxIdleConnections,
+		DisableKeepAlives: true,
 	}
 
 	return &http2.Client{Transport: transport, Timeout: time.Second * time.Duration(timeoutSec),}, nil
