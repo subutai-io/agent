@@ -31,7 +31,7 @@ func init() {
 	// move .gnupg dir to app home
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
-	secureClient, _ = util.GetUtil().GetBiSslClient(30)
+	secureClient, _ = util.GetUtil().GetSecureClient(30)
 }
 
 func EnsureGPGVersion() {

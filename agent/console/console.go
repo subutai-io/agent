@@ -39,7 +39,7 @@ var (
 
 func init() {
 	httpUtil := util.GetUtil()
-	sc, err := httpUtil.GetBiSslClient(30)
+	sc, err := httpUtil.GetSecureClient(30)
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
 	cache = utils.GetCache(time.Minute * 30)
 	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
@@ -87,7 +87,7 @@ func (c Console) IsRegistered() bool {
 			return true
 		}
 	}
-	log.Warn("RH is not registered")
+	log.Warn("RH is not registered: " + resp.Status)
 
 	return false
 }
