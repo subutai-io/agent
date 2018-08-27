@@ -87,7 +87,7 @@ func (c Console) IsRegistered() bool {
 			return true
 		}
 	}
-	log.Warn("RH is not registered")
+	log.Warn("RH is not registered: " + resp.Status)
 
 	return false
 }
