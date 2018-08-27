@@ -14,6 +14,10 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/agent/console"
+	"github.com/subutai-io/agent/log"
+	"strconv"
+	"github.com/subutai-io/agent/agent/util"
+	"path"
 )
 
 var (
@@ -87,6 +91,7 @@ func setupHttpServer() {
 	mux["/trigger"] = triggerHandler
 	mux["/ping"] = pingHandler
 	mux["/heartbeat"] = heartbeatHandler
+	mux["/test"] = testHandler
 	go srv.ListenAndServe()
 }
 
@@ -114,6 +119,21 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}
+}
+func testHandler(rw http.ResponseWriter, request *http.Request) {
+	log.Warn("TEST READY" + strconv.FormatBool(consol.IsReady()))
+	clnt, _ := util.GetUtil().GetSecureClient(30)
+
+	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
+	if err == nil {
+		defer util.GetUtil().Close(resp)
+		if resp.StatusCode == http.StatusOK {
+			log.Warn("TEST READY2 true")
+			return
+		}
+	}
+
+	log.Warn("TEST READY2 false")
 }
 
 //<<<HTTP server
