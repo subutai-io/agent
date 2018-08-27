@@ -64,10 +64,9 @@ func (http HttpUtil) GetSecureClient(timeoutSec int) (*http2.Client, error) {
 	}
 
 	transport := &http2.Transport{
-		TLSClientConfig:   tlsConfig,
-		IdleConnTimeout:   time.Minute,
-		MaxIdleConns:      MaxIdleConnections,
-		DisableKeepAlives: true,
+		TLSClientConfig: tlsConfig,
+		IdleConnTimeout: time.Second,
+		MaxIdleConns:    1,
 	}
 
 	return &http2.Client{Transport: transport, Timeout: time.Second * time.Duration(timeoutSec),}, nil
