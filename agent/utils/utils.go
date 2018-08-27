@@ -2,16 +2,9 @@
 package utils
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"io/ioutil"
-	"math/big"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -21,23 +14,13 @@ import (
 	"io"
 	"regexp"
 	"path"
-	"net/url"
 	"fmt"
 	"strconv"
-	"sync"
 )
 
 var (
-	sslPath      = path.Join(config.Agent.DataPrefix, "ssl")
-	mutex        sync.Mutex
-	secureClient *http.Client
+	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
 )
-
-// Iface describes network interfaces of the Resource Host.
-type Iface struct {
-	InterfaceName string `json:"interfaceName"`
-	IP            string `json:"ip"`
-}
 
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
@@ -60,6 +43,7 @@ func Close(resp *http.Response) {
 }
 
 // PublicCert returns Public SSL certificate for Resource Host
+//todo move to ssl
 func PublicCert() string {
 	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
@@ -69,6 +53,7 @@ func PublicCert() string {
 }
 
 // InstanceType returns type of the Resource host: EC2 or LOCAL
+//todo add GCE
 func InstanceType() string {
 	uuid, err := ioutil.ReadFile("/sys/hypervisor/uuid")
 	if !log.Check(log.DebugLevel, "Checking if AWS ec2 by reading /sys/hypervisor/uuid", err) {
@@ -78,138 +63,6 @@ func InstanceType() string {
 	}
 	return "LOCAL"
 }
-
-// GetSecureClient provides HTTP client for Bi-directional SSL connection with Management server.
-func GetSecureClient() *http.Client {
-
-	if secureClient != nil {
-		return secureClient
-	}
-
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	tlsConfig := newTLSConfig()
-	for tlsConfig == nil || len(tlsConfig.Certificates[0].Certificate) == 0 || PublicCert() == "" {
-		x509generate()
-		time.Sleep(time.Second * 1)
-		tlsConfig = newTLSConfig()
-	}
-
-	transport := &http.Transport{
-		TLSClientConfig:   tlsConfig,
-		IdleConnTimeout:   time.Minute,
-		MaxIdleConns:      10,
-		DisableKeepAlives: true,
-	}
-	secureClient = &http.Client{Transport: transport, Timeout: time.Second * 30}
-
-	return secureClient
-}
-
-func x509generate() {
-	hostname, err := os.Hostname()
-	if log.Check(log.DebugLevel, "Getting Resource Host hostname", err) {
-		return
-	}
-	host := []string{hostname}
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if log.Check(log.WarnLevel, "Generating private key", err) {
-		return
-	}
-
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	if log.Check(log.WarnLevel, "Generating serial number", err) {
-		return
-	}
-
-	var notBefore time.Time
-	notBefore = time.Now()
-	notAfter := notBefore.Add(3650 * 24 * time.Hour)
-	template := x509.Certificate{
-		SerialNumber:          serialNumber,
-		Subject:               pkix.Name{Organization: []string{"Subutai Foundation"}},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              host,
-	}
-
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
-	if log.Check(log.WarnLevel, "Creating certificate", err) {
-		return
-	}
-
-	if log.Check(log.DebugLevel, "Creating directory for SSL certificates", os.MkdirAll(sslPath, 0700)) {
-		return
-	}
-
-	certOut, err := os.Create(path.Join(sslPath, "cert.pem"))
-	if log.Check(log.WarnLevel, "Opening cert.pem for writing", err) {
-		return
-	}
-	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	if log.Check(log.DebugLevel, "Encoding certificate", err) {
-		os.Remove(path.Join(sslPath, "cert.pem"))
-		return
-	}
-	log.Check(log.DebugLevel, "Closing certificate", certOut.Close())
-
-	keyOut, err := os.OpenFile(path.Join(sslPath, "key.pem"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if log.Check(log.WarnLevel, "Opening key.pem for writing", err) {
-		os.Remove(path.Join(sslPath, "cert.pem"))
-		return
-	}
-	err = pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-	if log.Check(log.DebugLevel, "Encoding certificate key", err) {
-		os.Remove(path.Join(sslPath, "cert.pem"))
-		os.Remove(path.Join(sslPath, "key.pem"))
-		return
-	}
-	log.Check(log.DebugLevel, "Closing certificate key", keyOut.Close())
-
-}
-
-func newTLSConfig() *tls.Config {
-
-	clientCert, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
-	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
-		return nil
-	}
-	privateKey, err := ioutil.ReadFile(path.Join(sslPath, "key.pem"))
-	if log.Check(log.WarnLevel, "Checking key.pem file", err) {
-		return nil
-	}
-
-	cert, err := tls.X509KeyPair(clientCert, privateKey)
-	if log.Check(log.WarnLevel, "Loading x509 keypair", err) {
-		return nil
-	}
-
-	if len(cert.Certificate) != 0 {
-		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-		if log.Check(log.WarnLevel, "Parsing client certificates", err) {
-			return nil
-		}
-	}
-
-	if config.Management.AllowInsecure {
-		// Create tls.Config with desired tls properties
-		return &tls.Config{
-			ClientAuth:         tls.NoClientCert,
-			ClientCAs:          nil,
-			InsecureSkipVerify: true,
-			Certificates:       []tls.Certificate{cert},
-		}
-
-	}
-	return &tls.Config{ClientAuth: tls.NoClientCert, ClientCAs: nil, Certificates: []tls.Certificate{cert}}
-}
-
-//HTTP CLIENT
 
 func GetClient(allowInsecure bool, timeoutSec int) *http.Client {
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: allowInsecure}}
@@ -258,6 +111,7 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 	return
 }
 
+//todo use HttpUtil instead
 func GetConsolePubKey() []byte {
 	clnt := GetClient(config.Management.AllowInsecure, 30)
 	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
@@ -278,23 +132,4 @@ func GetConsolePubKey() []byte {
 
 	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
 	return nil
-}
-
-func IsValidUrl(toTest string) bool {
-	_, err := url.ParseRequestURI(toTest)
-	if err != nil {
-		return false
-	} else {
-		return true
-	}
-}
-
-func PostForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
-	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return client.Do(req)
 }

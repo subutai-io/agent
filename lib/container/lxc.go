@@ -29,6 +29,17 @@ import (
 	"github.com/subutai-io/agent/lib/common"
 )
 
+const (
+	Running = "RUNNING"
+	Stopped = "STOPPED"
+	Unknown = "UNKNOWN"
+)
+
+//TODO add methods IsRunning, IsStopped
+
+const Management = "management"
+const ContainerDefaultIface = "eth0"
+
 var crc32Table = crc32.MakeTable(0xD5828281)
 
 // All returns list of all containers
@@ -81,13 +92,13 @@ func State(name string) (state string) {
 		defer lxc.Release(c)
 		return c.State().String()
 	}
-	return "UNKNOWN"
+	return Unknown
 }
 
 // AddMetadata adds container information to database
 func AddMetadata(name string, meta map[string]string) error {
 	if !LxcInstanceExists(name) {
-		return errors.New("Container does not exists")
+		return errors.New("Container does not exist")
 	}
 	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(name, meta))
 	return nil
@@ -105,11 +116,11 @@ func Start(name string) error {
 
 	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
 
-	if c.State().String() != "RUNNING" {
+	if c.State().String() != Running {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": "RUNNING"})
+	AddMetadata(name, map[string]string{"state": Running})
 
 	return nil
 }
@@ -125,11 +136,11 @@ func Stop(name string) error {
 
 	log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
 
-	if c.State().String() != "STOPPED" {
+	if c.State().String() != Stopped {
 		return errors.New("Unable to stop container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": "STOPPED"})
+	AddMetadata(name, map[string]string{"state": Stopped})
 
 	return nil
 }
@@ -142,17 +153,17 @@ func Restart(name string) error {
 	}
 	defer lxc.Release(c)
 
-	if c.State().String() == "RUNNING" {
+	if c.State().String() == Running {
 		log.Check(log.DebugLevel, "Stopping LXC container "+name, c.Stop())
 	}
 
 	log.Check(log.DebugLevel, "Starting LXC container "+name, c.Start())
 
-	if c.State().String() != "RUNNING" {
+	if c.State().String() != Running {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": "RUNNING"})
+	AddMetadata(name, map[string]string{"state": Running})
 
 	return nil
 }
@@ -329,6 +340,26 @@ func Clone(parent, child string) error {
 	return nil
 }
 
+func QuotaDisk(name, size string) int {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
+
+	if len(size) > 0 {
+		vs, err := strconv.Atoi(size)
+		fs.SetQuota(name, vs)
+		log.Check(log.DebugLevel, "Setting disk limit of container "+name, err)
+	}
+	vr, err := fs.GetQuota(name)
+	log.Check(log.DebugLevel, "Getting disk limit of container "+name, err)
+	//convert bytes to GB
+	vr /= 1024 * 1024 * 1024
+
+	return vr
+}
+
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, it's just return current value.
 func QuotaRAM(name string, size string) int {
@@ -388,7 +419,7 @@ func QuotaCPU(name string, size string) int {
 		quota = quota * 100 / float32(freq) / float32(runtime.NumCPU())
 	}
 
-	if size != "" && State(name) == "RUNNING" {
+	if size != "" && State(name) == Running {
 		value := strconv.Itoa(int(float32(cfsPeriod) * float32(runtime.NumCPU()) * quota / 100))
 		log.Check(log.DebugLevel, "Setting cpu.cfs_quota_us", c.SetCgroupItem("cpu.cfs_quota_us", value))
 
@@ -593,6 +624,7 @@ func Mac() string {
 	return mac
 }
 
+//todo move to p2p
 func Mtu() int {
 
 	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
@@ -603,4 +635,18 @@ func Mtu() int {
 	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
 
 	return mtu - 50
+}
+
+
+func GetIp(name string) string {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
+
+	listip, err := c.IPAddress(ContainerDefaultIface)
+	log.Check(log.DebugLevel, "Getting ip of container "+name, err)
+
+	return strings.Join(listip, " ")
 }
