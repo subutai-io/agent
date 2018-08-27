@@ -49,6 +49,20 @@ func GetConsole() Console {
 	return console
 }
 
+func (c Console) Heartbeats() {
+	for {
+		if c.IsRegistered() {
+			if c.SendHeartBeat() == nil {
+				time.Sleep(30 * time.Second)
+			} else {
+				time.Sleep(5 * time.Second)
+			}
+		} else {
+			time.Sleep(10)
+		}
+	}
+}
+
 //returns true if Console is ready to operate
 //returns false if not approved or any error during checking status
 func (c Console) IsReady() bool {
@@ -164,7 +178,7 @@ func (c Console) SendHeartBeat() error {
 		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
-		resp, err := utils.PostForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
+		resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
 			defer utils.Close(resp)
 
@@ -267,7 +281,7 @@ func (c Console) getCommands() []executer.EncRequest {
 
 //send a single command execution result to Console
 func (c Console) sendResponse(msg []byte, deadline time.Time) {
-	resp, err := utils.PostForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
+	resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
 		defer utils.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
@@ -368,4 +382,13 @@ func interfaces(name string, staticIp string) []Iface {
 	}
 
 	return []Iface{*iface}
+}
+
+func postForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return client.Do(req)
 }

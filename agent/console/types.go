@@ -3,7 +3,6 @@ package console
 import (
 	"net/http"
 	"github.com/subutai-io/agent/agent/util"
-	"time"
 )
 
 // Container describes Subutai container with all required options for the Management server.
@@ -38,17 +37,6 @@ type Console struct {
 	httpUtil     util.HttpUtil
 	client       *http.Client
 	secureClient *http.Client
-}
-
-func (c Console) Heartbeats() {
-	for {
-
-		if c.SendHeartBeat() == nil {
-			time.Sleep(30 * time.Second)
-		} else {
-			time.Sleep(5 * time.Second)
-		}
-	}
 }
 
 type rHost struct {

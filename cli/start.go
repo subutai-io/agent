@@ -10,7 +10,7 @@ import (
 // LxcStart starts a Subutai container and checks if container state changed to "running" or "starting".
 // If state is not changing for 60 seconds, then the "start" operation is considered to have failed.
 func LxcStart(name string) {
-	if container.LxcInstanceExists(name) && container.State(name) == "STOPPED" {
+	if container.LxcInstanceExists(name) && container.State(name) == container.Stopped {
 		startErr := container.Start(name)
 		for i := 0; i < 60 && startErr != nil; i++ {
 			log.Info("Waiting for container start (60 sec)")

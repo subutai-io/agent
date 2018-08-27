@@ -14,7 +14,6 @@ import (
 	"io"
 	"regexp"
 	"path"
-	"net/url"
 	"fmt"
 	"strconv"
 )
@@ -44,6 +43,7 @@ func Close(resp *http.Response) {
 }
 
 // PublicCert returns Public SSL certificate for Resource Host
+//todo move to ssl
 func PublicCert() string {
 	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
 	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
@@ -111,6 +111,7 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 	return
 }
 
+//todo use HttpUtil instead
 func GetConsolePubKey() []byte {
 	clnt := GetClient(config.Management.AllowInsecure, 30)
 	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
@@ -131,23 +132,4 @@ func GetConsolePubKey() []byte {
 
 	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
 	return nil
-}
-
-func IsValidUrl(toTest string) bool {
-	_, err := url.ParseRequestURI(toTest)
-	if err != nil {
-		return false
-	} else {
-		return true
-	}
-}
-
-func PostForm(client *http.Client, url string, data url.Values) (resp *http.Response, err error) {
-	req, err := http.NewRequest("POST", url, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return client.Do(req)
 }

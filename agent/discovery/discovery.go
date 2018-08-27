@@ -72,28 +72,16 @@ func init() {
 // It starts SSDP server if management container active, otherwise it starts client for waiting another SSDP server.
 func Monitor() {
 	for {
-		if container.State("management") == "RUNNING" {
-			go common.RunNRecover(server)
+		if container.State(container.Management) == container.Running {
+			common.RunNRecover(server)
 		} else {
-			go common.RunNRecover(client)
+			common.RunNRecover(client)
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(time.Second)
 	}
 }
 
-var ssdpServerRunning bool
-
 func server() {
-	if ssdpServerRunning {
-		return
-	}
-
-	ssdpServerRunning = true
-
-	defer func() {
-		ssdpServerRunning = false
-	}()
-
 	save(MhIp)
 
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
@@ -116,7 +104,7 @@ func server() {
 
 		//stay as ssdp server while registration with Console is valid and MH IP has not changed
 		for consol.IsRegistered() && location == net.GetIp() {
-			time.Sleep(30 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	} else {
 		log.Warn(err)
@@ -125,16 +113,21 @@ func server() {
 
 func client() {
 	//don't search new peers while registration with Console is valid
-	if consol.IsRegistered() {
+	for consol.IsRegistered() {
 		if config.Management.GpgUser == "" {
 			consol.ImportPubKey()
 		}
-	} else {
-		//reset config.ManagementIP to enable rediscovery
-		if strings.TrimSpace(config.Management.Host) == "" {
-			log.Debug("Resetting MH IP")
-			config.ManagementIP = ""
+		//if management is imported, return immediately
+		if container.State(container.Management) == container.Running {
+			return
 		}
+		time.Sleep(10 * time.Second)
+	}
+
+	//reset config.ManagementIP to enable auto rediscovery
+	if strings.TrimSpace(config.Management.Host) == "" {
+		log.Debug("Resetting MH IP")
+		config.ManagementIP = ""
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
@@ -145,7 +138,8 @@ func client() {
 		address := "urn:subutai:management:peer:5"
 		log.Debug("Launching SSDP client on " + address)
 		err = c.ListenFor(address)
-		time.Sleep(9 * time.Second)
+
+		time.Sleep(10 * time.Second)
 	} else {
 		log.Warn(err)
 	}

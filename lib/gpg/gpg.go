@@ -324,7 +324,7 @@ func ExchageAndEncrypt(c, t string) {
 }
 
 
-
+//todo move to ssl
 // ValidatePem checks if OpenSSL x509 certificate valid.
 // 1. Validates public part
 // 2. Validates private part
@@ -350,6 +350,7 @@ func ValidatePem(pathToCert string) bool {
 	return true
 }
 
+//todo move to ssl
 // ParsePem return parsed OpenSSL x509 certificate.
 func ParsePem(cert string) (crt, key []byte) {
 	var err error

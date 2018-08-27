@@ -182,8 +182,8 @@ func LxcImport(name, token string, auxDepList ...string) {
 		log.Fatal("Lxc directory " + config.Agent.LxcPrefix + " not mounted")
 	}
 
-	if container.LxcInstanceExists(name) && name == "management" && len(token) > 1 {
-		gpg.ExchageAndEncrypt("management", token)
+	if container.LxcInstanceExists(name) && name == container.Management && len(token) > 1 {
+		gpg.ExchageAndEncrypt(container.Management, token)
 		return
 	}
 
@@ -218,7 +218,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 	//for local import this check currently does not work
 	if container.LxcInstanceExists(templateRef) {
-		if t.Name == "management" && !container.IsContainer("management") {
+		if t.Name == container.Management && !container.IsContainer(container.Management) {
 			template.MngInit(templateRef)
 			return
 		}
@@ -307,7 +307,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		log.Check(log.WarnLevel, "Removing file: "+localArchive, os.Remove(localArchive))
 	}
 
-	if t.Name == "management" {
+	if t.Name == container.Management {
 		template.MngInit(templateRef)
 		return
 	}
@@ -317,12 +317,21 @@ func LxcImport(name, token string, auxDepList ...string) {
 
 func download(template Template) {
 
-	if utils.IsValidUrl(config.CDN.TemplateDownloadUrl) {
+	if isValidUrl(config.CDN.TemplateDownloadUrl) {
 		downloadFromGateway(template)
 	} else {
 		downloadViaLocalIPFSNode(template)
 	}
 
+}
+
+func isValidUrl(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	} else {
+		return true
+	}
 }
 
 func getTemplateUrl(template Template) string {
