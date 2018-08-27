@@ -7,10 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/log"
-	"gopkg.in/lxc/go-lxc.v2"
 	"sort"
 )
 
@@ -101,13 +98,5 @@ func addParent(list []string) []string {
 
 // info adds container's IP and NIC to list
 func info(name string) (result []string) {
-	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-	log.Check(log.FatalLevel, "Looking for container "+name, err)
-	defer lxc.Release(c)
-
-	nic := "eth0"
-	listip, _ := c.IPAddress(nic)
-	ip := strings.Join(listip, " ")
-
-	return append(result, name+"\t"+container.State(name)+"\t"+ip+"\t"+nic)
+	return append(result, name+"\t"+container.State(name)+"\t"+container.GetIp(name)+"\t"+container.ContainerDefaultIface)
 }

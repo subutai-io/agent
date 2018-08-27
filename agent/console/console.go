@@ -21,10 +21,10 @@ import (
 	"sync"
 	"github.com/subutai-io/agent/agent/executer"
 	"time"
-	"gopkg.in/lxc/go-lxc.v2"
 	"github.com/subutai-io/agent/db"
 	cont "github.com/subutai-io/agent/lib/container"
 	"github.com/wunderlist/ttlcache"
+	"strconv"
 )
 
 var (
@@ -41,7 +41,7 @@ func init() {
 	httpUtil := util.GetUtil()
 	sc, err := httpUtil.GetBiSslClient(30)
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
-	cache = utils.GetCache(time.Minute * 60)
+	cache = utils.GetCache(time.Minute * 30)
 	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
 }
 
@@ -310,7 +310,7 @@ func containers(details bool) []Container {
 		if err != nil {
 			continue
 		}
-		configpath := path.Join(config.Agent.LxcPrefix, c, "config")
+		configPath := path.Join(config.Agent.LxcPrefix, c, "config")
 
 		if meta, err := db.INSTANCE.ContainerByName(c); err == nil {
 
@@ -335,19 +335,29 @@ func containers(details bool) []Container {
 			})
 
 			aContainer.Arch = utils.GetFromCacheOrCalculate(cache, c+"_arch", func() string {
-				return strings.ToUpper(cont.GetConfigItem(configpath, "lxc.arch"))
+				return strings.ToUpper(cont.GetConfigItem(configPath, "lxc.arch"))
 			})
 
 			aContainer.Parent = utils.GetFromCacheOrCalculate(cache, c+"_parent", func() string {
-				return cont.GetConfigItem(configpath, "subutai.parent")
+				return cont.GetConfigItem(configPath, "subutai.parent")
 			})
 
-			//<<<cacheable properties
+			quotaRam := utils.GetFromCacheOrCalculate(cache, c+"_quota_ram", func() string {
+				return strconv.Itoa(cont.QuotaRAM(c, ""))
+			})
+			aContainer.Quota.RAM, _ = strconv.Atoi(quotaRam)
 
-			//TODO cache quotas
-			aContainer.Quota.RAM = cont.QuotaRAM(c, "")
-			aContainer.Quota.CPU = cont.QuotaCPU(c, "")
-			aContainer.Quota.Disk = cont.QuotaDisk(c, "")
+			quotaCpu := utils.GetFromCacheOrCalculate(cache, c+"_quota_cpu", func() string {
+				return strconv.Itoa(cont.QuotaCPU(c, ""))
+			})
+			aContainer.Quota.CPU, _ = strconv.Atoi(quotaCpu)
+
+			quotaDisk := utils.GetFromCacheOrCalculate(cache, c+"_quota_disk", func() string {
+				return strconv.Itoa(cont.QuotaDisk(c, ""))
+			})
+			aContainer.Quota.Disk, _ = strconv.Atoi(quotaDisk)
+
+			//<<<cacheable properties
 
 			if details {
 				aContainer.Pk = gpg.GetContainerPk(c)
@@ -365,20 +375,14 @@ func interfaces(name string, staticIp string) []Iface {
 
 	iface := new(Iface)
 
-	iface.InterfaceName = "eth0"
+	iface.InterfaceName = cont.ContainerDefaultIface
 
 	if staticIp != "" {
 		iface.IP = staticIp
 	} else {
-		c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
-		if err == nil {
-			defer lxc.Release(c)
-
-			listip, err := c.IPAddress(iface.InterfaceName)
-			if err == nil {
-				iface.IP = strings.Join(listip, " ")
-			}
-		}
+		iface.IP = utils.GetFromCacheOrCalculate(cache, name+"_ip", func() string {
+			return cont.GetIp(name)
+		})
 	}
 
 	return []Iface{*iface}

@@ -34,9 +34,11 @@ const (
 	Stopped = "STOPPED"
 	Unknown = "UNKNOWN"
 )
+
 //TODO add methods IsRunning, IsStopped
 
 const Management = "management"
+const ContainerDefaultIface = "eth0"
 
 var crc32Table = crc32.MakeTable(0xD5828281)
 
@@ -339,11 +341,19 @@ func Clone(parent, child string) error {
 }
 
 func QuotaDisk(name, size string) int {
-	if len(size) > 0 {
-		vs, _ := strconv.Atoi(size)
-		fs.SetQuota(name, vs)
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
 	}
-	vr, _ := fs.GetQuota(name)
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
+
+	if len(size) > 0 {
+		vs, err := strconv.Atoi(size)
+		fs.SetQuota(name, vs)
+		log.Check(log.DebugLevel, "Setting disk limit of container "+name, err)
+	}
+	vr, err := fs.GetQuota(name)
+	log.Check(log.DebugLevel, "Getting disk limit of container "+name, err)
 	//convert bytes to GB
 	vr /= 1024 * 1024 * 1024
 
@@ -625,4 +635,18 @@ func Mtu() int {
 	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
 
 	return mtu - 50
+}
+
+
+func GetIp(name string) string {
+	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(c)
+	}
+	log.Check(log.DebugLevel, "Looking for container: "+name, err)
+
+	listip, err := c.IPAddress(ContainerDefaultIface)
+	log.Check(log.DebugLevel, "Getting ip of container "+name, err)
+
+	return strings.Join(listip, " ")
 }
