@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"github.com/subutai-io/agent/agent/util"
 	"net/http"
-	"time"
 )
 
 var (
@@ -33,8 +32,8 @@ func init() {
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 	secureClient, _ = util.GetUtil().GetSecureClient(30)
-	for GetRhFingerprint() == "" {
-		time.Sleep(500 * time.Millisecond)
+	if GetPk(config.Agent.GpgUser) == "" {
+		GenerateKey(config.Agent.GpgUser)
 	}
 }
 
@@ -105,10 +104,6 @@ func GetContainerPk(name string) string {
 func GetPk(name string) string {
 	stdout, err := exec.Command(GPG, "--export", "-a", name).Output()
 	log.Check(log.WarnLevel, "Getting public key", err)
-	if len(stdout) == 0 {
-		log.Warn("GPG key for RH not found. Creating new.")
-		GenerateKey(name)
-	}
 	return string(stdout)
 }
 
