@@ -34,7 +34,7 @@ func init() {
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 	secureClient, _ = util.GetUtil().GetSecureClient(30)
 	for GetRhFingerprint() == "" {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
