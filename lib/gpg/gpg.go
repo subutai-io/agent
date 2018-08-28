@@ -32,6 +32,9 @@ func init() {
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 	secureClient, _ = util.GetUtil().GetSecureClient(30)
+	if GetPk(config.Agent.GpgUser) == "" {
+		GenerateKey(config.Agent.GpgUser)
+	}
 }
 
 func EnsureGPGVersion() {
@@ -69,7 +72,7 @@ func EnsureGPGVersion() {
 	}
 }
 
-//ImportPk imports Public Key "gpg2 --import pubkey.key".
+//ImportPk imports Public Key "gpg2 --import pubkey.key" to RH
 func ImportPk(k []byte) error {
 	tmpfile, err := ioutil.TempFile("", "subutai-epub")
 	if log.Check(log.WarnLevel, "Creating gpg public key file", err) {
@@ -101,10 +104,6 @@ func GetContainerPk(name string) string {
 func GetPk(name string) string {
 	stdout, err := exec.Command(GPG, "--export", "-a", name).Output()
 	log.Check(log.WarnLevel, "Getting public key", err)
-	if len(stdout) == 0 {
-		log.Warn("GPG key for RH not found. Creating new.")
-		GenerateKey(name)
-	}
 	return string(stdout)
 }
 
@@ -205,9 +204,9 @@ func GetRhFingerprint() string {
 	}
 
 	if config.Agent.GpgUser == "" {
-		rhFingeprint = GetFingerprint(config.RhGpgUser)
+		rhFingeprint = strings.TrimSpace(GetFingerprint(config.RhGpgUser))
 	} else {
-		rhFingeprint = GetFingerprint(config.Agent.GpgUser)
+		rhFingeprint = strings.TrimSpace(GetFingerprint(config.Agent.GpgUser))
 	}
 
 	return rhFingeprint
@@ -302,6 +301,7 @@ func ExchageAndEncrypt(c, t string) {
 
 	getMngKey(c)
 
+	//import mgmt key to container
 	impkey := exec.Command(GPG, "-v", "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix, c, "public.pub"), "--import", path.Join(config.Agent.LxcPrefix, c, "mgn.key"))
 	impkey.Stdout = &impout
 	impkey.Stderr = &imperr
@@ -322,7 +322,6 @@ func ExchageAndEncrypt(c, t string) {
 
 	sendData(c)
 }
-
 
 //todo move to ssl
 // ValidatePem checks if OpenSSL x509 certificate valid.

@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	//todo move variables to Console instance
 	console      Console
+	//todo move variables to Console instance
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
 	mutex        sync.Mutex
