@@ -87,6 +87,7 @@ func (c Console) IsRegistered() bool {
 			return true
 		}
 	}
+	log.Debug("MH IP " + config.ManagementIP + " fingerprint + " + c.fingerprint)
 	log.Warn("RH is not registered" )
 
 	return false
