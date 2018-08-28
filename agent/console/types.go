@@ -33,7 +33,7 @@ type Iface struct {
 }
 
 type Console struct {
-	fingerprint  string
+	Fingerprint  string
 	httpUtil     util.HttpUtil
 	client       *http.Client
 	secureClient *http.Client
