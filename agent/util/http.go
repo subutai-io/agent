@@ -28,7 +28,7 @@ var (
 func init() {
 	//precreate certs for secure client if missing
 	if !ValidatePem2(path.Join(sslPath, "cert.pem"), path.Join(sslPath, "key.pem")) {
-			log.Check(log.FatalLevel, "Generating PEM certificate", generateCertNKey())
+		log.Check(log.FatalLevel, "Generating PEM certificate", generateCertNKey())
 	}
 }
 

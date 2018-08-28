@@ -42,7 +42,7 @@ func init() {
 	sc, err := httpUtil.GetSecureClient(30)
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
 	cache = utils.GetCache(time.Minute * 30)
-	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, Fingerprint: gpg.GetRhFingerprint()}
+	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
 }
 
 func GetConsole() Console {
@@ -80,14 +80,13 @@ func (c Console) IsReady() bool {
 //returns true if Console has approved this RH registration
 //returns false if not approved or any error during checking registration
 func (c Console) IsRegistered() bool {
-	resp, err := c.secureClient.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.Fingerprint)
+	resp, err := c.secureClient.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint)
 	if err == nil {
 		defer c.httpUtil.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
 	}
-	log.Debug("MH IP " + config.ManagementIP + " Fingerprint + " + c.Fingerprint)
 	log.Warn("RH is not registered" )
 
 	return false
