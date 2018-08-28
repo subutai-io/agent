@@ -121,10 +121,10 @@ func triggerHandler(rw http.ResponseWriter, request *http.Request) {
 	}
 }
 func testHandler(rw http.ResponseWriter, request *http.Request) {
-	log.Warn("TEST READY" + strconv.FormatBool(consol.IsReady()))
+	log.Warn("TEST READY" + strconv.FormatBool(consol.IsRegistered()))
 	clnt, _ := util.GetUtil().GetSecureClient(30)
 
-	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
+	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + consol.Fingerprint)
 	if err == nil {
 		defer util.GetUtil().Close(resp)
 		if resp.StatusCode == http.StatusOK {
