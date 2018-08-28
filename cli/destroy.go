@@ -173,6 +173,7 @@ func Prune() {
 	unusedTemplates := difference(container.Templates(), templatesInUse)
 
 	//remove unused templates
+	//todo we need to sort by ancestry level, pruning youngest generations first
 	for _, t := range unusedTemplates {
 		log.Info("Destroying " + t)
 		container.DestroyTemplate(t)
