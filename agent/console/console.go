@@ -58,7 +58,7 @@ func (c Console) Heartbeats() {
 				time.Sleep(5 * time.Second)
 			}
 		} else {
-			time.Sleep(10)
+			time.Sleep(10 * time.Second)
 		}
 	}
 }
