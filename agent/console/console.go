@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	console      Console
+	console Console
 	//todo move variables to Console instance
 	instanceType = utils.InstanceType()
 	instanceArch = strings.ToUpper(runtime.GOARCH)
@@ -80,14 +80,16 @@ func (c Console) IsReady() bool {
 //returns true if Console has approved this RH registration
 //returns false if not approved or any error during checking registration
 func (c Console) IsRegistered() bool {
-	resp, err := c.secureClient.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint)
+	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint
+	log.Debug("Checking registration with Console " + theUrl)
+	resp, err := c.secureClient.Get(theUrl)
 	if err == nil {
 		defer c.httpUtil.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
 	}
-	log.Warn("RH is not registered" )
+	log.Warn("RH is not registered")
 
 	return false
 }
