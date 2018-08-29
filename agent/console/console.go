@@ -52,7 +52,7 @@ func GetConsole() Console {
 func (c Console) Heartbeats() {
 	for {
 		if c.IsRegistered() {
-			if c.SendHeartBeat() == nil {
+			if c.SendHeartBeat(false) == nil {
 				time.Sleep(30 * time.Second)
 			} else {
 				time.Sleep(5 * time.Second)
@@ -153,11 +153,18 @@ func (c Console) GetFingerprint() (string, error) {
 	}
 }
 
+var lastHeartbeatTime time.Time
+var lastHeartbeat []byte
 //sends heartbeat to Console
 //todo check and return errors
-func (c Console) SendHeartBeat() error {
+func (c Console) SendHeartBeat(force bool) error {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	//dont send heartbeat if less than 5 seconds passed since last sending
+	if !force && time.Since(lastHeartbeatTime) < time.Second*5 {
+		return nil
+	}
 
 	pool = containers(false)
 	hostname, err := os.Hostname()
@@ -171,20 +178,28 @@ func (c Console) SendHeartBeat() error {
 		Instance:   instanceType,
 		Containers: pool,
 	}}
-	jbeat, err := json.Marshal(&res)
+	heartbeat, err := json.Marshal(&res)
 	if log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err) {
 		return err
 	}
-	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat)
+
+	//dont send heartbeat if nothing changed in its content
+	if !force && string(heartbeat) == string(lastHeartbeat) {
+		return nil
+	}
+
+	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, heartbeat)
 	if !log.Check(log.WarnLevel, "Encrypting message for Console", err) {
 		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
 		resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
-		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
+		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(heartbeat), err) {
 			defer utils.Close(resp)
 
 			if resp.StatusCode == http.StatusAccepted {
+				lastHeartbeatTime = time.Now()
+				lastHeartbeat = heartbeat
 				return nil
 			}
 		}
@@ -300,7 +315,7 @@ func (c Console) sendResponse(msg []byte, deadline time.Time) {
 
 func (c Console) execute(cmd executer.EncRequest) {
 	executer.Execute(cmd, c.sendResponse, c.getContainerNameByID(cmd.HostID))
-	c.SendHeartBeat()
+	c.SendHeartBeat(false)
 }
 
 // containers provides list of active Subutai containers.
