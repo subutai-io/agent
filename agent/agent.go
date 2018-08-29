@@ -101,7 +101,7 @@ func pingHandler(rw http.ResponseWriter, request *http.Request) {
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
 		rw.WriteHeader(http.StatusOK)
-		go consol.SendHeartBeat()
+		go consol.SendHeartBeat(true)
 	} else {
 		rw.WriteHeader(http.StatusForbidden)
 	}
