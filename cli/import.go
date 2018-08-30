@@ -403,10 +403,6 @@ func doDownload(template Template, templateUrl string) error {
 	// start download
 	resp := client.Do(req)
 
-	if log.Check(log.DebugLevel, "Download status ", resp.Err()) {
-		return resp.Err()
-	}
-
 	if resp.HTTPResponse != nil {
 		log.Debug("Http status ", resp.HTTPResponse.Status)
 	}
