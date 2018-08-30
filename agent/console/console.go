@@ -30,11 +30,12 @@ import (
 var (
 	console Console
 	//todo move variables to Console instance
-	instanceType = utils.InstanceType()
-	instanceArch = strings.ToUpper(runtime.GOARCH)
-	mutex        sync.Mutex
-	pool         []Container
-	cache        *ttlcache.Cache
+	instanceType          = utils.InstanceType()
+	instanceArch          = strings.ToUpper(runtime.GOARCH)
+	heartbeatLock         sync.Mutex
+	checkRegistrationLock sync.Mutex
+	pool                  []Container
+	cache                 *ttlcache.Cache
 )
 
 func init() {
@@ -90,6 +91,12 @@ func (c Console) IsRegistered() bool {
 		}
 	}
 	log.Warn("RH is not registered")
+
+	checkRegistrationLock.Lock()
+	defer checkRegistrationLock.Unlock()
+	//recreate secure client to exclude issue with SSL
+	c.secureClient, err = c.httpUtil.GetSecureClient(30)
+	log.Check(log.FatalLevel, "Recreating secure client", err)
 
 	return false
 }
@@ -158,8 +165,8 @@ var lastHeartbeat []byte
 //sends heartbeat to Console
 //todo check and return errors
 func (c Console) SendHeartBeat(force bool) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	heartbeatLock.Lock()
+	defer heartbeatLock.Unlock()
 
 	//dont send heartbeat if less than 5 seconds passed since last sending
 	if !force && time.Since(lastHeartbeatTime) < time.Second*5 {
