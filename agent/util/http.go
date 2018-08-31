@@ -16,6 +16,9 @@ import (
 	"encoding/pem"
 	"crypto/rand"
 	"io"
+	"strconv"
+	"bytes"
+	"github.com/subutai-io/agent/agent/vars"
 )
 
 const MaxIdleConnections = 10
@@ -94,6 +97,16 @@ func newTLSConfig() (*tls.Config, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if vars.IsDaemon {
+		buf := new(bytes.Buffer)
+		var pemkey = &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Leaf.Raw}
+		pem.Encode(buf, pemkey)
+		log.Debug(buf.String())
+		log.Debug("SslPath is " + sslPath + " AllowInsecure is " + strconv.FormatBool(allowInsecure))
 	}
 
 	return &tls.Config{
