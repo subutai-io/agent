@@ -18,7 +18,6 @@ import (
 	"io"
 	"strconv"
 	"bytes"
-	"fmt"
 )
 
 const MaxIdleConnections = 10
@@ -104,8 +103,8 @@ func newTLSConfig() (*tls.Config, error) {
 		Type:  "CERTIFICATE",
 		Bytes: cert.Leaf.Raw}
 	pem.Encode(buf, pemkey)
-	println("Cert is\n" + buf.String())
-	fmt.Printf("SslPath is %s\nAllowInsecure is %s\n", sslPath, strconv.FormatBool(allowInsecure))
+	log.Debug(buf.String())
+	log.Debug("SslPath is " + sslPath + " AllowInsecure is " + strconv.FormatBool(allowInsecure))
 
 	return &tls.Config{
 		ClientAuth:         tls.NoClientCert,
