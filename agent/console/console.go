@@ -94,6 +94,8 @@ func (c Console) IsRegistered() bool {
 
 	checkRegistrationLock.Lock()
 	defer checkRegistrationLock.Unlock()
+
+	c.secureClient.Transport.(*http.Transport).CloseIdleConnections()
 	//recreate secure client to exclude issue with SSL
 	c.secureClient, err = c.httpUtil.GetSecureClient(30)
 	log.Check(log.FatalLevel, "Recreating secure client", err)
