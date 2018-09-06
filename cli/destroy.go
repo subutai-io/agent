@@ -153,26 +153,26 @@ func Prune() {
 	for _, c := range container.Containers() {
 		cont := c
 
-		self := strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
+		self := strings.ToLower(strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
 			strings.TrimSpace(container.GetProperty(cont, "subutai.template.owner")) + ":" +
-			strings.TrimSpace(container.GetProperty(cont, "subutai.template.version"))
+			strings.TrimSpace(container.GetProperty(cont, "subutai.template.version")))
 
-		parent := strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
+		parent := strings.ToLower(strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
 			strings.TrimSpace(container.GetProperty(cont, "subutai.parent.owner")) + ":" +
-			strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version"))
+			strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version")))
 
 		for self != parent || container.IsContainer(cont) {
 			templatesInUse = append(templatesInUse, parent)
 
 			cont = parent
 
-			self = strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
+			self = strings.ToLower(strings.TrimSpace(container.GetProperty(cont, "subutai.template")) + ":" +
 				strings.TrimSpace(container.GetProperty(cont, "subutai.template.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(cont, "subutai.template.version"))
+				strings.TrimSpace(container.GetProperty(cont, "subutai.template.version")))
 
-			parent = strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
+			parent = strings.ToLower(strings.TrimSpace(container.GetProperty(cont, "subutai.parent")) + ":" +
 				strings.TrimSpace(container.GetProperty(cont, "subutai.parent.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version"))
+				strings.TrimSpace(container.GetProperty(cont, "subutai.parent.version")))
 		}
 
 	}
@@ -190,13 +190,13 @@ func Prune() {
 	for len(gradedTemplates) < len(allTemplates) && iterations < len(allTemplates) {
 		iterations++
 		for _, t := range allTemplates {
-			self := strings.TrimSpace(container.GetProperty(t, "subutai.template")) + ":" +
+			self := strings.ToLower(strings.TrimSpace(container.GetProperty(t, "subutai.template")) + ":" +
 				strings.TrimSpace(container.GetProperty(t, "subutai.template.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(t, "subutai.template.version"))
+				strings.TrimSpace(container.GetProperty(t, "subutai.template.version")))
 
-			parent := strings.TrimSpace(container.GetProperty(t, "subutai.parent")) + ":" +
+			parent := strings.ToLower(strings.TrimSpace(container.GetProperty(t, "subutai.parent")) + ":" +
 				strings.TrimSpace(container.GetProperty(t, "subutai.parent.owner")) + ":" +
-				strings.TrimSpace(container.GetProperty(t, "subutai.parent.version"))
+				strings.TrimSpace(container.GetProperty(t, "subutai.parent.version")))
 
 			if self == parent {
 				gradedTemplates[self] = gradedTemplate{reference: self, grade: 0}
