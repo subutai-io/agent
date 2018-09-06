@@ -58,11 +58,13 @@ func Exec(command string, args ...string) error {
 // executes command and prints its output progressively
 // returns nil if command executes successfully
 // returns error if command executes with error
-func ExecuteOutput(command string, args ... string) (string, error) {
+func ExecuteOutput(command string, env map[string]string, args ... string) (string, error) {
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd := exec.Command(command, args...)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "IPFS_PATH="+config.CDN.IpfsPath)
+	for key, val := range env {
+		cmd.Env = append(cmd.Env, key+"="+val)
+	}
 
 	stdoutIn, _ := cmd.StdoutPipe()
 	stderrIn, _ := cmd.StderrPipe()

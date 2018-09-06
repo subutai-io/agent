@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"os"
 	"os/exec"
 
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
 	"strings"
 	"github.com/subutai-io/agent/lib/common"
+	exec2 "github.com/subutai-io/agent/lib/exec"
 )
 
 // Update operation can be divided into two different types: container updates and Resource Host updates.
@@ -46,15 +46,11 @@ func updateRH(check bool) {
 		return
 	}
 
-	cmd := exec.Command("dpkg", "--configure", "-a")
-	cmd.Env = []string{"DEBIAN_FRONTEND=noninteractive", "PATH=" + os.Getenv("PATH")}
-	output, err = cmd.CombinedOutput()
-	log.Check(log.WarnLevel, "Configuring dpkg "+string(output), err)
+	_, err = exec2.ExecuteOutput("dpkg", map[string]string{"DEBIAN_FRONTEND": "noninteractive"}, "--configure", "-a")
+	log.Check(log.WarnLevel, "Configuring dpkg", err)
 
-	cmd = exec.Command("apt-get", "-qq", "dist-upgrade", "-y", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
-	cmd.Env = []string{"DEBIAN_FRONTEND=noninteractive", "PATH=" + os.Getenv("PATH")}
-	output, err = cmd.CombinedOutput()
-	log.Check(log.FatalLevel, "Updating host "+string(output), err)
+	_, err = exec2.ExecuteOutput("apt-get", map[string]string{"DEBIAN_FRONTEND": "noninteractive"}, "dist-upgrade", "-y", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
+	log.Check(log.FatalLevel, "Updating host", err)
 }
 
 func updateContainer(name string, check bool) {
@@ -72,9 +68,9 @@ func updateContainer(name string, check bool) {
 		log.Info("Update is available")
 		return
 	}
-	output, err = container.AttachExec(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.FatalLevel, "Configuring dpkg "+strings.Join(output, "\n"), err)
-	output, err = container.AttachExec(name, []string{"apt-get", "-qq", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
+	_, _, err = container.AttachExecOutput(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
+	log.Check(log.WarnLevel, "Configuring dpkg", err)
+	_, _, err = container.AttachExecOutput(name, []string{"apt-get", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
 		[]string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.FatalLevel, "Updating container "+strings.Join(output, "\n"), err)
+	log.Check(log.FatalLevel, "Updating container", err)
 }
