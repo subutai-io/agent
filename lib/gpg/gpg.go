@@ -33,7 +33,7 @@ func init() {
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
 	secureClient, _ = util.GetUtil().GetSecureClient(30)
 	if GetPk(config.Agent.GpgUser) == "" {
-		GenerateKey(config.Agent.GpgUser)
+		log.Check(log.FatalLevel, "Generating RH gpg key", GenerateKey(config.Agent.GpgUser))
 	}
 }
 
@@ -145,21 +145,27 @@ func EncryptWrapper(user, recipient string, message []byte, args ...string) ([]b
 
 // GenerateKey generates GPG-key for Subutai Agent.
 // This key used for encrypting messages for Subutai Agent.
-func GenerateKey(name string) {
+func GenerateKey(name string) error {
 	thePath := path.Join(config.Agent.LxcPrefix, name)
 	email := name + "@subutai.io"
 	pass := config.Agent.GpgPassword
+
+	//rh gpg key
 	if !container.LxcInstanceExists(name) {
 		err := os.MkdirAll("/root/.gnupg/", 0700)
-		log.Check(log.DebugLevel, "Creating /root/.gnupg/", err)
+		if log.Check(log.DebugLevel, "Creating /root/.gnupg/", err) {
+			return err
+		}
 		thePath = "/root/.gnupg"
 		email = name
 		pass = config.Agent.GpgPassword
 	}
+
 	conf, err := os.Create(thePath + "/defaults")
 	if log.Check(log.FatalLevel, "Writing default key ident", err) {
-		return
+		return err
 	}
+
 	_, err = conf.WriteString("%echo Generating default keys\n" +
 		"Key-Type: RSA\n" +
 		"Key-Length: 2048\n" +
@@ -172,28 +178,39 @@ func GenerateKey(name string) {
 		"%secring " + thePath + "/secret.sec\n" +
 		"%commit\n" +
 		"%echo Done\n")
-	log.Check(log.DebugLevel, "Writing defaults for gpg", err)
+	if log.Check(log.DebugLevel, "Writing defaults for gpg", err) {
+		return err
+	}
+
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
 	if _, err := os.Stat(thePath + "/secret.sec"); os.IsNotExist(err) {
-		log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", thePath+"/defaults").Run())
+		if log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", thePath+"/defaults").Run()) {
+			return err
+		}
 	}
+
+	//rh gpg key
 	if !container.LxcInstanceExists(name) {
 		out, err := exec.Command(GPG, "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			for _, f := range list {
 				os.Remove(f)
 			}
+			return err
 		}
 		out, err = exec.Command(GPG, "--import", "/root/.gnupg/public.pub").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.DataPrefix+".gnupg", "*.lock"))
+			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			for _, f := range list {
 				os.Remove(f)
 			}
+			return err
 		}
 	}
+
+	return nil
 }
 
 var rhFingeprint string

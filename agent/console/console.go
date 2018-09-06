@@ -28,13 +28,14 @@ import (
 )
 
 var (
-	console      Console
+	console Console
 	//todo move variables to Console instance
-	instanceType = utils.InstanceType()
-	instanceArch = strings.ToUpper(runtime.GOARCH)
-	mutex        sync.Mutex
-	pool         []Container
-	cache        *ttlcache.Cache
+	instanceType          = utils.InstanceType()
+	instanceArch          = strings.ToUpper(runtime.GOARCH)
+	heartbeatLock         sync.Mutex
+	checkRegistrationLock sync.Mutex
+	pool                  []Container
+	cache                 *ttlcache.Cache
 )
 
 func init() {
@@ -52,13 +53,13 @@ func GetConsole() Console {
 func (c Console) Heartbeats() {
 	for {
 		if c.IsRegistered() {
-			if c.SendHeartBeat() == nil {
+			if c.SendHeartBeat(false) == nil {
 				time.Sleep(30 * time.Second)
 			} else {
 				time.Sleep(5 * time.Second)
 			}
 		} else {
-			time.Sleep(10)
+			time.Sleep(10 * time.Second)
 		}
 	}
 }
@@ -80,14 +81,24 @@ func (c Console) IsReady() bool {
 //returns true if Console has approved this RH registration
 //returns false if not approved or any error during checking registration
 func (c Console) IsRegistered() bool {
-	resp, err := c.secureClient.Get("https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint)
+	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint
+	log.Debug("Checking registration with Console " + theUrl)
+	resp, err := c.secureClient.Get(theUrl)
 	if err == nil {
 		defer c.httpUtil.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
 	}
-	log.Warn("RH is not registered" )
+	log.Warn("RH is not registered")
+
+	checkRegistrationLock.Lock()
+	defer checkRegistrationLock.Unlock()
+
+	c.secureClient.Transport.(*http.Transport).CloseIdleConnections()
+	//recreate secure client to exclude issue with SSL
+	c.secureClient, err = c.httpUtil.GetSecureClient(30)
+	log.Check(log.FatalLevel, "Recreating secure client", err)
 
 	return false
 }
@@ -151,11 +162,18 @@ func (c Console) GetFingerprint() (string, error) {
 	}
 }
 
+var lastHeartbeatTime time.Time
+var lastHeartbeat []byte
 //sends heartbeat to Console
 //todo check and return errors
-func (c Console) SendHeartBeat() error {
-	mutex.Lock()
-	defer mutex.Unlock()
+func (c Console) SendHeartBeat(force bool) error {
+	heartbeatLock.Lock()
+	defer heartbeatLock.Unlock()
+
+	//dont send heartbeat if less than 5 seconds passed since last sending
+	if !force && time.Since(lastHeartbeatTime) < time.Second*5 {
+		return nil
+	}
 
 	pool = containers(false)
 	hostname, err := os.Hostname()
@@ -169,20 +187,28 @@ func (c Console) SendHeartBeat() error {
 		Instance:   instanceType,
 		Containers: pool,
 	}}
-	jbeat, err := json.Marshal(&res)
+	heartbeat, err := json.Marshal(&res)
 	if log.Check(log.WarnLevel, "Marshaling heartbeat JSON", err) {
 		return err
 	}
-	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, jbeat)
+
+	//dont send heartbeat if nothing changed in its content
+	if !force && string(heartbeat) == string(lastHeartbeat) {
+		return nil
+	}
+
+	encryptedMessage, err := gpg.EncryptWrapper(config.Agent.GpgUser, config.Management.GpgUser, heartbeat)
 	if !log.Check(log.WarnLevel, "Encrypting message for Console", err) {
 		message, err := json.Marshal(map[string]string{"hostId": gpg.GetRhFingerprint(), "response": string(encryptedMessage)})
 		log.Check(log.WarnLevel, "Marshal response json", err)
 
 		resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
-		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(jbeat), err) {
+		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(heartbeat), err) {
 			defer utils.Close(resp)
 
 			if resp.StatusCode == http.StatusAccepted {
+				lastHeartbeatTime = time.Now()
+				lastHeartbeat = heartbeat
 				return nil
 			}
 		}
@@ -298,7 +324,7 @@ func (c Console) sendResponse(msg []byte, deadline time.Time) {
 
 func (c Console) execute(cmd executer.EncRequest) {
 	executer.Execute(cmd, c.sendResponse, c.getContainerNameByID(cmd.HostID))
-	c.SendHeartBeat()
+	c.SendHeartBeat(false)
 }
 
 // containers provides list of active Subutai containers.

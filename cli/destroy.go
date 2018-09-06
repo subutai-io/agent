@@ -138,6 +138,14 @@ func removePortMap(name string) {
 	}
 }
 
+type gradedTemplate struct {
+	reference string
+	grade     int
+}
+
+//Prune destroys templates that don't have child containers
+//It destroys unused templates by hierarchy, first destroying child templates and then parents
+//this is imposed by underlying zfs file system that prohibits destruction of datasets that have child datasets
 func Prune() {
 	var templatesInUse []string
 
@@ -169,13 +177,49 @@ func Prune() {
 
 	}
 
-	//figure out unused templates
-	unusedTemplates := difference(container.Templates(), templatesInUse)
+	allTemplates := container.Templates()
 
-	//remove unused templates
-	for _, t := range unusedTemplates {
-		log.Info("Destroying " + t)
-		container.DestroyTemplate(t)
+	//figure out unused templates
+	unusedTemplates := difference(allTemplates, templatesInUse)
+
+	//grade templates by hierarchy
+	var gradedTemplates = make(map[string]gradedTemplate)
+
+	maxGrade := 0
+	iterations := 0
+	for len(gradedTemplates) < len(allTemplates) && iterations < len(allTemplates) {
+		iterations++
+		for _, t := range allTemplates {
+			self := strings.TrimSpace(container.GetProperty(t, "subutai.template")) + ":" +
+				strings.TrimSpace(container.GetProperty(t, "subutai.template.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(t, "subutai.template.version"))
+
+			parent := strings.TrimSpace(container.GetProperty(t, "subutai.parent")) + ":" +
+				strings.TrimSpace(container.GetProperty(t, "subutai.parent.owner")) + ":" +
+				strings.TrimSpace(container.GetProperty(t, "subutai.parent.version"))
+
+			if self == parent {
+				gradedTemplates[self] = gradedTemplate{reference: self, grade: 0}
+			} else {
+				if gradedParent, ok := gradedTemplates[parent]; ok {
+					grade := gradedParent.grade + 1
+					gradedTemplates[self] = gradedTemplate{reference: self, grade: grade}
+					if grade > maxGrade {
+						maxGrade = grade
+					}
+				}
+			}
+		}
+	}
+
+	//destroy templates starting with highest grade first
+	for grade := maxGrade; grade >= 0; grade-- {
+		for _, name := range unusedTemplates {
+			if t, ok := gradedTemplates[name]; ok && t.grade == grade {
+				log.Info("Destroying " + t.reference)
+				container.DestroyTemplate(t.reference)
+			}
+		}
 	}
 
 }

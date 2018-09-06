@@ -402,7 +402,10 @@ func doDownload(template Template, templateUrl string) error {
 
 	// start download
 	resp := client.Do(req)
-	log.Debug("Http status ", resp.HTTPResponse.Status)
+
+	if resp.HTTPResponse != nil {
+		log.Debug("Http status ", resp.HTTPResponse.Status)
+	}
 
 	// start UI loop
 	t := time.NewTicker(100 * time.Millisecond)

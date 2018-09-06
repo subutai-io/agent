@@ -16,6 +16,9 @@ import (
 	"encoding/pem"
 	"crypto/rand"
 	"io"
+	"strconv"
+	"bytes"
+	"github.com/subutai-io/agent/agent/vars"
 )
 
 const MaxIdleConnections = 10
@@ -64,9 +67,10 @@ func (http HttpUtil) GetSecureClient(timeoutSec int) (*http2.Client, error) {
 	}
 
 	transport := &http2.Transport{
-		TLSClientConfig: tlsConfig,
-		IdleConnTimeout: time.Second,
-		MaxIdleConns:    1,
+		TLSClientConfig:     tlsConfig,
+		IdleConnTimeout:     time.Minute,
+		MaxIdleConns:        MaxIdleConnections,
+		TLSHandshakeTimeout: 10 * time.Second,
 	}
 
 	return &http2.Client{Transport: transport, Timeout: time.Second * time.Duration(timeoutSec),}, nil
@@ -94,6 +98,16 @@ func newTLSConfig() (*tls.Config, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if vars.IsDaemon {
+		buf := new(bytes.Buffer)
+		var pemkey = &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Leaf.Raw}
+		pem.Encode(buf, pemkey)
+		log.Debug(buf.String())
+		log.Debug("SslPath is " + sslPath + " AllowInsecure is " + strconv.FormatBool(allowInsecure))
 	}
 
 	return &tls.Config{
