@@ -27,6 +27,7 @@ import (
 	"hash/crc32"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
+	"io"
 )
 
 const (
@@ -216,6 +217,77 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 	}
 
 	return output, nil
+}
+
+// AttachExec executes a command inside Subutai container.
+func AttachExecOutput(name string, command []string, env ...[]string) (output string, errOutput string, err error) {
+	if !LxcInstanceExists(name) {
+		return "", "", errors.New("Container does not exist")
+	}
+
+	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
+	if err == nil {
+		defer lxc.Release(container)
+	}
+
+	if container.State() != lxc.RUNNING || err != nil {
+		return "", "", errors.New("Container is " + container.State().String())
+	}
+
+	bufR, bufW, err := os.Pipe()
+	if err != nil {
+		return "", "", errors.New("Failed to create OS pipe")
+	}
+	defer bufR.Close()
+	defer bufW.Close()
+
+	bufRErr, bufWErr, err := os.Pipe()
+	if err != nil {
+		return "", "", errors.New("Failed to create OS pipe")
+	}
+	defer bufRErr.Close()
+	defer bufWErr.Close()
+
+	options := lxc.AttachOptions{
+		Namespaces: -1,
+		UID:        0,
+		GID:        0,
+		StdoutFd:   bufW.Fd(),
+		StderrFd:   bufWErr.Fd(),
+	}
+	if len(env) > 0 {
+		options.Env = env[0]
+	}
+
+	pid, err := container.RunCommandNoWait(command, options)
+	log.Check(log.ErrorLevel, "Executing command inside container", err)
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	stdout := io.MultiWriter(os.Stdout, &stdoutBuf)
+	stderr := io.MultiWriter(os.Stderr, &stderrBuf)
+	go func() {
+		io.Copy(stdout, bufR)
+	}()
+	go func() {
+		io.Copy(stderr, bufRErr)
+	}()
+
+	proc, err := os.FindProcess(pid)
+	log.Check(log.ErrorLevel, "Looking process by pid "+strconv.Itoa(pid), err)
+
+	procState, err := proc.Wait()
+	log.Check(log.ErrorLevel, "Waiting for process completion", err)
+
+	if !procState.Success() {
+		log.ErrorNoExit("Command failed")
+		if status, ok := procState.Sys().(syscall.WaitStatus); ok {
+			os.Exit(status.ExitStatus())
+		} else {
+			os.Exit(1)
+		}
+	}
+
+	return string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()), nil
 }
 
 // Destroy deletes the Subutai container.
@@ -636,7 +708,6 @@ func Mtu() int {
 
 	return mtu - 50
 }
-
 
 func GetIp(name string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)

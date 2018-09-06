@@ -87,6 +87,11 @@ func Error(msg ...interface{}) {
 	os.Exit(1)
 }
 
+func ErrorNoExit(msg ... interface{}) {
+	logrus.SetOutput(os.Stderr)
+	logrus.Error(msg...)
+}
+
 // Warn keeps process working after showing warning message.
 func Warn(msg ...interface{}) {
 	logrus.Warn(msg...)
