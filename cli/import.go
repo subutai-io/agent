@@ -472,7 +472,7 @@ func downloadViaLocalIPFSNode(template Template) {
 	templatePath := path.Join(config.Agent.CacheDir, template.Id)
 
 	//download template
-	_, err = exec.ExecuteOutput("ipfs", "get", template.Id, "-o", templatePath)
+	_, err = exec.ExecuteOutput("ipfs", map[string]string{"IPFS_PATH": config.CDN.IpfsPath}, "get", template.Id, "-o", templatePath)
 	log.Check(log.FatalLevel, "Checking download status", err)
 
 	//check if download is a directory
