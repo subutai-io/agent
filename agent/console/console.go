@@ -24,7 +24,6 @@ import (
 	"github.com/subutai-io/agent/db"
 	cont "github.com/subutai-io/agent/lib/container"
 	"github.com/wunderlist/ttlcache"
-	"strconv"
 )
 
 var (
@@ -368,20 +367,11 @@ func containers(details bool) []Container {
 				return cont.GetConfigItem(configPath, "subutai.parent")
 			})
 
-			quotaRam := utils.GetFromCacheOrCalculate(cache, c+"_quota_ram", func() string {
-				return strconv.Itoa(cont.QuotaRAM(c, ""))
-			})
-			aContainer.Quota.RAM, _ = strconv.Atoi(quotaRam)
+			aContainer.Quota.RAM = cont.QuotaRAM(c, "")
 
-			quotaCpu := utils.GetFromCacheOrCalculate(cache, c+"_quota_cpu", func() string {
-				return strconv.Itoa(cont.QuotaCPU(c, ""))
-			})
-			aContainer.Quota.CPU, _ = strconv.Atoi(quotaCpu)
+			aContainer.Quota.CPU = cont.QuotaCPU(c, "")
 
-			quotaDisk := utils.GetFromCacheOrCalculate(cache, c+"_quota_disk", func() string {
-				return strconv.Itoa(cont.QuotaDisk(c, ""))
-			})
-			aContainer.Quota.Disk, _ = strconv.Atoi(quotaDisk)
+			aContainer.Quota.Disk = cont.QuotaDisk(c, "")
 
 			//<<<cacheable properties
 

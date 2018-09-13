@@ -433,7 +433,7 @@ func QuotaDisk(name, size string) int {
 }
 
 // QuotaRAM sets the memory quota to the Subutai container.
-// If quota size argument is missing, it's just return current value.
+// If quota size argument is missing, just return current value.
 func QuotaRAM(name string, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -450,6 +450,9 @@ func QuotaRAM(name string, size string) int {
 	}
 
 	limit, err := c.MemoryLimit()
+	if limit == 9223372036854771712 {
+		limit = 0
+	}
 	log.Check(log.DebugLevel, "Getting memory limit of container: "+name, err)
 	return int(limit / 1024 / 1024)
 }
