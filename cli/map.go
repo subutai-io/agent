@@ -120,66 +120,6 @@ func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, ssl
 	restart()
 }
 
-// MapPort exposes internal container ports to sockExt RH interface. It supports udp, tcp, http(s) protocols and other reverse proxy features
-//func MapPort(protocol, sockInt, sockExt, policy, domain, cert string, remove, sslbcknd bool) {
-//
-//	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
-//		log.Error("Unsupported protocol \"" + protocol + "\"")
-//	} else if protocol == "tcp" || protocol == "udp" {
-//		domain = protocol
-//	}
-//
-//	if !ovs.ValidSocket(sockExt) {
-//		sockExt = "0.0.0.0:" + sockExt
-//	}
-//
-//	switch {
-//	case (protocol == "http" || protocol == "https") && len(domain) == 0:
-//		log.Error("\"-d domain\" is mandatory for http protocol")
-//	case remove:
-//		mapRemove(protocol, sockExt, domain, sockInt)
-//	case protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)):
-//		log.Error("\"-c certificate\" is missing or invalid pem file")
-//	case len(sockInt) != 0 && !ovs.ValidSocket(sockInt):
-//		log.Error("Invalid internal socket \"" + sockInt + "\"")
-//	case (strings.HasSuffix(sockExt, ":8443") || strings.HasSuffix(sockExt, ":8444") || strings.HasSuffix(sockExt, ":8086")) &&
-//		sockInt != "10.10.10.1:"+strings.Split(sockExt, ":")[1]:
-//		log.Error("Reserved system ports")
-//	case len(sockInt) != 0:
-//
-//		var mapping = protocol + domain + sockInt + sockExt
-//		var lock lockfile.Lockfile
-//		var err error
-//		for lock, err = common.LockFile(mapping, "map"); err != nil; lock, err = common.LockFile(mapping, "map") {
-//			time.Sleep(time.Second * 1)
-//		}
-//		defer lock.Unlock()
-//
-//		// check sockExt port and create nginx config
-//		if portIsNew(protocol, sockInt, domain, &sockExt) {
-//			newConfig(protocol, sockExt, domain, cert, sslbcknd)
-//		}
-//
-//		// add containers to backend
-//		addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
-//			"#Add new host here", "	server "+sockInt+";", false)
-//
-//		// save information to database
-//		saveMapToDB(protocol, sockExt, domain, sockInt)
-//		containerMapToDB(protocol, sockExt, domain, sockInt)
-//		balanceMethod(protocol, sockExt, domain, policy)
-//
-//		if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
-//			log.Info(ovs.GetIp() + ":" + socket[1])
-//		} else {
-//			log.Info(sockExt)
-//		}
-//	case len(policy) != 0:
-//		balanceMethod(protocol, sockExt, domain, policy)
-//	}
-//	restart()
-//}
-
 func mapList(protocol string) (list []string) {
 	switch protocol {
 	case "tcp", "udp", "http", "https":
@@ -200,14 +140,27 @@ func mapList(protocol string) (list []string) {
 func mapRemove(protocol, sockExt, domain, sockInt string) {
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
-	if sockInt != "" && deletePortMap(protocol, sockExt, domain, sockInt) > 0 {
-		if strings.Contains(sockInt, ":") {
-			sockInt = sockInt + ";"
-		} else {
-			sockInt = sockInt + ":"
+	if sockInt != "" {
+		if checkPort(protocol, sockExt, domain, sockInt) {
+			if deletePortMap(protocol, sockExt, domain, sockInt) > 0 {
+				if strings.Contains(sockInt, ":") {
+					sockInt = sockInt + ";"
+				} else {
+					sockInt = sockInt + ":"
+				}
+				addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
+					"server "+sockInt, " ", true)
+			} else {
+				if deletePortMap(protocol, sockExt, domain, "") == 0 {
+					deletePortMap(protocol, sockExt, "", "")
+				}
+				os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
+				if protocol == "https" {
+					os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"))
+					os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"))
+				}
+			}
 		}
-		addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
-			"server "+sockInt, " ", true)
 	} else {
 		if deletePortMap(protocol, sockExt, domain, "") == 0 {
 			deletePortMap(protocol, sockExt, "", "")
