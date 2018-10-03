@@ -178,8 +178,8 @@ func md5sum(filePath string) string {
 func LxcImport(name, token string, auxDepList ...string) {
 	var err error
 
-	if !fs.IsMountPoint(config.Agent.LxcPrefix) {
-		log.Fatal("Lxc directory " + config.Agent.LxcPrefix + " not mounted")
+	if !fs.DatasetExists("") {
+		log.Fatal("Root dataset " + config.Agent.Dataset + " not mounted")
 	}
 
 	if container.LxcInstanceExists(name) && name == container.Management && len(token) > 1 {
