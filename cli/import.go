@@ -29,17 +29,21 @@ import (
 const maxDownloadAttempts = 3
 
 const wrappedTemplateSuffix = ".tar.gz"
+const Md5DigestMethod = "md5"
+const Sha256DigestMethod = "sha256"
 
 type Template struct {
-	Id       string `json:"id"`
-	Name     string `json:"name"`
-	Owner    string `json:"owner"`
-	Version  string `json:"version"`
-	MD5      string `json:"md5"`
-	Parent   string `json:"parent"`
-	Size     int64  `json:"size"`
-	FullRef  string `json:"full-ref"`
-	PrefSize string `json:"pref-size"`
+	Id           string `json:"id"`
+	Name         string `json:"name"`
+	Owner        string `json:"owner"`
+	Version      string `json:"version"`
+	MD5          string `json:"md5"`
+	DigestMethod string `json:"digest-method"`
+	DigestHash   string `json:"digest"`
+	Parent       string `json:"parent"`
+	Size         int64  `json:"size"`
+	FullRef      string `json:"full-ref"`
+	PrefSize     string `json:"pref-size"`
 }
 
 func init() {
@@ -81,6 +85,8 @@ func getTemplateInfoById(t *Template, id string) {
 	t.MD5 = templ.MD5
 	t.Parent = templ.Parent
 	t.Size = templ.Size
+	t.DigestMethod = templ.DigestMethod
+	t.DigestHash = templ.DigestHash
 
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
@@ -129,6 +135,8 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	t.MD5 = templ.MD5
 	t.Parent = templ.Parent
 	t.Size = templ.Size
+	t.DigestMethod = templ.DigestMethod
+	t.DigestHash = templ.DigestHash
 
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
@@ -173,6 +181,22 @@ func md5sum(filePath string) string {
 	hash, err := fs.Md5Sum(filePath)
 	log.Check(log.WarnLevel, "Getting md5sum of "+filePath, err)
 	return hash
+}
+
+func sha256(filePath string) string {
+	hash, err := fs.Sha256Sum(filePath)
+	log.Check(log.WarnLevel, "Getting sha256sum of "+filePath, err)
+	return hash
+}
+
+func verifyChecksum(template Template, filePath string) bool {
+	if template.DigestMethod == Sha256DigestMethod {
+		return template.DigestHash == sha256(filePath)
+	} else if template.DigestMethod == Md5DigestMethod {
+		return template.DigestHash == md5sum(filePath)
+	}
+
+	return false
 }
 
 func LxcImport(name, token string, auxDepList ...string) {
@@ -234,8 +258,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		log.Debug("Template archive is present in local cache")
 
 		if !local {
-			md5 := md5sum(localArchive)
-			if t.MD5 == md5 {
+			if verifyChecksum(t, localArchive) {
 
 				log.Debug("File integrity is verified")
 			} else {
@@ -443,8 +466,8 @@ Loop:
 		log.Check(log.ErrorLevel, "Renaming template", os.Rename(templatePath+wrappedSuffix, templatePath))
 	}
 
-	//check md5 sum
-	if template.MD5 != md5sum(templatePath) {
+	//check hash sum
+	if !verifyChecksum(template, templatePath) {
 		return errors.New("File integrity verification failed")
 	}
 
@@ -492,7 +515,7 @@ func downloadViaLocalIPFSNode(template Template) {
 	}
 
 	//verify its md5 sum
-	if template.MD5 != md5sum(templatePath) {
+	if !verifyChecksum(template, templatePath) {
 		log.Fatal("File integrity verification failed")
 	}
 

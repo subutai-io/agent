@@ -4,8 +4,8 @@ import (
 	"io"
 	"os"
 	"github.com/subutai-io/agent/log"
-	"os/exec"
 	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 )
 
@@ -70,8 +70,16 @@ func Md5Sum(filePath string) (string, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
-func IsMountPoint(path string) bool {
-	out, err := exec.Command("mountpoint", path).CombinedOutput()
-	log.Check(log.DebugLevel, "Checking mountpoint "+string(out), err)
-	return err == nil
+func Sha256Sum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
