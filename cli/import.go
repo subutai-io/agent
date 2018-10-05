@@ -85,6 +85,8 @@ func getTemplateInfoById(t *Template, id string) {
 	t.MD5 = templ.MD5
 	t.Parent = templ.Parent
 	t.Size = templ.Size
+	t.DigestMethod = templ.DigestMethod
+	t.DigestHash = templ.DigestHash
 
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
@@ -133,6 +135,8 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 	t.MD5 = templ.MD5
 	t.Parent = templ.Parent
 	t.Size = templ.Size
+	t.DigestMethod = templ.DigestMethod
+	t.DigestHash = templ.DigestHash
 
 	log.Debug("Template identified as " + t.Name + "@" + t.Owner + ":" + t.Version)
 }
