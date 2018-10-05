@@ -1,6 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: subutai-p2p
-Source: https://github.com/subutai-io/p2p
+Upstream-Name: subutai
+Source: https://github.com/subutai-io/agent
 
 Files: *
 Copyright: 2018 OptDyn Coporation
