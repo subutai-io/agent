@@ -275,9 +275,10 @@ var (
 	//tunnel command
 	tunnelCmd = app.Command("tunnel", "Manage ssh tunnels")
 	//tunnel add ip[:port] [ttl]
-	tunnelAddCmd     = tunnelCmd.Command("add", "Create ssh tunnel")
-	tunneAddSocket   = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
-	tunnelAddTimeout = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
+	tunnelAddCmd           = tunnelCmd.Command("add", "Create ssh tunnel")
+	tunneAddSocket         = tunnelAddCmd.Arg("socket", "socket in form ip[:port]").Required().String()
+	tunnelAddTimeout       = tunnelAddCmd.Arg("ttl", "ttl of tunnel (if ttl missing, tunnel is permanent)").String()
+	tunnelAddHumanFriendly = tunnelAddCmd.Flag("ssh", "generate ssh connection string").Short('s').Bool()
 	//tunnel del ip[:port]
 	tunnelDelCmd    = tunnelCmd.Command("del", "Delete ssh tunnel").Alias("rm")
 	tunnelDelSocket = tunnelDelCmd.Arg("socket", "socket in form ip[:port]").Required().String()
@@ -428,7 +429,7 @@ func main() {
 	case updateCmd.FullCommand():
 		cli.Update(*updateCmdComponent, *updateCheck)
 	case tunnelAddCmd.FullCommand():
-		cli.AddSshTunnel(*tunneAddSocket, *tunnelAddTimeout)
+		cli.AddSshTunnel(*tunneAddSocket, *tunnelAddTimeout, *tunnelAddHumanFriendly)
 	case tunnelDelCmd.FullCommand():
 		cli.DelSshTunnel(*tunnelDelSocket)
 	case tunnelCheckCmd.FullCommand():
