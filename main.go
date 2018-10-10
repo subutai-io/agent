@@ -170,6 +170,15 @@ var (
 	mapAddPolicy         = mapAddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
 
+	map2Cmd               = app.Command("map2", "Manage port mappings")
+	map2AddCmd            = map2Cmd.Command("add", "Add port mapping")
+	map2AddProtocol       = map2AddCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
+	map2AddInternalSocket = map2AddCmd.Flag("internal", "internal socket").Short('i').Required().String()
+	map2AddExternalSocket = map2AddCmd.Flag("external", "external socket").Short('e').String()
+	map2AddDomain         = map2AddCmd.Flag("domain", "domain name").Short('n').String()
+	map2AddPolicy         = map2AddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
+	map2AddSslBackend     = map2AddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
+
 	/*
 	subutai map rm tcp ...
 	*/
@@ -373,6 +382,14 @@ func main() {
 		for _, v := range cli.GetPortMappings(*mapListProtocol) {
 			fmt.Println(v)
 		}
+
+		//map2
+	case map2AddCmd.FullCommand():
+		cli.CreatePortMapping(*map2AddProtocol, *map2AddInternalSocket, *map2AddExternalSocket,
+			*map2AddDomain, *map2AddPolicy, *map2AddSslBackend)
+
+		//todo remove, list
+
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 

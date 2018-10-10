@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/fs"
-	"github.com/subutai-io/agent/lib/gpg"
 	ovs "github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 	"github.com/nightlyone/lockfile"
@@ -20,14 +18,14 @@ import (
 )
 
 var (
-	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
+	nginxIncPath = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
 
-func GetPortMappings(protocol string) []string {
-	return mapList(protocol)
+func ListPortMappings(protocol string) []string {
+	return getMapList(protocol)
 }
 
-func RemovePortMapping(protocol, sockInt, sockExt, domain string) {
+func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
@@ -47,13 +45,15 @@ func RemovePortMapping(protocol, sockInt, sockExt, domain string) {
 	}
 
 	//remove mapping
-	mapRemove(protocol, sockExt, domain, sockInt)
+	removeMapping(protocol, sockExt, domain, sockInt)
 
 	//restart nginx
 	restart()
 }
 
-func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, sslBackend bool) {
+
+//todo USE template from string variable
+func CreatePortMapping(protocol, sockInt, sockExt, domain, policy string, sslBackend bool) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
@@ -70,10 +70,6 @@ func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, ssl
 
 	if !ovs.ValidSocket(sockExt) {
 		sockExt = "0.0.0.0:" + sockExt
-	}
-
-	if protocol == "https" && (len(cert) == 0 || !gpg.ValidatePem(cert)) {
-		log.Error("\"-c certificate\" is missing or invalid pem file")
 	}
 
 	if !ovs.ValidSocket(sockInt) {
@@ -96,18 +92,18 @@ func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, ssl
 	defer lock.Unlock()
 
 	// check sockExt port and create nginx config
-	if portIsNew(protocol, sockInt, domain, &sockExt) {
-		newConfig(protocol, sockExt, domain, cert, sslBackend)
+	if isPortNew(protocol, sockInt, domain, &sockExt) {
+		createConfig(protocol, sockExt, domain, sslBackend)
 	}
 
 	// add containers to backend
-	addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
+	addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
 		"#Add new host here", "	server "+sockInt+";", false)
 
 	// save information to database
-	saveMapToDB(protocol, sockExt, domain, sockInt)
-	containerMapToDB(protocol, sockExt, domain, sockInt)
-	balanceMethod(protocol, sockExt, domain, policy)
+	saveRhMapping(protocol, sockExt, domain, sockInt)
+	saveContainerMapping(protocol, sockExt, domain, sockInt)
+	addBalanceMethod(protocol, sockExt, domain, policy)
 
 	if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
 		log.Info(ovs.GetIp() + ":" + socket[1])
@@ -119,7 +115,7 @@ func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, ssl
 	restart()
 }
 
-func mapList(protocol string) (list []string) {
+func getMapList(protocol string) (list []string) {
 	switch protocol {
 	case "tcp", "udp", "http", "https":
 		l, err := db.INSTANCE.PortmapList(protocol)
@@ -136,24 +132,24 @@ func mapList(protocol string) (list []string) {
 	return
 }
 
-func mapRemove(protocol, sockExt, domain, sockInt string) {
+func removeMapping(protocol, sockExt, domain, sockInt string) {
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
 	if sockInt != "" {
-		if checkPort(protocol, sockExt, domain, sockInt) {
-			if deletePortMap(protocol, sockExt, domain, sockInt) > 0 {
+		if checkPortMapping(protocol, sockExt, domain, sockInt) {
+			if deletePortMapping(protocol, sockExt, domain, sockInt) > 0 {
 				if strings.Contains(sockInt, ":") {
 					sockInt = sockInt + ";"
 				} else {
 					sockInt = sockInt + ":"
 				}
-				addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
+				addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
 					"server "+sockInt, " ", true)
 			} else {
-				if deletePortMap(protocol, sockExt, domain, "") == 0 {
-					deletePortMap(protocol, sockExt, "", "")
+				if deletePortMapping(protocol, sockExt, domain, "") == 0 {
+					deletePortMapping(protocol, sockExt, "", "")
 				}
-				os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
+				os.Remove(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"))
 				if protocol == "https" {
 					os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"))
 					os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"))
@@ -161,10 +157,10 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 			}
 		}
 	} else {
-		if deletePortMap(protocol, sockExt, domain, "") == 0 {
-			deletePortMap(protocol, sockExt, "", "")
+		if deletePortMapping(protocol, sockExt, domain, "") == 0 {
+			deletePortMapping(protocol, sockExt, "", "")
 		}
-		os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
+		os.Remove(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"))
 		if protocol == "https" {
 			os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"))
 			os.Remove(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"))
@@ -172,7 +168,7 @@ func mapRemove(protocol, sockExt, domain, sockInt string) {
 	}
 }
 
-func isFree(protocol, sockExt string) bool {
+func isPortFree(protocol, sockExt string) bool {
 	switch protocol {
 	case "tcp", "http", "https":
 		if ln, err := net.Listen("tcp", sockExt); err == nil {
@@ -190,7 +186,7 @@ func isFree(protocol, sockExt string) bool {
 	return false
 }
 
-func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
+func isPortNew(protocol, sockInt, domain string, sockExt *string) bool {
 	socket := strings.Split(*sockExt, ":")
 	if len(socket) > 1 && socket[1] != "" {
 		if port, err := strconv.Atoi(socket[1]); err != nil || port < 1000 || port > 65536 {
@@ -198,28 +194,28 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 				log.Error("Port number in \"external\" should be integer in range of 1000-65536")
 			}
 		}
-		if isFree(protocol, *sockExt) {
+		if isPortFree(protocol, *sockExt) {
 			return true
 		}
 
-		if !checkPort(protocol, *sockExt, "", "") && socket[1] != "80" {
+		if !checkPortMapping(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
-		} else if checkPort(protocol, *sockExt, domain, sockInt) {
+		} else if checkPortMapping(protocol, *sockExt, domain, sockInt) {
 			log.Error("Mapping already exists")
 		}
-		return !checkPort(protocol, *sockExt, domain, "")
+		return !checkPortMapping(protocol, *sockExt, domain, "")
 	}
-	for port := strconv.Itoa(common.RandomInt(1000, 65536)); isFree(protocol, socket[0]+":"+port); port = strconv.Itoa(common.RandomInt(1000, 65536)) {
+	for port := strconv.Itoa(common.RandomInt(1000, 65536)); isPortFree(protocol, socket[0]+":"+port); port = strconv.Itoa(common.RandomInt(1000, 65536)) {
 		*sockExt = socket[0] + ":" + port
 		return true
 	}
 	return false
 }
 
-func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
+func createConfig(protocol, sockExt, domain string, sslbcknd bool) {
 	log.Check(log.WarnLevel, "Creating nginx include folder",
-		os.MkdirAll(path.Join(nginxInc, protocol), 0755))
-	conf := path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf")
+		os.MkdirAll(path.Join(nginxIncPath, protocol), 0755))
+	conf := path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf")
 
 	switch protocol {
 	case "https":
@@ -235,9 +231,10 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		}
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+" {", true)
 
-		crt, key := gpg.ParsePem(cert)
-		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"), crt, 0644))
-		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"), key, 0644))
+		//todo cert
+		//crt, key := gpg.ParsePem(cert)
+		//log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"), crt, 0644))
+		//log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"), key, 0644))
 
 		addLine(conf, "ssl_certificate "+path.Join(webSslPath, "UNIXDATE.crt;"),
 			"ssl_certificate "+path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt;"), true)
@@ -251,7 +248,7 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		addLine(conf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://http-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+";", true)
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream http-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+" {", true)
 		if !strings.HasSuffix(sockExt, ":80") {
-			httpRedirect(sockExt, domain)
+			addHttpRedirect(sockExt, domain)
 		}
 	case "tcp":
 		fs.Copy(path.Join(conftmpl, "stream.example"), conf)
@@ -265,11 +262,11 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 	addLine(conf, "proxy_pass PROTO-PORT;", "	proxy_pass "+protocol+"-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+";", true)
 }
 
-func balanceMethod(protocol, sockExt, domain, policy string) {
+func addBalanceMethod(protocol, sockExt, domain, policy string) {
 	replaceString := "upstream " + protocol + "-" + strings.Replace(sockExt, ":", "-", -1) + "-" + domain + " {"
 	replace := false
 
-	if !checkPort(protocol, sockExt, domain, "") {
+	if !checkPortMapping(protocol, sockExt, domain, "") {
 		log.Error("Port is not mapped")
 	}
 	switch policy {
@@ -307,29 +304,29 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	}
 	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetMapMethod(protocol, sockExt, domain, policy))
 
-	addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
+	addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
 		replaceString, "	"+policy+"; #policy", replace)
 }
 
-func httpRedirect(sockExt, domain string) {
+func addHttpRedirect(sockExt, domain string) {
 	var redirect = `server {
 	    listen      80; #redirect
     	server_name ` + domain + `;
     	return 301 http://$host:` + strings.Split(sockExt, ":")[1] + `$request_uri;
 }`
 
-	addLine(path.Join(nginxInc, "http", sockExt+"-"+domain+".conf"),
+	addLine(path.Join(nginxIncPath, "http", sockExt+"-"+domain+".conf"),
 		"#redirect placeholder", redirect, true)
 
 }
 
-func saveMapToDB(protocol, sockExt, domain, sockInt string) {
-	if !checkPort(protocol, sockExt, domain, sockInt) {
+func saveRhMapping(protocol, sockExt, domain, sockInt string) {
+	if !checkPortMapping(protocol, sockExt, domain, sockInt) {
 		log.Check(log.ErrorLevel, "Saving port map to database", db.INSTANCE.PortMapSet(protocol, sockExt, domain, sockInt))
 	}
 }
 
-func containerMapToDB(protocol, sockExt, domain, sockInt string) {
+func saveContainerMapping(protocol, sockExt, domain, sockInt string) {
 	list, err := db.INSTANCE.ContainerByKey("ip", strings.Split(sockInt, ":")[0])
 	log.Check(log.ErrorLevel, "Reading container metadata from db", err)
 	for _, name := range list {
@@ -337,13 +334,13 @@ func containerMapToDB(protocol, sockExt, domain, sockInt string) {
 	}
 }
 
-func checkPort(protocol, external, domain, internal string) bool {
+func checkPortMapping(protocol, external, domain, internal string) bool {
 	res, err := db.INSTANCE.PortInMap(protocol, external, domain, internal)
 	log.Check(log.ErrorLevel, "Checking port mapping in db", err)
 	return res
 }
 
-func deletePortMap(protocol, sockExt, domain, sockInt string) int {
+func deletePortMapping(protocol, sockExt, domain, sockInt string) int {
 	left, err := db.INSTANCE.PortMapDelete(protocol, sockExt, domain, sockInt)
 	log.Check(log.ErrorLevel, "Removing port mapping from db", err)
 	return left

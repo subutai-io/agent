@@ -10,6 +10,8 @@ import (
 	"strings"
 	"os"
 	"path"
+	"time"
+	"math/rand"
 )
 
 func RunNRecover(g func()) {
@@ -52,4 +54,9 @@ func LockFile(name string, command string) (lockfile.Lockfile, error) {
 	}
 
 	return lock, nil
+}
+
+func RandomInt(min, max int) int {
+	rand.Seed(time.Now().Unix())
+	return rand.Intn(max-min) + min
 }
