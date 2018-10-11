@@ -148,7 +148,7 @@ func client() {
 func save(ip string) {
 	ip = strings.TrimSpace(ip)
 
-	log.Check(log.WarnLevel, "Saving Console IP "+ip, db.INSTANCE.DiscoverySave(ip))
+	log.Check(log.WarnLevel, "Saving Console IP "+ip, db.INSTANCE.SaveDiscoveredIp(ip))
 
 	config.ManagementIP = ip
 
@@ -158,7 +158,7 @@ func save(ip string) {
 
 func loadManagementIp() {
 	if strings.TrimSpace(config.Management.Host) == "" {
-		ip, err := db.INSTANCE.DiscoveryLoad()
+		ip, err := db.INSTANCE.GetDiscoveredIp()
 		if !log.Check(log.ErrorLevel, "Loading discovered Console ip from db", err) {
 			config.ManagementIP = strings.TrimSpace(ip)
 		}

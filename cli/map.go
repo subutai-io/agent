@@ -122,12 +122,12 @@ func AddPortMapping(protocol, sockInt, sockExt, domain, policy, cert string, ssl
 func mapList(protocol string) (list []string) {
 	switch protocol {
 	case "tcp", "udp", "http", "https":
-		l, err := db.INSTANCE.PortmapList(protocol)
+		l, err := db.INSTANCE.PortMapList(protocol)
 		log.Check(log.ErrorLevel, "Reading port mappings from db", err)
 		list = l
 	default:
 		for _, v := range []string{"tcp", "udp", "http", "https"} {
-			l, err := db.INSTANCE.PortmapList(v)
+			l, err := db.INSTANCE.PortMapList(v)
 			if !log.Check(log.ErrorLevel, "Reading port mappings from db", err) {
 				list = append(list, l...)
 			}
@@ -202,11 +202,13 @@ func portIsNew(protocol, sockInt, domain string, sockExt *string) bool {
 			return true
 		}
 
+		//for non-80 port dont allow multiple mappings
 		if !checkPort(protocol, *sockExt, "", "") && socket[1] != "80" {
 			log.Error("Port is busy")
 		} else if checkPort(protocol, *sockExt, domain, sockInt) {
 			log.Error("Mapping already exists")
 		}
+		//just check to see if config files for the same external port and diff internal ports already exists
 		return !checkPort(protocol, *sockExt, domain, "")
 	}
 	for port := strconv.Itoa(common.RandomInt(1000, 65536)); isFree(protocol, socket[0]+":"+port); port = strconv.Itoa(common.RandomInt(1000, 65536)) {
@@ -296,7 +298,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 		return
 	}
 
-	p, err := db.INSTANCE.GetMapMethod(protocol, sockExt, domain)
+	p, err := db.INSTANCE.GetBalancingPolicy(protocol, sockExt, domain)
 	log.Check(log.ErrorLevel, "Reading port mapping from db", err)
 
 	if len(p) != 0 && p != policy {
@@ -305,7 +307,7 @@ func balanceMethod(protocol, sockExt, domain, policy string) {
 	} else if p == policy {
 		return
 	}
-	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetMapMethod(protocol, sockExt, domain, policy))
+	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetBalancingPolicy(protocol, sockExt, domain, policy))
 
 	addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
 		replaceString, "	"+policy+"; #policy", replace)
@@ -330,10 +332,10 @@ func saveMapToDB(protocol, sockExt, domain, sockInt string) {
 }
 
 func containerMapToDB(protocol, sockExt, domain, sockInt string) {
-	list, err := db.INSTANCE.ContainerByKey("ip", strings.Split(sockInt, ":")[0])
+	list, err := db.INSTANCE.GetContainerByKey("ip", strings.Split(sockInt, ":")[0])
 	log.Check(log.ErrorLevel, "Reading container metadata from db", err)
 	for _, name := range list {
-		log.Check(log.ErrorLevel, "Saving port mapping to db", db.INSTANCE.ContainerMapping(name, protocol, sockExt, domain, sockInt))
+		log.Check(log.ErrorLevel, "Saving port mapping to db", db.INSTANCE.SaveContainerPortMapping(name, protocol, sockExt, domain, sockInt))
 	}
 }
 

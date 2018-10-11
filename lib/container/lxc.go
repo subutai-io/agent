@@ -101,7 +101,7 @@ func AddMetadata(name string, meta map[string]string) error {
 	if !LxcInstanceExists(name) {
 		return errors.New("Container does not exist")
 	}
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(name, meta))
+	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.SaveContainer(name, meta))
 	return nil
 }
 
@@ -309,7 +309,7 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.ErrorLevel, "Removing container", err)
 
-	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.ContainerDel(name))
+	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.RemoveContainer(name))
 
 	return nil
 }

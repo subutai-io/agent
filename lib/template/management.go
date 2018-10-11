@@ -31,7 +31,7 @@ func MngInit(templateRef string) {
 	log.Check(log.WarnLevel, "Exposing port 8086",
 		exec.Command("subutai", "map", "add", "-p", "tcp", "-i", "10.10.10.1:8086", "-e", "8086").Run())
 
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(container.Management, map[string]string{"ip": "10.10.10.1"}))
+	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.SaveContainer(container.Management, map[string]string{"ip": "10.10.10.1"}))
 
 	log.Info("********************")
 	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")

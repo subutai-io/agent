@@ -22,7 +22,9 @@ var (
 )
 
 func ListPortMappings(protocol string) []string {
-	return getMapList(protocol)
+	mappings, err := db.GetAllMappings(protocol)
+	log.Check(log.ErrorLevel, "Fetching port mappings", err)
+	return mappings
 }
 
 func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
@@ -33,7 +35,7 @@ func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
 	}
 
 	if (protocol == "http" || protocol == "https") && len(domain) == 0 {
-		log.Error("\"-n domain\" is mandatory for http protocol")
+		log.Error("\"-n domain\" is mandatory for http(s) protocol")
 	}
 
 	if protocol == "tcp" || protocol == "udp" {
@@ -43,17 +45,26 @@ func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
 	if !ovs.ValidSocket(sockExt) {
 		sockExt = "0.0.0.0:" + sockExt
 	}
+	mappings, err := db.FindMappings(protocol, sockExt, sockInt, domain)
+
+	log.Check(log.ErrorLevel, "Fetching matching mappings", err)
+
+	for i := 0; i < len(mappings); i++ {
+		log.Check(log.ErrorLevel, "Removing mapping", db.RemoveMapping(mappings[i]))
+	}
+	//todo remove from db
 
 	//remove mapping
-	removeMapping(protocol, sockExt, domain, sockInt)
+	//removeMapping(protocol, sockExt, domain, sockInt)
 
 	//restart nginx
-	restart()
+	//restart()
 }
 
-
+//TODO use new db implementation
+//todo extract validation part (create, delete) into common method
 //todo USE template from string variable
-func CreatePortMapping(protocol, sockInt, sockExt, domain, policy string, sslBackend bool) {
+func CreatePortMapping(protocol, sockInt, sockExt, domain, balancingPolicy string, sslBackend bool) {
 	protocol = strings.ToLower(protocol)
 
 	if protocol != "tcp" && protocol != "udp" && protocol != "http" && protocol != "https" {
@@ -61,7 +72,7 @@ func CreatePortMapping(protocol, sockInt, sockExt, domain, policy string, sslBac
 	}
 
 	if (protocol == "http" || protocol == "https") && len(domain) == 0 {
-		log.Error("\"-n domain\" is mandatory for http protocol")
+		log.Error("\"-n domain\" is mandatory for http(s) protocol")
 	}
 
 	if protocol == "tcp" || protocol == "udp" {
@@ -83,27 +94,40 @@ func CreatePortMapping(protocol, sockInt, sockExt, domain, policy string, sslBac
 
 	//add mapping
 
-	var mapping = protocol + domain + sockInt + sockExt
+	var mappingLockFile = protocol + domain + sockInt + sockExt
 	var lock lockfile.Lockfile
 	var err error
-	for lock, err = common.LockFile(mapping, "map"); err != nil; lock, err = common.LockFile(mapping, "map") {
+	for lock, err = common.LockFile(mappingLockFile, "map"); err != nil; lock, err = common.LockFile(mappingLockFile, "map") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
 
+	//todo below
+
 	// check sockExt port and create nginx config
-	if isPortNew(protocol, sockInt, domain, &sockExt) {
-		createConfig(protocol, sockExt, domain, sslBackend)
+	//if isPortNew(protocol, sockInt, domain, &sockExt) {
+	//createConfig(protocol, sockExt, domain, sslBackend)
+	//}
+
+	//todo save to db
+	portMapping := &db.PortMapping{
+		Protocol:        protocol,
+		ExternalSocket:  sockExt,
+		InternalSocket:  sockInt,
+		Domain:          domain,
+		BalancingPolicy: balancingPolicy,
+		SslBackend:      sslBackend,
 	}
 
+	db.SaveMapping(portMapping)
 	// add containers to backend
-	addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
-		"#Add new host here", "	server "+sockInt+";", false)
+	//addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
+	//	"#Add new host here", "	server "+sockInt+";", false)
 
 	// save information to database
-	saveRhMapping(protocol, sockExt, domain, sockInt)
-	saveContainerMapping(protocol, sockExt, domain, sockInt)
-	addBalanceMethod(protocol, sockExt, domain, policy)
+	//saveRhMapping(protocol, sockExt, domain, sockInt)
+	//saveContainerMapping(protocol, sockExt, domain, sockInt)
+	//addBalanceMethod(protocol, sockExt, domain, policy)
 
 	if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
 		log.Info(ovs.GetIp() + ":" + socket[1])
@@ -112,18 +136,18 @@ func CreatePortMapping(protocol, sockInt, sockExt, domain, policy string, sslBac
 	}
 
 	//restart nginx
-	restart()
+	//restart()
 }
 
 func getMapList(protocol string) (list []string) {
 	switch protocol {
 	case "tcp", "udp", "http", "https":
-		l, err := db.INSTANCE.PortmapList(protocol)
+		l, err := db.INSTANCE.PortMapList(protocol)
 		log.Check(log.ErrorLevel, "Reading port mappings from db", err)
 		list = l
 	default:
 		for _, v := range []string{"tcp", "udp", "http", "https"} {
-			l, err := db.INSTANCE.PortmapList(v)
+			l, err := db.INSTANCE.PortMapList(v)
 			if !log.Check(log.ErrorLevel, "Reading port mappings from db", err) {
 				list = append(list, l...)
 			}
@@ -293,7 +317,7 @@ func addBalanceMethod(protocol, sockExt, domain, policy string) {
 		return
 	}
 
-	p, err := db.INSTANCE.GetMapMethod(protocol, sockExt, domain)
+	p, err := db.INSTANCE.GetBalancingPolicy(protocol, sockExt, domain)
 	log.Check(log.ErrorLevel, "Reading port mapping from db", err)
 
 	if len(p) != 0 && p != policy {
@@ -302,7 +326,7 @@ func addBalanceMethod(protocol, sockExt, domain, policy string) {
 	} else if p == policy {
 		return
 	}
-	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetMapMethod(protocol, sockExt, domain, policy))
+	log.Check(log.ErrorLevel, "Saving map method", db.INSTANCE.SetBalancingPolicy(protocol, sockExt, domain, policy))
 
 	addLine(path.Join(nginxIncPath, protocol, sockExt+"-"+domain+".conf"),
 		replaceString, "	"+policy+"; #policy", replace)
@@ -327,10 +351,10 @@ func saveRhMapping(protocol, sockExt, domain, sockInt string) {
 }
 
 func saveContainerMapping(protocol, sockExt, domain, sockInt string) {
-	list, err := db.INSTANCE.ContainerByKey("ip", strings.Split(sockInt, ":")[0])
+	list, err := db.INSTANCE.GetContainerByKey("ip", strings.Split(sockInt, ":")[0])
 	log.Check(log.ErrorLevel, "Reading container metadata from db", err)
 	for _, name := range list {
-		log.Check(log.ErrorLevel, "Saving port mapping to db", db.INSTANCE.ContainerMapping(name, protocol, sockExt, domain, sockInt))
+		log.Check(log.ErrorLevel, "Saving port mapping to db", db.INSTANCE.SaveContainerPortMapping(name, protocol, sockExt, domain, sockInt))
 	}
 }
 
