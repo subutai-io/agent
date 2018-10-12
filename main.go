@@ -404,7 +404,6 @@ func main() {
 		for _, v := range cli.ListPortMappings(*map2ListProtocol) {
 			fmt.Println(v)
 		}
-		//todo remove
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
@@ -451,7 +450,7 @@ func main() {
 		cli.CheckSshTunnels()
 	case tunnelListCmd.FullCommand():
 		for _, tun := range cli.GetSshTunnels() {
-			fmt.Printf("%s\t%s\t%s\n", tun.Remote, tun.Local, tun.Ttl)
+			fmt.Println(tun)
 		}
 
 	case vxlanAddCmd.FullCommand():

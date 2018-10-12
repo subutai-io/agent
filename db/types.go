@@ -9,3 +9,11 @@ type PortMapping struct {
 	BalancingPolicy string
 	SslBackend      bool
 }
+
+type SshTunnel struct {
+	Id           int    `storm:"id,increment"`
+	Pid          int    `storm:"index"`
+	LocalSocket  string `storm:"index"`
+	RemoteSocket string
+	Ttl          int
+}

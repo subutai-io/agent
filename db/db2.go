@@ -9,6 +9,7 @@ import (
 	"time"
 	bolt "go.etcd.io/bbolt"
 	"github.com/asdine/storm/q"
+	"fmt"
 )
 
 var (
@@ -26,7 +27,10 @@ func init() {
 		log.Check(log.ErrorLevel, "Creating database", err)
 		defer db.Close()
 		//init PortMapping struct
-		log.Check(log.ErrorLevel, "Initializing database", db.Init(&PortMapping{}))
+		log.Check(log.ErrorLevel, "Initializing port mappings storage", db.Init(&PortMapping{}))
+		//init SshTunnel struct
+		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&SshTunnel{}))
+
 	}
 }
 
@@ -41,33 +45,25 @@ func getDb(readOnly bool) (*storm.DB, error) {
 	return boltDB, nil
 }
 
-func GetAllMappings(protocol string) (list []string, err error) {
+//Port Mappings >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+func GetAllMappings(protocol string) (mappings []PortMapping, err error) {
 	var db *storm.DB
 	db, err = getDb(true);
 	if err != nil {
-		return list, err
+		return
 	}
 	defer db.Close()
 
-	var mappings [] PortMapping
 	if protocol == "" {
 		db.All(&mappings)
 	} else {
 		err = db.Find("Protocol", protocol, &mappings)
 		if err != nil {
-			return list, err
+			return
 		}
 	}
 
-	for i := 0; i < len(mappings); i++ {
-		mapping := mappings[i]
-
-		line := mapping.Protocol + "\t" + mapping.ExternalSocket + "\t" + mapping.InternalSocket + "\t" + mapping.Domain
-
-		list = append(list, line)
-	}
-
-	return list, err
+	return mappings, nil
 }
 
 func SaveMapping(mapping *PortMapping) (err error) {
@@ -122,3 +118,97 @@ func FindMappings(protocol, socketExt, socketInt, domain string) (mappings []Por
 
 	return mappings, err
 }
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Port Mappings
+
+// Ssh tunnels >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+func SaveTunnel(tunnel *SshTunnel) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Save(tunnel)
+}
+
+func UpdateTunnel(tunnel *SshTunnel) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Update(tunnel)
+}
+
+func FindTunnelByLocalSocket(localSocket string) (tunnel *SshTunnel, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	err = db.One("LocalSocket", localSocket, &tunnel)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+func GetAllTunnels() (tunnels []SshTunnel, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
+	db.All(&tunnels)
+
+	return tunnels, nil
+}
+
+func FindTunnelsByPid(pid int) (tunnels []SshTunnel, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	err = db.Find("Pid", pid, &tunnels)
+
+	return
+}
+
+func RemoveTunnelsByPid(pid int) error {
+	tunnels, err := FindTunnelsByPid(pid)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(tunnels); i++ {
+		log.Check(log.WarnLevel, fmt.Sprintf("Removing tunnel %v", tunnels[i]), RemoveTunnel(tunnels[i]))
+	}
+
+	return nil
+}
+
+func RemoveTunnel(tunnel SshTunnel) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.DeleteStruct(&tunnel)
+}
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Ssh tunnels

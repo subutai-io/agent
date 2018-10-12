@@ -14,14 +14,23 @@ import (
 	"github.com/subutai-io/agent/lib/common"
 )
 
+//TODO to support existing mappings we need to recreate them in new way, removing old existing mappings
+
 var (
 	nginxIncPath = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
 
-func ListPortMappings(protocol string) []string {
+func ListPortMappings(protocol string) (list []string) {
 	mappings, err := db.GetAllMappings(protocol)
 	log.Check(log.ErrorLevel, "Fetching port mappings", err)
-	return mappings
+	for i := 0; i < len(mappings); i++ {
+		mapping := mappings[i]
+
+		line := mapping.Protocol + "\t" + mapping.ExternalSocket + "\t" + mapping.InternalSocket + "\t" + mapping.Domain
+
+		list = append(list, line)
+	}
+	return list
 }
 
 func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
