@@ -50,17 +50,18 @@ func DeletePortMapping(protocol, sockInt, sockExt, domain string) {
 		log.Check(log.ErrorLevel, "Removing mapping", db.RemoveMapping(mappings[i]))
 	}
 
-	//todo if there are no mappings for the same protocol, domain and socketExt
-	//then we have to delete nginx config file and related certificates
-	//otherwise we have to edit the corresponding nginx config file (another way is
-	//to generate new config file each time and overwrite the existing)
+	mappings, _ = db.FindMappings(protocol, sockExt, "", domain)
 
-	//restart nginx
+	if len(mappings) == 0 {
+		//todo delete nginx config file
+	} else {
+		//todo recreate nginx config file
+	}
+
+	//todo restart nginx
 	//restart()
 }
 
-//TODO use new db implementation
-//todo extract validation part (create, delete) into common method
 //todo USE template from string variable
 func CreatePortMapping(protocol, sockInt, sockExt, domain, balancingPolicy string, sslBackend bool) {
 	protocol = strings.ToLower(protocol)
@@ -112,7 +113,7 @@ func CreatePortMapping(protocol, sockInt, sockExt, domain, balancingPolicy strin
 	db.SaveMapping(portMapping)
 
 	//TODO for the same protocol socketExt and domain (re)create nginx config file and overwite existing if any
-	//TODO when destroying container, we need to destroy all related mapping by container IP == socketInt[0]
+	//TODO when destroying container, we need to remove all related mappings by container IP == socketInt[0]
 	// (without port so we have to keep socketIntIp in PortMapping struct or filter in code)
 
 	if socket := strings.Split(sockExt, ":"); socket[0] == "0.0.0.0" {
