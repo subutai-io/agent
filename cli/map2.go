@@ -16,6 +16,66 @@ import (
 
 //TODO to support existing mappings we need to recreate them in new way, removing old existing mappings
 
+//for http and LE certs only
+//place-holders: {domain}
+var letsEncryptWellKnownSection = `
+    location /.well-known {                                                                                                                                                                    
+        default_type "text/plain";                                                                                                                                                             
+        rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
+        root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
+    }
+`
+
+//for https only
+//place-holders: {domain}, {external-ip}
+var redirect80to443Section = `
+	server {
+		listen {external-ip}:80;
+		server_name {domain};
+		return 301 https://$host:443$request_uri;  # enforce https
+	}
+`
+
+//http & https
+//place-holders: {protocol}, {external-socket}, {domain}, {policy}, {internal-sockets}, {ssl}
+var webConfig = `
+	upstream {protocol}-{external-socket}-{domain}{
+		{policy}
+	
+		{internal-sockets}
+	}                                                                                                                                                                                       
+			
+	server {
+		listen {external-socket}
+		server_name {domain};
+		client_max_body_size 1G;
+
+		{ssl}
+	
+		error_page 497	https://$host$request_uri;
+	
+		location / {
+            proxy_pass         http://{protocol}-{external-socket}-{domain}; 
+			proxy_set_header   X-Real-IP $remote_addr;
+			proxy_set_header   Host $http_host;
+			proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        	proxy_set_header   X-Forwarded-Proto $scheme;
+		}
+	}
+
+`
+//tcp & udp
+var streamConfig = `
+	upstream {protocol}-{external-socket} {
+		{internal-sockets}
+	}
+	
+	server {
+			listen {external-socket}
+			proxy_pass {protocol}-{external-socket} ;
+	}
+`
+
 var (
 	nginxIncPath = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
