@@ -30,6 +30,8 @@ func init() {
 		log.Check(log.ErrorLevel, "Initializing port mappings storage", db.Init(&PortMapping{}))
 		//init SshTunnel struct
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&SshTunnel{}))
+		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&Proxy{}))
+		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&ProxiedServer{}))
 
 	}
 }
@@ -44,6 +46,108 @@ func getDb(readOnly bool) (*storm.DB, error) {
 
 	return boltDB, nil
 }
+
+//Proxy>>>>>>>
+
+func SaveProxy(proxy *Proxy) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Save(proxy)
+}
+
+func SaveProxiedServer(proxiedServer *ProxiedServer) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Save(proxiedServer)
+}
+func RemoveProxiedServer(proxiedServer ProxiedServer) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.DeleteStruct(&proxiedServer)
+}
+
+func FindProxyByTag(tag string) (proxy *Proxy, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	err = db.One("Tag", tag, &proxy)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+func FindProxies(protocol, domain string, port int) (proxies []Proxy, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var matchers []q.Matcher
+
+	if protocol != "" {
+		matchers = append(matchers, q.Eq("Protocol", protocol))
+	}
+
+	if domain != "" {
+		matchers = append(matchers, q.Eq("Domain", domain))
+	}
+
+	if port > 0 {
+		matchers = append(matchers, q.Eq("Port", port))
+	}
+
+	err = db.Select(matchers...).Find(&proxies)
+
+	return proxies, err
+}
+
+func FindProxiedServers(tag, socket string) (servers []ProxiedServer, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var matchers []q.Matcher
+
+	if tag != "" {
+		matchers = append(matchers, q.Eq("ProxyTag", tag))
+	}
+
+	if socket != "" {
+		matchers = append(matchers, q.Eq("Socket", socket))
+	}
+
+	err = db.Select(matchers...).Find(&servers)
+
+	return servers, err
+}
+
+//<<<<<<<Proxy
 
 //Port Mappings >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 func GetAllMappings(protocol string) (mappings []PortMapping, err error) {
