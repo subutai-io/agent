@@ -45,7 +45,7 @@ func CreateProxy(protocol, domain, balancingPolicy, tag string, port int, redire
 		checkArgument(certPath == "" || fs.FileExists(certPath), "Certificate file %s does not exist", certPath)
 
 		//check if supplied certificate file is valid
-		checkArgument(certPath == "" || gpg.ValidatePem(certPath), "Certificate file %s is not valid")
+		checkArgument(certPath == "" || gpg.ValidatePem(certPath), "Certificate file %s is not valid", certPath)
 	}
 
 	//check if tag is new
@@ -164,7 +164,7 @@ func checkNotNil(object interface{}, errMsg string, vals ...interface{}) {
 
 func checkState(condition bool, errMsg string, vals ...interface{}) {
 	checkCondition(condition, func() {
-		log.Error(fmt.Sprint(errMsg, vals))
+		log.Error(fmt.Sprintf(errMsg, vals...))
 	})
 }
 
