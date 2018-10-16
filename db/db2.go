@@ -26,9 +26,7 @@ func init() {
 		db, err := storm.Open(dbFilePath, storm.BoltOptions(0600, &bolt.Options{ReadOnly: false}))
 		log.Check(log.ErrorLevel, "Creating database", err)
 		defer db.Close()
-		//init PortMapping struct
-		log.Check(log.ErrorLevel, "Initializing port mappings storage", db.Init(&PortMapping{}))
-		//init SshTunnel struct
+		//init db structs
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&SshTunnel{}))
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&Proxy{}))
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&ProxiedServer{}))
@@ -148,82 +146,6 @@ func FindProxiedServers(tag, socket string) (servers []ProxiedServer, err error)
 }
 
 //<<<<<<<Proxy
-
-//Port Mappings >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-func GetAllMappings(protocol string) (mappings []PortMapping, err error) {
-	var db *storm.DB
-	db, err = getDb(true);
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	if protocol == "" {
-		db.All(&mappings)
-	} else {
-		err = db.Find("Protocol", protocol, &mappings)
-		if err != nil {
-			return
-		}
-	}
-
-	return mappings, nil
-}
-
-func SaveMapping(mapping *PortMapping) (err error) {
-	var db *storm.DB
-	db, err = getDb(false);
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	return db.Save(mapping)
-}
-
-func RemoveMapping(mapping PortMapping) (err error) {
-	var db *storm.DB
-	db, err = getDb(false);
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	return db.DeleteStruct(&mapping)
-}
-
-func FindMappings(protocol, socketExt, socketInt, domain string) (mappings []PortMapping, err error) {
-	var db *storm.DB
-	db, err = getDb(true);
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	var matchers []q.Matcher
-
-	if protocol != "" {
-		matchers = append(matchers, q.Eq("Protocol", protocol))
-	}
-
-	if socketInt != "" {
-		matchers = append(matchers, q.Eq("InternalSocket", socketInt))
-	}
-
-	if socketExt != "" {
-		matchers = append(matchers, q.Eq("ExternalSocket", socketExt))
-	}
-
-	if domain != "" {
-		matchers = append(matchers, q.Eq("Domain", domain))
-	}
-
-	err = db.Select(matchers...).Find(&mappings)
-
-	return mappings, err
-}
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Port Mappings
 
 // Ssh tunnels >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -130,7 +130,6 @@ func RemoveProxiedServer(tag, socket string) {
 	applyConfig(tag, false)
 }
 
-//utilities
 func applyConfig(tag string, creating bool) {
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
@@ -143,14 +142,18 @@ func applyConfig(tag string, creating bool) {
 	if len(proxiedServers) > 0 {
 		//todo (re)create config
 	} else {
+		//todo make sure that empty backend servers dont crash nginx
 		if (creating) {
 			//TODO for LE certs, obtain them via certbot; for self-signed certs, parse and copy certs to web/ssl folder
 		} else {
 			//todo remove config and certs
 		}
 	}
+
+	//todo reload nginx
 }
 
+//utilities
 func checkArgument(condition bool, errMsg string, vals ...interface{}) {
 	checkState(condition, errMsg, vals)
 }

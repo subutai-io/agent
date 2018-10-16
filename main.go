@@ -170,15 +170,6 @@ var (
 	mapAddPolicy         = mapAddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
 
-	map2Cmd               = app.Command("map2", "Manage port mappings")
-	map2AddCmd            = map2Cmd.Command("add", "Add port mapping")
-	map2AddProtocol       = map2AddCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
-	map2AddInternalSocket = map2AddCmd.Flag("internal", "internal socket").Short('i').Required().String()
-	map2AddExternalSocket = map2AddCmd.Flag("external", "external socket").Short('e').String()
-	map2AddDomain         = map2AddCmd.Flag("domain", "domain name").Short('n').String()
-	map2AddPolicy         = map2AddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
-	map2AddSslBackend     = map2AddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
-
 	/*
 	subutai map rm tcp ...
 	*/
@@ -188,21 +179,12 @@ var (
 	mapRemoveInternalSocket = mapRemoveCmd.Flag("internal", "internal socket").Short('i').String()
 	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('n').String()
 
-	map2RemoveCmd            = map2Cmd.Command("rm", "Remove port mapping").Alias("del")
-	map2RemoveProtocol       = map2RemoveCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
-	map2RemoveExternalSocket = map2RemoveCmd.Flag("external", "external socket").Short('e').Required().String()
-	map2RemoveInternalSocket = map2RemoveCmd.Flag("internal", "internal socket").Short('i').String()
-	map2RemoveDomain         = map2RemoveCmd.Flag("domain", "domain name").Short('n').String()
-
 	/*
 	subutai map list
 	subutai map list tcp
 	*/
 	mapList         = mapCmd.Command("list", "list mapped ports").Alias("ls")
 	mapListProtocol = mapList.Flag("protocol", "http, https, tcp or udp").Short('p').String()
-
-	map2List         = map2Cmd.Command("list", "list mapped ports").Alias("ls")
-	map2ListProtocol = map2List.Flag("protocol", "http, https, tcp or udp").Short('p').String()
 
 	//metrics command
 	//subutai metrics -s "2018-08-17 02:26:11" -e "2018-08-17 03:26:11"
@@ -390,18 +372,6 @@ func main() {
 
 	case mapList.FullCommand():
 		for _, v := range cli.GetPortMappings(*mapListProtocol) {
-			fmt.Println(v)
-		}
-
-		//map2
-	case map2AddCmd.FullCommand():
-		cli.CreatePortMapping(*map2AddProtocol, *map2AddInternalSocket, *map2AddExternalSocket,
-			*map2AddDomain, *map2AddPolicy, *map2AddSslBackend)
-	case map2RemoveCmd.FullCommand():
-		cli.DeletePortMapping(*map2RemoveProtocol, *map2RemoveInternalSocket, *map2RemoveExternalSocket,
-			*map2RemoveDomain)
-	case map2List.FullCommand():
-		for _, v := range cli.ListPortMappings(*map2ListProtocol) {
 			fmt.Println(v)
 		}
 
