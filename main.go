@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/agent/vars"
+	"text/tabwriter"
 )
 
 var version = "unknown"
@@ -182,6 +183,37 @@ var (
 	metricsHost  = metricsCmd.Arg("name", "host/container name").Required().String()
 	metricsStart = metricsCmd.Flag("start", "metrics start time 'yyyy-mm-dd hh:mi:ss'").Short('s').Required().String()
 	metricsEnd   = metricsCmd.Flag("end", "metrics end time 'yyyy-mm-dd hh:mi:ss'").Short('e').Required().String()
+
+	//prxy command
+	prxyCmd = app.Command("prxy", "Subutai proxy")
+
+	prxyCreateCmd           = prxyCmd.Command("create", "Create proxy")
+	prxyCreateDomain        = prxyCreateCmd.Flag("domain", "proxy domain").Short('n').Required().String()
+	prxyCreateProtocol      = prxyCreateCmd.Flag("protocol", "protocol [http,https]").Short('p').Required().String()
+	prxyCreatePort          = prxyCreateCmd.Flag("external port", "port in range [80,443,1000-65536]").Short('e').Required().Int()
+	prxyCreateTag           = prxyCreateCmd.Flag("proxy tag", "unique tag for proxy").Short('t').Required().String()
+	prxyCreateLoadBalancing = prxyCreateCmd.Flag("load balancing", "load balancing [round_robin,hash,ip_hash,least_time]").Short('b').String()
+	prxyCreateCertificate   = prxyCreateCmd.Flag("x509 certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
+	prxyCreateRedirect      = prxyCreateCmd.Flag("redirect", "redirect port 80 to 443").Short('r').Bool()
+	prxyCreateSslBackend    = prxyCreateCmd.Flag("sslbackend", "redirect port 80 to 443").Short('s').Bool()
+
+	prxyListCmd      = prxyCmd.Command("list", "List proxies").Alias("ls")
+	prxyListProtocol = prxyListCmd.Flag("protocol", "filer by protocol [http,https]").Short('p').String()
+	prxyListTag      = prxyListCmd.Flag("tag", "proxy tag").Short('t').String()
+
+	prxyRemoveCmd = prxyCmd.Command("remove", "Remove proxy").Alias("rm").Alias("del")
+	prxyRemoveTag = prxyRemoveCmd.Flag("tag", "proxy tag").Short('t').Required().String()
+
+	//prxy server command
+	prxyServerCmd = prxyCmd.Command("server", "Manage proxied servers").Alias("srv")
+
+	prxyServerAddCmd    = prxyServerCmd.Command("add", "Add proxied server")
+	prxyServerAddTag    = prxyServerAddCmd.Flag("tag", "proxy tag").Short('t').Required().String()
+	prxyServerAddSocket = prxyServerAddCmd.Flag("ip:port", "proxied server ip:port").Short('i').Required().String()
+
+	prxyServerRemoveCmd    = prxyServerCmd.Command("remove", "Remove proxied server").Alias("rm").Alias("del")
+	prxyServerRemoveTag    = prxyServerRemoveCmd.Flag("tag", "proxy tag").Short('t').Required().String()
+	prxyServerRemoveSocket = prxyServerRemoveCmd.Flag("ip:port", "proxied server ip:port").Short('i').Required().String()
 
 	//proxy command
 	proxyCmd       = app.Command("proxy", "Subutai reverse proxy")
@@ -365,6 +397,30 @@ func main() {
 			fmt.Println(v)
 		}
 
+		//prxy command
+
+	case prxyCreateCmd.FullCommand():
+		cli.CreateProxy(*prxyCreateProtocol, *prxyCreateDomain, *prxyCreateLoadBalancing, *prxyCreateTag, *prxyCreatePort, *prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate)
+
+	case prxyListCmd.FullCommand():
+		lines := []string{"Tag\tProtocol\tPort\tDomain\tApplied"}
+		for _, v := range cli.GetProxies(*prxyListProtocol) {
+			proxy := v.Proxy
+			if *prxyListTag == "" || *prxyListTag == proxy.Tag {
+				servers := v.Servers
+				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%t", proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, len(servers) > 0))
+			}
+		}
+		output(lines)
+
+	case prxyRemoveCmd.FullCommand():
+		cli.RemoveProxy(*prxyRemoveTag)
+
+	case prxyServerAddCmd.FullCommand():
+		cli.AddProxiedServer(*prxyServerAddTag, *prxyServerAddSocket)
+	case prxyServerRemoveCmd.FullCommand():
+		cli.RemoveProxiedServer(*prxyServerRemoveTag, *prxyServerRemoveSocket)
+
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 
@@ -426,4 +482,12 @@ func main() {
 		cli.Batch(*batchJson)
 	}
 
+}
+
+func output(lines []string) {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.TabIndent)
+	for _, line := range lines {
+		fmt.Fprintln(w, line)
+	}
+	w.Flush()
 }

@@ -91,15 +91,37 @@ func init() {
 	makeDir(letsEncryptCertsDir)
 }
 
+type ProxyNServers struct {
+	Proxy   db.Proxy
+	Servers []db.ProxiedServer
+}
+
+func GetProxies(protocol string) []ProxyNServers {
+	var proxyNServers []ProxyNServers
+
+	proxies, err := db.FindProxies(protocol, "", 0)
+	log.Check(log.ErrorLevel, "Getting proxies from db", err)
+
+	for i := 0; i < len(proxies); i++ {
+		proxy := proxies[i]
+		proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
+		log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+		proxyNServers = append(proxyNServers, ProxyNServers{Proxy: proxy, Servers: proxiedServers})
+	}
+
+	return proxyNServers
+}
+
 //TODO extract balancing policies to constants
 //todo make mandatory parameter as required in CLI
 
-//subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [-r false] [-c path/to/cert] [--sslbackend]
+//subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
 //subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
-func CreateProxy(protocol, domain, balancingPolicy, tag string, port int, redirect80To443, sslBackend bool, certPath string) {
+func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80To443, sslBackend bool, certPath string) {
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
-	balancingPolicy = strings.ToLower(balancingPolicy)
+	loadBalancing = strings.ToLower(loadBalancing)
 	tag = strings.ToLower(tag)
 
 	//check if protocol is https or https
@@ -109,14 +131,14 @@ func CreateProxy(protocol, domain, balancingPolicy, tag string, port int, redire
 	checkArgument(port == 80 || port == 443 || (port >= 1000 && port <= 65536),
 		"External port must be one of [80, 443, 1000-65536] ")
 
-	if balancingPolicy != "" {
-		checkArgument(balancingPolicy == "round_robin" || balancingPolicy == "least_time" ||
-			balancingPolicy == "hash" || balancingPolicy == "ip_hash",
+	if loadBalancing != "" {
+		checkArgument(loadBalancing == "round_robin" || loadBalancing == "least_time" ||
+			loadBalancing == "hash" || loadBalancing == "ip_hash",
 			"Balancing policy must be one of [round_robin,least_time,hash,ip_hash]")
 	}
 	//default policy to round-robin
-	checkCondition(len(balancingPolicy) > 0, func() {
-		balancingPolicy = "round_robin"
+	checkCondition(len(loadBalancing) > 0, func() {
+		loadBalancing = "round_robin"
 	})
 
 	if protocol == HTTPS {
@@ -130,7 +152,7 @@ func CreateProxy(protocol, domain, balancingPolicy, tag string, port int, redire
 	//check if tag is new
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Checking proxy in db", err)
-	checkNotNil(proxy, "Proxy with tag %s already exists: %v", tag, proxy)
+	checkState(proxy == nil, "Proxy with tag %s already exists", tag)
 
 	//check if proxy with the same combination of protocol+domain+port does not exist
 	proxies, err := db.FindProxies(protocol, domain, port)
@@ -158,7 +180,7 @@ func CreateProxy(protocol, domain, balancingPolicy, tag string, port int, redire
 		Port:            port,
 		Tag:             tag,
 		Redirect80To443: redirect80To443,
-		BalancingPolicy: balancingPolicy,
+		LoadBalancing:   loadBalancing,
 		SslBackend:      sslBackend,
 		IsLetsEncrypt:   protocol == HTTPS && certPath == "",
 	}
@@ -173,15 +195,12 @@ func RemoveProxy(tag string) {
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
 
-	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
-
-	removeConfig(*proxy)
+	deleteProxy(proxy)
 
 	reloadNginx()
 }
 
 func AddProxiedServer(tag, socket string) {
-
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
@@ -231,19 +250,20 @@ func applyConfig(tag string, creating bool) {
 		//todo make sure that empty backend servers dont crash nginx
 		if (creating) {
 
+			log.Debug("Creating initial config file")
 			if proxy.IsLetsEncrypt {
-				//TODO for LE certs, obtain them via certbot;
 				//1) create http config with LE section
-				//2) run certbot
+				//todo
+				//2) reload nginx
+				reloadNginx()
+				//3) run certbot
+				//todo
 			} else {
-				//TODO for self-signed certs, parse and copy certs to web/ssl folder, name consistently with LE certs
 				//1) copy certs to self signed certs directory
+				//todo
 			}
 		} else {
-
-			removeConfig(*proxy)
-
-			//todo remove certs from relevant directory
+			deleteProxy(proxy)
 		}
 	}
 
@@ -276,7 +296,26 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
 
-	print(effectiveConfig)
+	println(effectiveConfig)
+}
+
+func deleteProxy(proxy *db.Proxy) {
+	//remove cfg file
+	removeConfig(*proxy)
+
+	//remove domain certificates
+	//todo remove certs from relevant directory
+
+	proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
+	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+	//remove proxied servers from db
+	for _, server := range proxiedServers {
+		log.Check(log.ErrorLevel, "Removing proxied server from db", db.RemoveProxiedServer(&server))
+	}
+
+	//remove proxy from db
+	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
 }
 
 func composeConfigPath(proxy db.Proxy) string {
@@ -290,7 +329,7 @@ func removeConfig(proxy db.Proxy) {
 
 func reloadNginx() {
 	//todo uncomment
-
+	log.Debug("Reloading nginx")
 	//out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
 	//log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
@@ -307,11 +346,11 @@ func makeDir(path string) {
 }
 
 func checkArgument(condition bool, errMsg string, vals ...interface{}) {
-	checkState(condition, errMsg, vals)
+	checkState(condition, errMsg, vals...)
 }
 
 func checkNotNil(object interface{}, errMsg string, vals ...interface{}) {
-	checkState(object != nil, errMsg, vals)
+	checkState(object != nil, errMsg, vals...)
 }
 
 func checkState(condition bool, errMsg string, vals ...interface{}) {

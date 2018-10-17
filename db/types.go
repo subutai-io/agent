@@ -6,7 +6,7 @@ type Proxy struct {
 	Port            int    `storm:"index"`
 	Domain          string `storm:"index"`
 	Tag             string `storm:"unique"`
-	BalancingPolicy string
+	LoadBalancing   string
 	Redirect80To443 bool
 	SslBackend      bool
 	IsLetsEncrypt   bool

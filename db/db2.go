@@ -99,12 +99,15 @@ func FindProxyByTag(tag string) (proxy *Proxy, err error) {
 	}
 	defer db.Close()
 
-	err = db.One("Tag", tag, &proxy)
-	if err != nil {
-		return nil, err
+	result := Proxy{}
+
+	err = db.One("Tag", tag, &result)
+
+	if err != nil && err == storm.ErrNotFound {
+		return nil, nil
 	}
 
-	return
+	return &result, err
 }
 
 func FindProxies(protocol, domain string, port int) (proxies []Proxy, err error) {
@@ -131,6 +134,10 @@ func FindProxies(protocol, domain string, port int) (proxies []Proxy, err error)
 
 	err = db.Select(matchers...).Find(&proxies)
 
+	if err != nil && err == storm.ErrNotFound {
+		err = nil
+	}
+
 	return proxies, err
 }
 
@@ -153,6 +160,10 @@ func FindProxiedServers(tag, socket string) (servers []ProxiedServer, err error)
 	}
 
 	err = db.Select(matchers...).Find(&servers)
+
+	if err != nil && err == storm.ErrNotFound {
+		err = nil
+	}
 
 	return servers, err
 }
@@ -191,12 +202,13 @@ func FindTunnelByLocalSocket(localSocket string) (tunnel *SshTunnel, err error) 
 	}
 	defer db.Close()
 
-	err = db.One("LocalSocket", localSocket, &tunnel)
-	if err != nil {
-		return nil, err
+	result := SshTunnel{}
+	err = db.One("LocalSocket", localSocket, &result)
+	if err != nil && err == storm.ErrNotFound {
+		return nil, nil
 	}
 
-	return
+	return &result, err
 }
 
 func GetAllTunnels() (tunnels []SshTunnel, err error) {
