@@ -28,6 +28,8 @@ var (
 )
 
 func init() {
+	ensureGPGVersion()
+
 	// move .gnupg dir to app home
 	err := os.Setenv("GNUPGHOME", config.Agent.GpgHome)
 	log.Check(log.DebugLevel, "Setting GNUPGHOME environment variable", err)
@@ -37,7 +39,7 @@ func init() {
 	}
 }
 
-func EnsureGPGVersion() {
+func ensureGPGVersion() {
 	out, err := exec2.Execute("gpg1", "--version")
 	if err != nil {
 		out, err = exec2.Execute("gpg", "--version")
