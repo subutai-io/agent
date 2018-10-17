@@ -32,7 +32,7 @@ type SshTunnel struct {
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
 
 // TunAdd adds tunnel to specified network socket
-func AddSshTunnel(socket, timeout string) {
+func AddSshTunnel(socket, timeout string, ssh bool) {
 	if len(socket) == 0 {
 		log.Error("Please specify socket")
 	}
@@ -50,7 +50,13 @@ func AddSshTunnel(socket, timeout string) {
 			item["ttl"] = "-1"
 		}
 		log.Check(log.ErrorLevel, "Updating tunnel entry", db.INSTANCE.AddTunEntry(item))
-		fmt.Println(item["remote"])
+		if ssh {
+			tunnel := strings.Split(item["remote"], ":")
+			fmt.Println("ssh root@" + tunnel[0] + " -p " + tunnel[1])
+		} else {
+			fmt.Println(item["remote"])
+		}
+
 		return
 	}
 
@@ -71,7 +77,11 @@ func AddSshTunnel(socket, timeout string) {
 		log.Debug("Ssh tunnel output: \n" + string(line))
 		if strings.Contains(string(line), "Allocated port") {
 			port := strings.Fields(string(line))
-			fmt.Println(tunsrv + ":" + port[2])
+			if ssh {
+				fmt.Println("ssh root@" + tunsrv + " -p " + port[2])
+			} else {
+				fmt.Println(tunsrv + ":" + port[2])
+			}
 			tunnel := map[string]string{
 				"pid":    strconv.Itoa(cmd.Process.Pid),
 				"local":  socket,
@@ -91,7 +101,6 @@ func AddSshTunnel(socket, timeout string) {
 	}
 	log.Error("Cannot get tunnel port")
 }
-
 
 func GetSshTunnels() []SshTunnel {
 	res := []SshTunnel{}
@@ -137,7 +146,7 @@ func CheckSshTunnels() {
 				if ttl-int(time.Now().Unix()) > 0 {
 					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
 				}
-				AddSshTunnel(item["local"], newttl)
+				AddSshTunnel(item["local"], newttl, false)
 			}
 		}
 	}
