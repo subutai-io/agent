@@ -7,10 +7,89 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/config"
+	"path"
+	"os"
+	"strconv"
 )
 
 const HTTP = "http"
 const HTTPS = "https"
+
+//for http and LE certs only
+//place-holders: {domain}
+const letsEncryptWellKnownSection = `
+    location /.well-known {                                                                                                                                                                    
+        default_type "text/plain";                                                                                                                                                             
+        rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
+        root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
+    }
+`
+
+//for https only
+//place-holders: {domain}
+const redirect80to443Section = `
+	server {
+		listen 80;
+		server_name {domain};
+		return 301 https://$host:443$request_uri;  # enforce https
+	}
+`
+
+//http & https
+//place-holders: {protocol}, {port}, {domain}, {policy}, {servers}, {ssl}
+const webConfig = `
+	upstream {protocol}-{port}-{domain}{
+		{policy}
+	
+		{servers}
+	}                                                                                                                                                                                       
+			
+	server {
+		listen {port}
+		server_name {domain};
+		client_max_body_size 1G;
+
+		{ssl}
+	
+		error_page 497	https://$host$request_uri;
+	
+		location / {
+            proxy_pass         http://{protocol}-{port}-{domain}; 
+			proxy_set_header   X-Real-IP $remote_addr;
+			proxy_set_header   Host $http_host;
+			proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        	proxy_set_header   X-Forwarded-Proto $scheme;
+		}
+	}
+
+`
+
+//place-holders: {domain}
+const letsEncryptSslDirectives = `
+    ssl on;
+    ssl_certificate /var/lib/subutai/letsencrypt/live/{domain}/cert.pem;
+    ssl_certificate_key /var/lib/subutai/letsencrypt/live/{domain}/privkey.pem;
+`
+
+//place-holders: {domain}
+const selfSignedSslDirectives = `
+    ssl on;
+    ssl_certificate /var/lib/subutai/web/ssl/{domain}.crt;
+    ssl_certificate_key /var/lib/subutai/web/ssl/{domain}.key;
+`
+
+var selfSignedCertsDir = path.Join(config.Agent.DataPrefix, "/web/ssl")
+var letsEncryptDir = path.Join(config.Agent.DataPrefix, "/letsencrypt")
+var letsEncryptWebRootDir = path.Join(letsEncryptDir, "/webroot")
+var letsEncryptCertsDir = path.Join(letsEncryptDir, "/live")
+
+func init() {
+	makeDir(selfSignedCertsDir)
+	makeDir(letsEncryptDir)
+	makeDir(letsEncryptWebRootDir)
+	makeDir(letsEncryptCertsDir)
+}
 
 //TODO extract balancing policies to constants
 //todo make mandatory parameter as required in CLI
@@ -94,6 +173,11 @@ func RemoveProxy(tag string) {
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
 
+	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
+
+	removeConfig(*proxy)
+
+	reloadNginx()
 }
 
 func AddProxiedServer(tag, socket string) {
@@ -125,7 +209,7 @@ func RemoveProxiedServer(tag, socket string) {
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
 	checkState(len(proxiedServers) > 0, "Proxied server not found")
 
-	log.Check(log.ErrorLevel, "Removing proxied server from db", db.RemoveProxiedServer(proxiedServers[0]))
+	log.Check(log.ErrorLevel, "Removing proxied server from db", db.RemoveProxiedServer(&proxiedServers[0]))
 
 	applyConfig(tag, false)
 }
@@ -140,20 +224,88 @@ func applyConfig(tag string, creating bool) {
 
 	//todo lock config file
 	if len(proxiedServers) > 0 {
-		//todo (re)create config
+
+		//create config
+		createConfig(proxy, proxiedServers)
 	} else {
 		//todo make sure that empty backend servers dont crash nginx
 		if (creating) {
-			//TODO for LE certs, obtain them via certbot; for self-signed certs, parse and copy certs to web/ssl folder
+
+			if proxy.IsLetsEncrypt {
+				//TODO for LE certs, obtain them via certbot;
+				//1) create http config with LE section
+				//2) run certbot
+			} else {
+				//TODO for self-signed certs, parse and copy certs to web/ssl folder, name consistently with LE certs
+				//1) copy certs to self signed certs directory
+			}
 		} else {
-			//todo remove config and certs
+
+			removeConfig(*proxy)
+
+			//todo remove certs from relevant directory
 		}
 	}
 
-	//todo reload nginx
+	reloadNginx()
+}
+
+func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
+	//todo
+	//place-holders: {protocol}, {port}, {domain}, {policy}, {servers}, {ssl}
+	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+
+	//todo policy
+
+	//servers
+	serversConfig := ""
+	for i := 0; i < len(servers); i++ {
+		serversConfig += servers[i].Socket + ";\n"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
+
+	//ssl
+	sslConfig := ""
+	if proxy.IsLetsEncrypt {
+		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", proxy.Domain, -1)
+	} else {
+
+		sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", proxy.Domain, -1)
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
+
+	print(effectiveConfig)
+}
+
+func composeConfigPath(proxy db.Proxy) string {
+	return proxy.Protocol + "-" + proxy.Domain + "-" + strconv.Itoa(proxy.Port)
+}
+
+func removeConfig(proxy db.Proxy) {
+	cfgPath := composeConfigPath(proxy)
+	log.Check(log.ErrorLevel, "Removing config file "+cfgPath, fs.DeleteFile(cfgPath))
+}
+
+func reloadNginx() {
+	//todo uncomment
+
+	//out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
+	//log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
 
 //utilities
+
+func makeDir(path string) {
+	if !fs.FileExists(path) {
+		err := os.MkdirAll(path, 0755)
+		if err != nil {
+			log.Error("Failed to create directory " + path)
+		}
+	}
+}
+
 func checkArgument(condition bool, errMsg string, vals ...interface{}) {
 	checkState(condition, errMsg, vals)
 }

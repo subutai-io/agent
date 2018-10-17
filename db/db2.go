@@ -58,6 +58,17 @@ func SaveProxy(proxy *Proxy) (err error) {
 	return db.Save(proxy)
 }
 
+func RemoveProxy(proxy *Proxy) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.DeleteStruct(proxy)
+}
+
 func SaveProxiedServer(proxiedServer *ProxiedServer) (err error) {
 	var db *storm.DB
 	db, err = getDb(false);
@@ -68,7 +79,8 @@ func SaveProxiedServer(proxiedServer *ProxiedServer) (err error) {
 
 	return db.Save(proxiedServer)
 }
-func RemoveProxiedServer(proxiedServer ProxiedServer) (err error) {
+
+func RemoveProxiedServer(proxiedServer *ProxiedServer) (err error) {
 	var db *storm.DB
 	db, err = getDb(false);
 	if err != nil {
@@ -76,7 +88,7 @@ func RemoveProxiedServer(proxiedServer ProxiedServer) (err error) {
 	}
 	defer db.Close()
 
-	return db.DeleteStruct(&proxiedServer)
+	return db.DeleteStruct(proxiedServer)
 }
 
 func FindProxyByTag(tag string) (proxy *Proxy, err error) {
