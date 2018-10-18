@@ -215,6 +215,9 @@ var (
 	prxyServerRemoveTag    = prxyServerRemoveCmd.Flag("tag", "proxy tag").Short('t').Required().String()
 	prxyServerRemoveSocket = prxyServerRemoveCmd.Flag("server", "ip:port").Short('s').Required().String()
 
+	prxyServerListCmd = prxyServerCmd.Command("list", "List servers for proxy").Alias("ls")
+	prxyServerListTag = prxyServerListCmd.Flag("tag", "proxy tag").Short('t').Required().String()
+
 	//proxy command
 	proxyCmd       = app.Command("proxy", "Subutai reverse proxy")
 	proxyDomainCmd = proxyCmd.Command("domain", "Manage vlan-domain mappings").Alias("dom")
@@ -420,6 +423,17 @@ func main() {
 		cli.AddProxiedServer(*prxyServerAddTag, *prxyServerAddSocket)
 	case prxyServerRemoveCmd.FullCommand():
 		cli.RemoveProxiedServer(*prxyServerRemoveTag, *prxyServerRemoveSocket)
+	case prxyServerListCmd.FullCommand():
+		lines := []string{"Protocol\tPort\tDomain\tServer"}
+		for _, v := range cli.GetProxies("") {
+			proxy := v.Proxy
+			if *prxyServerListTag == proxy.Tag {
+				for _, server := range v.Servers {
+					lines = append(lines, fmt.Sprintf("%s\t%d\t%s\t%s", proxy.Protocol, proxy.Port, proxy.Domain, server.Socket))
+				}
+			}
+		}
+		output(lines)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))

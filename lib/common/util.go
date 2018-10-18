@@ -60,3 +60,8 @@ func RandomInt(min, max int) int {
 	rand.Seed(time.Now().Unix())
 	return rand.Intn(max-min) + min
 }
+
+
+func IsZeroOfUnderlyingType(x interface{}) bool {
+	return x ==nil || reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface())
+}

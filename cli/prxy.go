@@ -11,6 +11,7 @@ import (
 	"path"
 	"os"
 	"strconv"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 const HTTP = "http"
@@ -19,49 +20,49 @@ const HTTPS = "https"
 //for http and LE certs only
 //place-holders: {domain}
 const letsEncryptWellKnownSection = `
-    location /.well-known {                                                                                                                                                                    
-        default_type "text/plain";                                                                                                                                                             
-        rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
-        root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
-    }
+location /.well-known {                                                                                                                                                                    
+	default_type "text/plain";                                                                                                                                                             
+	rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
+	root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
+}
 `
 
 //for https only
 //place-holders: {domain}
 const redirect80to443Section = `
-	server {
-		listen 80;
-		server_name {domain};
-		return 301 https://$host:443$request_uri;  # enforce https
-	}
+server {
+	listen 80;
+	server_name {domain};
+	return 301 https://$host:443$request_uri;  # enforce https
+}
 `
 
 //http & https
 //place-holders: {protocol}, {port}, {domain}, {policy}, {servers}, {ssl}
 const webConfig = `
-	upstream {protocol}-{port}-{domain}{
-		{policy}
-	
-		{servers}
-	}                                                                                                                                                                                       
-			
-	server {
-		listen {port}
-		server_name {domain};
-		client_max_body_size 1G;
+upstream {protocol}-{port}-{domain}{
+{policy}
 
-		{ssl}
+{servers}
+}                                                                                                                                                                                       
+
+server {
+    listen {port}
+    server_name {domain};
+    client_max_body_size 1G;
 	
-		error_page 497	https://$host$request_uri;
+{ssl}
 	
-		location / {
-            proxy_pass         http://{protocol}-{port}-{domain}; 
-			proxy_set_header   X-Real-IP $remote_addr;
-			proxy_set_header   Host $http_host;
-			proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-        	proxy_set_header   X-Forwarded-Proto $scheme;
-		}
-	}
+    error_page 497	https://$host$request_uri;
+	
+    location / {
+        proxy_pass         http://{protocol}-{port}-{domain}; 
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   Host $http_host;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}
 
 `
 
@@ -102,8 +103,7 @@ func GetProxies(protocol string) []ProxyNServers {
 	proxies, err := db.FindProxies(protocol, "", 0)
 	log.Check(log.ErrorLevel, "Getting proxies from db", err)
 
-	for i := 0; i < len(proxies); i++ {
-		proxy := proxies[i]
+	for _, proxy := range proxies {
 		proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
 		log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
 
@@ -207,7 +207,7 @@ func AddProxiedServer(tag, socket string) {
 
 	proxiedServers, err := db.FindProxiedServers(tag, socket)
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
-	checkState(len(proxiedServers) == 0, "Proxied server %v already exists", proxiedServers[0])
+	checkState(len(proxiedServers) == 0, "Proxied server already exists")
 
 	proxiedServer := &db.ProxiedServer{
 		ProxyTag: tag,
@@ -282,7 +282,7 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	//servers
 	serversConfig := ""
 	for i := 0; i < len(servers); i++ {
-		serversConfig += servers[i].Socket + ";\n"
+		serversConfig += "    " + servers[i].Socket + ";\n"
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
 
@@ -324,7 +324,10 @@ func composeConfigPath(proxy db.Proxy) string {
 
 func removeConfig(proxy db.Proxy) {
 	cfgPath := composeConfigPath(proxy)
-	log.Check(log.ErrorLevel, "Removing config file "+cfgPath, fs.DeleteFile(cfgPath))
+	err := fs.DeleteFile(cfgPath)
+	if !os.IsNotExist(err) {
+		log.Check(log.ErrorLevel, "Removing config file "+cfgPath, err)
+	}
 }
 
 func reloadNginx() {
@@ -350,10 +353,11 @@ func checkArgument(condition bool, errMsg string, vals ...interface{}) {
 }
 
 func checkNotNil(object interface{}, errMsg string, vals ...interface{}) {
-	checkState(object != nil, errMsg, vals...)
+	checkState(!common.IsZeroOfUnderlyingType(object), errMsg, vals...)
 }
 
 func checkState(condition bool, errMsg string, vals ...interface{}) {
+	log.Debug(condition)
 	checkCondition(condition, func() {
 		log.Error(fmt.Sprintf(errMsg, vals...))
 	})
