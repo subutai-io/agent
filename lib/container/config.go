@@ -10,6 +10,18 @@ type LxcConfig struct {
 	path   string
 }
 
+func SetConfig(path string, params [][]string) error {
+	cfg := LxcConfig{}
+	err := cfg.Load(path)
+	if err != nil {
+		return err
+	}
+
+	cfg.SetParams(params)
+
+	return cfg.Save()
+}
+
 func GetConfig(path string) (LxcConfig, error) {
 	cfg := LxcConfig{}
 

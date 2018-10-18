@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/subutai-io/agent/log"
+	"strconv"
 )
 
 // RemoveByIface deletes P2P interface from the Resource Host.
@@ -36,6 +37,7 @@ func RemoveByIface(name string) {
 }
 
 // iptablesCleanUp removes Iptables rules applied for passed interface
+//todo move to net.go
 func iptablesCleanUp(name string) {
 	out, _ := exec.Command("iptables-save").Output()
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -47,4 +49,15 @@ func iptablesCleanUp(name string) {
 			exec.Command("iptables", append([]string{"-t", "nat"}, args...)...).Run()
 		}
 	}
+}
+
+func Mtu() int{
+	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
+	output := strings.TrimSpace(string(out))
+	log.Check(log.FatalLevel, "Getting p2p mtu: "+output, err)
+
+	mtu, err := strconv.Atoi(output)
+	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
+
+	return mtu - 50
 }
