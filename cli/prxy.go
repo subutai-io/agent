@@ -30,18 +30,20 @@ location /.well-known {
 //for https only
 //place-holders: {domain}
 const redirect80to443Section = `
+
 server {
 	listen 80;
 	server_name {domain};
 	return 301 https://$host:443$request_uri;  # enforce https
 }
+
 `
 
 //http & https
-//place-holders: {protocol}, {port}, {domain}, {policy}, {servers}, {ssl}
+//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
 const webConfig = `
 upstream {protocol}-{port}-{domain}{
-{policy}
+    {load-balancing}
 
 {servers}
 }                                                                                                                                                                                       
@@ -132,13 +134,13 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		"External port must be one of [80, 443, 1000-65536] ")
 
 	if loadBalancing != "" {
-		checkArgument(loadBalancing == "round_robin" || loadBalancing == "least_time" ||
-			loadBalancing == "hash" || loadBalancing == "ip_hash",
+		checkArgument(loadBalancing == "rr" || loadBalancing == "lcon" ||
+			loadBalancing == "sticky",
 			"Balancing policy must be one of [round_robin,least_time,hash,ip_hash]")
 	}
 	//default policy to round-robin
 	checkCondition(len(loadBalancing) > 0, func() {
-		loadBalancing = "round_robin"
+		loadBalancing = "rr"
 	})
 
 	if protocol == HTTPS {
@@ -272,12 +274,27 @@ func applyConfig(tag string, creating bool) {
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	//todo
-	//place-holders: {protocol}, {port}, {domain}, {policy}, {servers}, {ssl}
+	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
 
-	//todo policy
+	if proxy.Redirect80To443 {
+		effectiveConfig += strings.Replace(redirect80to443Section, "{domain}", proxy.Domain, -1)
+	}
+
+	//load balancing
+	loadBalancing := ""
+	switch proxy.LoadBalancing {
+	case "rr":
+		//no-op
+	case "sticky":
+		loadBalancing = "ip_hash;";
+	case "lcon":
+		loadBalancing = "least_conn;"
+
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{load-balancing}", loadBalancing, -1)
 
 	//servers
 	serversConfig := ""
