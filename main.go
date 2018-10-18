@@ -4,13 +4,12 @@
 package main
 
 import (
+	_ "github.com/subutai-io/agent/a"
 	"os"
-
 	"github.com/subutai-io/agent/agent"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/lib/gpg"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
@@ -18,15 +17,6 @@ import (
 )
 
 var version = "unknown"
-
-func init() {
-	if os.Getuid() != 0 {
-		log.Error("Please run as root")
-	}
-
-	gpg.EnsureGPGVersion()
-
-}
 
 var (
 	app       = kingpin.New("subutai", "Subutai Agent")
