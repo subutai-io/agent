@@ -190,10 +190,10 @@ var (
 	prxyCreateCmd           = prxyCmd.Command("create", "Create proxy")
 	prxyCreateDomain        = prxyCreateCmd.Flag("domain", "proxy domain").Short('n').Required().String()
 	prxyCreateProtocol      = prxyCreateCmd.Flag("protocol", "protocol [http,https]").Short('p').Required().String()
-	prxyCreatePort          = prxyCreateCmd.Flag("external port", "port in range [80,443,1000-65536]").Short('e').Required().Int()
-	prxyCreateTag           = prxyCreateCmd.Flag("proxy tag", "unique tag for proxy").Short('t').Required().String()
-	prxyCreateLoadBalancing = prxyCreateCmd.Flag("load balancing", "load balancing [round_robin,hash,ip_hash,least_time]").Short('b').String()
-	prxyCreateCertificate   = prxyCreateCmd.Flag("x509 certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
+	prxyCreatePort          = prxyCreateCmd.Flag("port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	prxyCreateTag           = prxyCreateCmd.Flag("tag", "unique tag for proxy").Short('t').Required().String()
+	prxyCreateLoadBalancing = prxyCreateCmd.Flag("balancing", "load balancing policy [round_robin,hash,ip_hash,least_time]").Short('b').String()
+	prxyCreateCertificate   = prxyCreateCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
 	prxyCreateRedirect      = prxyCreateCmd.Flag("redirect", "redirect port 80 to 443").Short('r').Bool()
 	prxyCreateSslBackend    = prxyCreateCmd.Flag("sslbackend", "redirect port 80 to 443").Short('s').Bool()
 
@@ -209,11 +209,11 @@ var (
 
 	prxyServerAddCmd    = prxyServerCmd.Command("add", "Add proxied server")
 	prxyServerAddTag    = prxyServerAddCmd.Flag("tag", "proxy tag").Short('t').Required().String()
-	prxyServerAddSocket = prxyServerAddCmd.Flag("ip:port", "proxied server ip:port").Short('i').Required().String()
+	prxyServerAddSocket = prxyServerAddCmd.Flag("server", "ip:port").Short('s').Required().String()
 
 	prxyServerRemoveCmd    = prxyServerCmd.Command("remove", "Remove proxied server").Alias("rm").Alias("del")
 	prxyServerRemoveTag    = prxyServerRemoveCmd.Flag("tag", "proxy tag").Short('t').Required().String()
-	prxyServerRemoveSocket = prxyServerRemoveCmd.Flag("ip:port", "proxied server ip:port").Short('i').Required().String()
+	prxyServerRemoveSocket = prxyServerRemoveCmd.Flag("server", "ip:port").Short('s').Required().String()
 
 	//proxy command
 	proxyCmd       = app.Command("proxy", "Subutai reverse proxy")

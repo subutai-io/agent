@@ -36,7 +36,9 @@ func init() {
 
 func getDb(readOnly bool) (*storm.DB, error) {
 	boltDB, err := storm.Open(dbFilePath,
-		storm.BoltOptions(0600, &bolt.Options{Timeout: 15 * time.Second, ReadOnly: readOnly}))
+		//workaround: seems storm has bug related with read-only mode, it still tries to open db as read-write
+		storm.BoltOptions(0600, &bolt.Options{Timeout: 15 * time.Second, ReadOnly: false}))
+		//storm.BoltOptions(0600, &bolt.Options{Timeout: 15 * time.Second, ReadOnly: readOnly}))
 
 	if err != nil {
 		return nil, err
