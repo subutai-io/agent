@@ -116,7 +116,6 @@ func GetProxies(protocol string) []ProxyNServers {
 }
 
 //TODO extract balancing policies to constants
-//todo make mandatory parameter as required in CLI
 
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
 //subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
@@ -273,7 +272,6 @@ func applyConfig(tag string, creating bool) {
 }
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
-	//todo
 	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
@@ -321,7 +319,7 @@ func deleteProxy(proxy *db.Proxy) {
 	removeConfig(*proxy)
 
 	//remove domain certificates
-	//todo remove certs from relevant directory
+	//todo remove certs from relevant directory (make consistent naming between LE and self-signed certs)
 
 	proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)

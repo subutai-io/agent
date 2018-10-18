@@ -15,11 +15,6 @@ import (
 var (
 	dbFilePath = path.Join(config.Agent.DataPrefix, "agent.db")
 )
-/*TODO rules:
-1. Check for existing mappings only in db. DB must be the single place of authority
-2. For config files just write what is inside db, thus overwriting the existing file upon need.
-This way we dont care if configuration reside in separate files or single file
-*/
 
 func init() {
 	if !fs.FileExists(dbPath) {
