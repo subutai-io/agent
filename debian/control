@@ -45,5 +45,5 @@ Depends: gnupg1 | gnupg (<< 2.0.0~),
          ${shlibs:Depends}
 Conflicts: uidmap
 Suggests: ipfs
-Description: intelligent P2P cloud computing
- project allows users to build their private networks.
+Description: subutai agent
+ project allows to turn a host into subutai peer and is used together with subutai console

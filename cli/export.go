@@ -302,7 +302,7 @@ func upload(template, token string) error {
 		}
 	}()
 
-	resp, err := http.Post(config.CdnUrl+"/uploadTemplate", mpw.FormDataContentType(), r)
+	resp, err := http.Post(config.CdnUrl+"/template/upload", mpw.FormDataContentType(), r)
 
 	wg.Wait()
 
