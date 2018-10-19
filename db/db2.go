@@ -21,11 +21,11 @@ func init() {
 		db, err := storm.Open(dbFilePath, storm.BoltOptions(0600, &bolt.Options{ReadOnly: false}))
 		log.Check(log.ErrorLevel, "Creating database", err)
 		defer db.Close()
+
 		//init db structs
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&SshTunnel{}))
-		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&Proxy{}))
-		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&ProxiedServer{}))
-
+		log.Check(log.ErrorLevel, "Initializing proxy storage", db.Init(&Proxy{}))
+		log.Check(log.ErrorLevel, "Initializing proxied servers storage", db.Init(&ProxiedServer{}))
 	}
 }
 

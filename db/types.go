@@ -7,9 +7,9 @@ type Proxy struct {
 	Domain          string `storm:"index"`
 	Tag             string `storm:"unique"`
 	LoadBalancing   string
+	CertPath        string
 	Redirect80To443 bool
 	SslBackend      bool
-	IsLetsEncrypt   bool
 }
 
 type ProxiedServer struct {

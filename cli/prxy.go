@@ -12,6 +12,10 @@ import (
 	"os"
 	"strconv"
 	"github.com/subutai-io/agent/lib/common"
+	"io/ioutil"
+	"regexp"
+	"os/exec"
+	exec2 "github.com/subutai-io/agent/lib/exec"
 )
 
 const HTTP = "http"
@@ -58,7 +62,7 @@ server {
     error_page 497	https://$host$request_uri;
 	
     location / {
-        proxy_pass         http://{protocol}-{port}-{domain}; 
+        proxy_pass         http{ssl-backend}://{protocol}-{port}-{domain}; 
         proxy_set_header   X-Real-IP $remote_addr;
         proxy_set_header   Host $http_host;
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -180,10 +184,10 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		Domain:          domain,
 		Port:            port,
 		Tag:             tag,
+		CertPath:        certPath,
 		Redirect80To443: redirect80To443,
 		LoadBalancing:   loadBalancing,
 		SslBackend:      sslBackend,
-		IsLetsEncrypt:   protocol == HTTPS && certPath == "",
 	}
 
 	log.Check(log.ErrorLevel, "Saving proxy to db", db.SaveProxy(proxy))
@@ -242,27 +246,20 @@ func applyConfig(tag string, creating bool) {
 	proxiedServers, err := db.FindProxiedServers(tag, "")
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
 
-	//todo lock config file
 	if len(proxiedServers) > 0 {
-
 		//create config
 		createConfig(proxy, proxiedServers)
 	} else {
-		//todo make sure that empty backend servers dont crash nginx
 		if (creating) {
-
-			log.Debug("Creating initial config file")
-			if proxy.IsLetsEncrypt {
-				//1) create http config with LE section
-				//todo
-				//2) reload nginx
-				reloadNginx()
-				//3) run certbot
-				//todo
+			//Install certificates
+			if proxy.CertPath == "" {
+				installLECert(proxy)
 			} else {
-				//1) copy certs to self signed certs directory
-				//todo
+				installSelfSignedCert(proxy)
 			}
+
+			//return since we dont apply config for newly created proxy without added servers
+			return
 		} else {
 			deleteProxy(proxy)
 		}
@@ -271,8 +268,64 @@ func applyConfig(tag string, creating bool) {
 	reloadNginx()
 }
 
+func installLECert(proxy *db.Proxy) {
+	makeDir(path.Join(letsEncryptWebRootDir, proxy.Domain))
+	//1) create http config with LE section
+	generateTempLEConfig(proxy)
+	//2) reload nginx
+	reloadNginx()
+	//3) run certbot
+	obtainLECerts(proxy)
+	//4) remove http config created in step 1
+	removeTempLEConfig(proxy)
+}
+
+func obtainLECerts(proxy *db.Proxy) {
+	err := exec2.Exec("certbot", "certonly", "--config-dir", letsEncryptDir,
+		"--email", "hostmaster@subutai.io", "--agree-tos", "--webroot",
+		"--webroot-path", path.Join(letsEncryptWebRootDir, proxy.Domain),
+		"-d", proxy.Domain)
+	log.Check(log.ErrorLevel, "Obtaining LE certs", err)
+}
+
+func removeCert(proxy *db.Proxy) {
+	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	if proxy.CertPath == "" {
+		//LE certs
+		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
+	}
+	log.Check(log.ErrorLevel, "Removing certs", fs.DeleteDir(certDir))
+}
+
+func installSelfSignedCert(proxy *db.Proxy) {
+	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	makeDir(certDir)
+	crt, key := gpg.ParsePem(proxy.CertPath)
+	log.Check(log.ErrorLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
+	log.Check(log.ErrorLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
+}
+
+func generateTempLEConfig(proxy *db.Proxy) {
+	effectiveConfig := webConfig + letsEncryptWellKnownSection
+	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", HTTP, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(80), -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+
+	//remove other placeholders
+	r := regexp.MustCompile("{\\S+}")
+	effectiveConfig = r.ReplaceAllString(effectiveConfig, "")
+
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"), []byte(effectiveConfig), 0744))
+}
+
+func removeTempLEConfig(proxy *db.Proxy) {
+	log.Check(log.ErrorLevel, "Removing nginx config", fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf")))
+}
+
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
-	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
+	//todo lock config file
+
+	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
@@ -303,7 +356,7 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 
 	//ssl
 	sslConfig := ""
-	if proxy.IsLetsEncrypt {
+	if proxy.CertPath == "" {
 		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", proxy.Domain, -1)
 	} else {
 
@@ -311,15 +364,28 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
 
-	println(effectiveConfig)
+	sslBackend := ""
+	if proxy.SslBackend {
+		sslBackend = "s"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{ssl-backend}", sslBackend, -1)
+
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(effectiveConfig), 0744))
+}
+
+func removeConfig(proxy db.Proxy) {
+	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
+	if !os.IsNotExist(err) {
+		log.Check(log.ErrorLevel, "Removing nginx config", err)
+	}
 }
 
 func deleteProxy(proxy *db.Proxy) {
 	//remove cfg file
 	removeConfig(*proxy)
 
-	//remove domain certificates
-	//todo remove certs from relevant directory (make consistent naming between LE and self-signed certs)
+	//remove certificates
+	removeCert(proxy)
 
 	proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
@@ -333,23 +399,9 @@ func deleteProxy(proxy *db.Proxy) {
 	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
 }
 
-func composeConfigPath(proxy db.Proxy) string {
-	return proxy.Protocol + "-" + proxy.Domain + "-" + strconv.Itoa(proxy.Port)
-}
-
-func removeConfig(proxy db.Proxy) {
-	cfgPath := composeConfigPath(proxy)
-	err := fs.DeleteFile(cfgPath)
-	if !os.IsNotExist(err) {
-		log.Check(log.ErrorLevel, "Removing config file "+cfgPath, err)
-	}
-}
-
 func reloadNginx() {
-	//todo uncomment
-	log.Debug("Reloading nginx")
-	//out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
-	//log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
+	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
+	log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
 
 //utilities
@@ -372,7 +424,6 @@ func checkNotNil(object interface{}, errMsg string, vals ...interface{}) {
 }
 
 func checkState(condition bool, errMsg string, vals ...interface{}) {
-	log.Debug(condition)
 	checkCondition(condition, func() {
 		log.Error(fmt.Sprintf(errMsg, vals...))
 	})

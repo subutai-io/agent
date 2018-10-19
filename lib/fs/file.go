@@ -87,3 +87,7 @@ func Sha256Sum(filePath string) (string, error) {
 func DeleteFile(filePath string) error {
 	return os.Remove(filePath)
 }
+
+func DeleteDir(dirPath string) error {
+	return os.RemoveAll(dirPath)
+}
