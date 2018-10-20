@@ -119,8 +119,6 @@ func GetProxies(protocol string) []ProxyNServers {
 	return proxyNServers
 }
 
-//TODO extract balancing policies to constants
-
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
 //subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
 func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80To443, sslBackend bool, certPath string) {
@@ -323,8 +321,6 @@ func removeTempLEConfig(proxy *db.Proxy) {
 }
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
-	//todo lock config file
-
 	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
