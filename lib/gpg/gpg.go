@@ -374,7 +374,8 @@ func ParsePem(cert string) (crt, key []byte) {
 	var err error
 	if key, err = exec.Command("openssl", "pkey", "-in", cert).Output(); err == nil {
 		f, err := ioutil.ReadFile(cert)
-		if !log.Check(log.ErrorLevel, "Cannot read file "+cert, err) {
+		if !log.Check(log.ErrorLevel, "Reading cert "+cert, err) {
+			//todo remove private key from cert
 			crt = bytes.Replace(f, key, []byte(""), -1)
 		}
 	}

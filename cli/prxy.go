@@ -87,8 +87,8 @@ const letsEncryptSslDirectives = `
 //place-holders: {domain}
 const selfSignedSslDirectives = `
     ssl on;
-    ssl_certificate /var/lib/subutai/web/ssl/{domain}.crt;
-    ssl_certificate_key /var/lib/subutai/web/ssl/{domain}.key;
+    ssl_certificate /var/lib/subutai/web/ssl/{domain}/cert.pem;
+    ssl_certificate_key /var/lib/subutai/web/ssl/{domain}/privkey.pem;
 `
 
 var selfSignedCertsDir = path.Join(config.Agent.DataPrefix, "/web/ssl")
@@ -169,9 +169,17 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 
 	//if redirection is requested (https only, otherwise ignored), check if port 80 for http+domain is not already reserved
 	if protocol == HTTPS && redirect80Port {
+		//check http proxies
 		proxies, err := db.FindProxies(HTTP, domain, 80)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		checkState(len(proxies) == 0, "Proxy to http://%s:80 already exists, can not redirect", domain)
+		//check https proxies
+		proxies, err = db.FindProxies(HTTPS, domain, 0)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		for _, prxy := range proxies {
+			checkState(!prxy.Redirect80Port,
+				"Proxy to https://%s:%d with port 80 redirection already exists, can not redirect", domain, prxy.Port)
+		}
 	} else if protocol == HTTP {
 		//check if https proxy with redirection exists for the same domain
 		proxies, err := db.FindProxies(HTTPS, domain, 0)
@@ -373,11 +381,11 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	sslConfig := ""
 	if proxy.CertPath == "" {
 		//adjust path to LE cert
-		domain := figureOutDomainFolderName(proxy.Domain)
-		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", domain, -1)
+		certDir := figureOutDomainFolderName(proxy.Domain)
+		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
 	} else {
-
-		sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", proxy.Domain, -1)
+		certDir := proxy.Domain + "-" + strconv.Itoa(proxy.Port)
+		sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", certDir, -1)
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
 
