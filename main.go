@@ -194,8 +194,8 @@ var (
 	prxyCreateTag           = prxyCreateCmd.Flag("tag", "unique tag for proxy").Short('t').Required().String()
 	prxyCreateLoadBalancing = prxyCreateCmd.Flag("balancing", "load balancing policy [rr(round_robin),sticky(ip_hash),lcon(least_conn)]").Short('b').String()
 	prxyCreateCertificate   = prxyCreateCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
-	prxyCreateRedirect      = prxyCreateCmd.Flag("redirect", "redirect port 80 to 443").Short('r').Bool()
-	prxyCreateSslBackend    = prxyCreateCmd.Flag("sslbackend", "redirect port 80 to 443").Short('s').Bool()
+	prxyCreateRedirect      = prxyCreateCmd.Flag("redirect", "redirect port 80 to external port").Short('r').Bool()
+	prxyCreateSslBackend    = prxyCreateCmd.Flag("sslbackend", "use ssl backend in https upstream").Short('s').Bool()
 
 	prxyListCmd      = prxyCmd.Command("list", "List proxies").Alias("ls")
 	prxyListProtocol = prxyListCmd.Flag("protocol", "filer by protocol [http,https]").Short('p').String()
@@ -412,7 +412,7 @@ func main() {
 			if *prxyListTag == "" || *prxyListTag == proxy.Tag {
 				servers := v.Servers
 				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%s\t%t\t%t\t%t\t%t",
-					proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, proxy.LoadBalancing, proxy.Redirect80To443,
+					proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, proxy.LoadBalancing, proxy.Redirect80Port,
 					proxy.SslBackend, proxy.CertPath == "", len(servers) > 0))
 			}
 		}
