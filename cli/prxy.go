@@ -16,6 +16,8 @@ import (
 	"regexp"
 	"os/exec"
 	exec2 "github.com/subutai-io/agent/lib/exec"
+	"path/filepath"
+	"sort"
 )
 
 const HTTP = "http"
@@ -53,7 +55,7 @@ upstream {protocol}-{port}-{domain}{
 }                                                                                                                                                                                       
 
 server {
-    listen {port}
+    listen {port};
     server_name {domain};
     client_max_body_size 1G;
 	
@@ -68,6 +70,8 @@ server {
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
     }
+
+	{well-known}
 }
 
 `
@@ -204,6 +208,7 @@ func RemoveProxy(tag string) {
 }
 
 func AddProxiedServer(tag, socket string) {
+	//todo check socket: format and probably accessibility
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
@@ -282,7 +287,7 @@ func obtainLECerts(proxy *db.Proxy) {
 	err := exec2.Exec("certbot", "certonly", "--config-dir", letsEncryptDir,
 		"--email", "hostmaster@subutai.io", "--agree-tos", "--webroot",
 		"--webroot-path", path.Join(letsEncryptWebRootDir, proxy.Domain),
-		"-d", proxy.Domain)
+		"-d", proxy.Domain, "-n")
 	log.Check(log.ErrorLevel, "Obtaining LE certs", err)
 }
 
@@ -304,10 +309,12 @@ func installSelfSignedCert(proxy *db.Proxy) {
 }
 
 func generateTempLEConfig(proxy *db.Proxy) {
-	effectiveConfig := webConfig + letsEncryptWellKnownSection
+	effectiveConfig := webConfig
+	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", HTTP, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(80), -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", "    server localhost:81;", -1)
 
 	//remove other placeholders
 	r := regexp.MustCompile("{\\S+}")
@@ -325,6 +332,7 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", "", -1)
 
 	if proxy.Redirect80To443 {
 		effectiveConfig += strings.Replace(redirect80to443Section, "{domain}", proxy.Domain, -1)
@@ -346,14 +354,16 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	//servers
 	serversConfig := ""
 	for i := 0; i < len(servers); i++ {
-		serversConfig += "    " + servers[i].Socket + ";\n"
+		serversConfig += "    server " + servers[i].Socket + ";\n"
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
 
 	//ssl
 	sslConfig := ""
 	if proxy.CertPath == "" {
-		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", proxy.Domain, -1)
+		//adjust path to LE cert
+		domain := figureOutDomainFolderName(proxy.Domain)
+		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", domain, -1)
 	} else {
 
 		sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", proxy.Domain, -1)
@@ -369,7 +379,38 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(effectiveConfig), 0744))
 }
 
+//workaround for https://github.com/certbot/certbot/issues/2128
+func figureOutDomainFolderName(domain string) string {
+	var validCertDirName = regexp.MustCompile(fmt.Sprintf("^%s(-\\d\\d\\d\\d)?$", domain))
+
+	files, err := ioutil.ReadDir(letsEncryptCertsDir)
+	log.Check(log.ErrorLevel, "Reading certificate directory", err)
+
+	//collect all matching directory names
+	res := []string{}
+	for _, f := range files {
+		if f.IsDir() && ( validCertDirName.MatchString(f.Name())) {
+			res = append(res, filepath.Join(f.Name()))
+		}
+	}
+
+	//sort
+	sort.Strings(res)
+
+	//reverse
+	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
+		res[i], res[j] = res[j], res[i]
+	}
+
+	checkState(len(res) > 0, "Certificates for domain %s not found", domain)
+
+	//since certbot does not generate certificates if they already exist, we assume that lexicographically last one is the dir
+	return res[0]
+}
+
 func removeConfig(proxy db.Proxy) {
+	//remove tmp config just in case
+	fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"))
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
 	if !os.IsNotExist(err) {
 		log.Check(log.ErrorLevel, "Removing nginx config", err)
