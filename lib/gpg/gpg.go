@@ -368,20 +368,6 @@ func ValidatePem(pathToCert string) bool {
 	return true
 }
 
-//todo move to ssl
-// ParsePem return parsed OpenSSL x509 certificate.
-func ParsePem(cert string) (crt, key []byte) {
-	var err error
-	if key, err = exec.Command("openssl", "pkey", "-in", cert).Output(); err == nil {
-		f, err := ioutil.ReadFile(cert)
-		if !log.Check(log.ErrorLevel, "Reading cert "+cert, err) {
-			//todo remove private key from cert
-			crt = bytes.Replace(f, key, []byte(""), -1)
-		}
-	}
-	return crt, key
-}
-
 func ExtractKeyID(k []byte) string {
 	command := exec.Command(GPG)
 	stdin, err := command.StdinPipe()

@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
 	"path"
+	"github.com/subutai-io/agent/agent/util"
 )
 
 var (
@@ -147,7 +148,7 @@ func addDomain(vlan, domain, cert string) {
 		}
 
 		fs.Copy(path.Join(conftmpl, "vhost-ssl.example"), vlanConf)
-		crt, key := gpg.ParsePem(cert)
+		crt, key := util.ParsePem(cert)
 		err := ioutil.WriteFile(path.Join(webSslPath, currentDT+".crt"), crt, 0644)
 		if err != nil {
 			log.Info("Cannot create crt file " + path.Join(webSslPath, currentDT+".crt"))

@@ -17,6 +17,7 @@ import (
 	"github.com/nightlyone/lockfile"
 	"path"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/agent/util"
 )
 
 var (
@@ -237,7 +238,7 @@ func newConfig(protocol, sockExt, domain, cert string, sslbcknd bool) {
 		}
 		addLine(conf, "upstream DOMAIN-upstream {", "upstream https-"+strings.Replace(sockExt, ":", "-", -1)+"-"+domain+" {", true)
 
-		crt, key := gpg.ParsePem(cert)
+		crt, key := util.ParsePem(cert)
 		log.Check(log.WarnLevel, "Writing certificate body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".crt"), crt, 0644))
 		log.Check(log.WarnLevel, "Writing key body", ioutil.WriteFile(path.Join(webSslPath, "https-"+sockExt+"-"+domain+".key"), key, 0644))
 

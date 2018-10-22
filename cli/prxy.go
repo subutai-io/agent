@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 	"net"
+	"github.com/subutai-io/agent/agent/util"
 )
 
 const HTTP = "http"
@@ -322,7 +323,7 @@ func removeCert(proxy *db.Proxy) {
 func installSelfSignedCert(proxy *db.Proxy) {
 	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
 	makeDir(certDir)
-	crt, key := gpg.ParsePem(proxy.CertPath)
+	crt, key := util.ParsePem(proxy.CertPath)
 	log.Check(log.ErrorLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
 	log.Check(log.ErrorLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
 }
