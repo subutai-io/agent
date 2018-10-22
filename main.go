@@ -406,12 +406,14 @@ func main() {
 		cli.CreateProxy(*prxyCreateProtocol, *prxyCreateDomain, *prxyCreateLoadBalancing, *prxyCreateTag, *prxyCreatePort, *prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate)
 
 	case prxyListCmd.FullCommand():
-		lines := []string{"Tag\tProtocol\tPort\tDomain\tApplied"}
+		lines := []string{"Tag\tProtocol\tPort\tDomain\tBalancing\tRedirected\tSslBackend\tLE\tApplied"}
 		for _, v := range cli.GetProxies(*prxyListProtocol) {
 			proxy := v.Proxy
 			if *prxyListTag == "" || *prxyListTag == proxy.Tag {
 				servers := v.Servers
-				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%t", proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, len(servers) > 0))
+				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%s\t%t\t%t\t%t\t%t",
+					proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, proxy.LoadBalancing, proxy.Redirect80To443,
+					proxy.SslBackend, proxy.CertPath == "", len(servers) > 0))
 			}
 		}
 		output(lines)
