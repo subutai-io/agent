@@ -18,6 +18,7 @@ import (
 	exec2 "github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
 	"sort"
+	"net"
 )
 
 const HTTP = "http"
@@ -208,7 +209,6 @@ func RemoveProxy(tag string) {
 }
 
 func AddProxiedServer(tag, socket string) {
-	//todo check socket: format and probably accessibility
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
@@ -216,6 +216,8 @@ func AddProxiedServer(tag, socket string) {
 	proxiedServers, err := db.FindProxiedServers(tag, socket)
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
 	checkState(len(proxiedServers) == 0, "Proxied server already exists")
+
+	checkArgument(isValidSocket(socket), "Server socket is not valid")
 
 	proxiedServer := &db.ProxiedServer{
 		ProxyTag: tag,
@@ -262,10 +264,10 @@ func applyConfig(tag string, creating bool) {
 					installSelfSignedCert(proxy)
 				}
 			}
-			//return since we don't apply config for newly created proxy without added servers
+			//return since we don't apply config for newly created proxy without added servers, no need to reload nginx
 			return
 		} else {
-			deleteProxy(proxy)
+			removeConfig(*proxy)
 		}
 	}
 
@@ -443,6 +445,17 @@ func reloadNginx() {
 }
 
 //utilities
+
+func isValidSocket(socket string) bool {
+	if addr := strings.Split(socket, ":"); len(addr) == 2 {
+		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
+			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 func makeDir(path string) {
 	if !fs.FileExists(path) {
