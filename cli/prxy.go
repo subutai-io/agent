@@ -254,14 +254,15 @@ func applyConfig(tag string, creating bool) {
 		createConfig(proxy, proxiedServers)
 	} else {
 		if (creating) {
-			//Install certificates
-			if proxy.CertPath == "" {
-				installLECert(proxy)
-			} else {
-				installSelfSignedCert(proxy)
+			//Install certificates for https
+			if proxy.Protocol == HTTPS {
+				if proxy.CertPath == "" {
+					installLECert(proxy)
+				} else {
+					installSelfSignedCert(proxy)
+				}
 			}
-
-			//return since we dont apply config for newly created proxy without added servers
+			//return since we don't apply config for newly created proxy without added servers
 			return
 		} else {
 			deleteProxy(proxy)
