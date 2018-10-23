@@ -49,6 +49,21 @@ server {
 
 `
 
+//place-holders: {protocol}, {port}, {load-balancing}, {servers},
+const streamConfig = `
+upstream {protocol}-{port} {
+    {load-balancing}
+
+{servers}
+}
+
+server {
+	listen {port};
+	proxy_pass {protocol}-{port};
+}
+
+`
+
 //http & https
 //place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
 const webConfig = `
@@ -142,6 +157,11 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	//check if port is specified and valid
 	checkArgument(port == 80 || port == 443 || (port >= 1000 && port <= 65536),
 		"External port must be one of [80, 443, 1000-65536] ")
+
+	//check domain
+	if protocol == HTTP || protocol == HTTPS {
+		checkArgument(domain != "", "Domain is required for http/https proxies")
+	}
 
 	if loadBalancing != "" {
 		checkArgument(loadBalancing == "rr" || loadBalancing == "lcon" ||
@@ -350,6 +370,46 @@ func removeTempLEConfig(proxy *db.Proxy) {
 }
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
+	cfg := ""
+
+	if proxy.Protocol == HTTPS || proxy.Protocol == HTTP {
+		cfg = createHttpHttpsConfig(proxy, servers)
+	} else {
+		cfg = createTcpUdpConfig(proxy, servers)
+	}
+
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+}
+
+func createTcpUdpConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
+	//place-holders: {protocol}, {port}, {load-balancing}, {servers},
+	effectiveConfig := strings.Replace(streamConfig, "{protocol}", proxy.Protocol, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
+
+	//load balancing
+	loadBalancing := ""
+	switch proxy.LoadBalancing {
+	case "rr":
+		//no-op
+	case "sticky":
+		loadBalancing = "ip_hash;"
+	case "lcon":
+		loadBalancing = "least_conn;"
+
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{load-balancing}", loadBalancing, -1)
+
+	//servers
+	serversConfig := ""
+	for i := 0; i < len(servers); i++ {
+		serversConfig += "    server " + servers[i].Socket + ";\n"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
+
+	return effectiveConfig
+}
+
+func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
 	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
@@ -399,7 +459,7 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl-backend}", sslBackend, -1)
 
-	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(effectiveConfig), 0744))
+	return effectiveConfig
 }
 
 //workaround for https://github.com/certbot/certbot/issues/2128
@@ -434,6 +494,7 @@ func figureOutDomainFolderName(domain string) string {
 func removeConfig(proxy db.Proxy) {
 	//remove tmp config just in case
 	fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"))
+	//remove config
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
 	if !os.IsNotExist(err) {
 		log.Check(log.ErrorLevel, "Removing nginx config", err)
@@ -444,8 +505,10 @@ func deleteProxy(proxy *db.Proxy) {
 	//remove cfg file
 	removeConfig(*proxy)
 
-	//remove certificates
-	removeCert(proxy)
+	if proxy.Protocol == HTTPS {
+		//remove certificates
+		removeCert(proxy)
+	}
 
 	proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
 	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
