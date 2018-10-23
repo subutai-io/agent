@@ -274,7 +274,7 @@ func applyConfig(tag string, creating bool) {
 		//create config
 		createConfig(proxy, proxiedServers)
 	} else {
-		if (creating) {
+		if creating {
 			//Install certificates for https
 			if proxy.Protocol == HTTPS {
 				if proxy.CertPath == "" {
@@ -367,7 +367,7 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	case "rr":
 		//no-op
 	case "sticky":
-		loadBalancing = "ip_hash;";
+		loadBalancing = "ip_hash;"
 	case "lcon":
 		loadBalancing = "least_conn;"
 
@@ -410,7 +410,7 @@ func figureOutDomainFolderName(domain string) string {
 	log.Check(log.ErrorLevel, "Reading certificate directory", err)
 
 	//collect all matching directory names
-	res := []string{}
+	var res []string
 	for _, f := range files {
 		if f.IsDir() && ( validCertDirName.MatchString(f.Name())) {
 			res = append(res, filepath.Join(f.Name()))
