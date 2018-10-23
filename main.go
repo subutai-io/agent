@@ -189,7 +189,7 @@ var (
 
 	prxyCreateCmd           = prxyCmd.Command("create", "Create proxy")
 	prxyCreateDomain        = prxyCreateCmd.Flag("domain", "proxy domain").Short('n').Required().String()
-	prxyCreateProtocol      = prxyCreateCmd.Flag("protocol", "protocol [http,https]").Short('p').Required().String()
+	prxyCreateProtocol      = prxyCreateCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
 	prxyCreatePort          = prxyCreateCmd.Flag("port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
 	prxyCreateTag           = prxyCreateCmd.Flag("tag", "unique tag for proxy").Short('t').Required().String()
 	prxyCreateLoadBalancing = prxyCreateCmd.Flag("balancing", "load balancing policy [rr(round_robin),sticky(ip_hash),lcon(least_conn)]").Short('b').String()
