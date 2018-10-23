@@ -191,12 +191,42 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	log.Check(log.ErrorLevel, "Checking proxy in db", err)
 	checkState(len(proxies) == 0, "Proxy with such combination of protocol, domain and port already exists")
 
-	//if redirection is requested (https only, otherwise ignored), check if port 80 for http+domain is not already reserved
-	if (protocol == HTTPS && redirect80Port) || port == 80 {
-		//check all proxies with 80 port
-		proxies, err := db.FindProxies("", domain, 80)
+	if protocol == TCP || protocol == UDP {
+		//check port range
+		checkArgument(port >= 1000, "For tcp/udp protocols port must be >= 1000")
+
+		//check port availability
+		proxies, err := db.FindProxies("", "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
-		checkState(len(proxies) == 0, "Proxy to %s:80 already exists, can not redirect", domain)
+
+		checkCondition(len(proxies) == 0, func() {
+			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
+				proxies[0].Protocol, proxies[0].Domain, port))
+		})
+
+	} else {
+		//for http/https check if tcp/udp is not reserved
+		//check port availability
+		tcpProxies, err := db.FindProxies(TCP, "", port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		udpProxies, err := db.FindProxies(UDP, "", port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+		proxies := append(tcpProxies, udpProxies...)
+
+		checkCondition(len(proxies) == 0, func() {
+			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
+				proxies[0].Protocol, proxies[0].Domain, port))
+		})
+	}
+
+	//if redirection is requested (https only, otherwise ignored), check if port 80 for http+domain is not already reserved
+	if protocol == HTTPS && redirect80Port {
+		//check all http proxies with 80 port
+		proxies, err := db.FindProxies(HTTP, domain, 80)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		checkState(len(proxies) == 0, "Proxy to http://%s:80 already exists, can not redirect", domain)
+
 		//check https proxies with redirect to 80 port
 		proxies, err = db.FindProxies(HTTPS, domain, 0)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
@@ -204,11 +234,13 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 			checkState(!prxy.Redirect80Port,
 				"Proxy to https://%s:%d with port 80 redirection already exists, can not redirect", domain, prxy.Port)
 		}
-	} else {
-		//check all proxies with the same port
-		proxies, err := db.FindProxies("", domain, port)
+	} else if protocol == HTTP && port == 80 {
+		proxies, err = db.FindProxies(HTTPS, domain, 0)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
-		checkState(len(proxies) == 0, "Proxy to %s:%d already exists, can not create proxy", domain, port)
+		for _, prxy := range proxies {
+			checkState(!prxy.Redirect80Port,
+				"Proxy to https://%s:%d with port 80 redirection already exists, can not create proxy", domain, prxy.Port)
+		}
 	}
 
 	//make optional flags consistent
