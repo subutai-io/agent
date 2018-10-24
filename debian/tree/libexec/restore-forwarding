@@ -9,7 +9,7 @@ function checkNRestore(){
     MISSING_IPS=()
 
     # iterate over IPs of running containers
-    for containerIp in `subutai list -i | grep eth0 | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+    for containerIp in `subutai list i | grep eth0 | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
 
         MISSING=1
 
@@ -37,7 +37,7 @@ function checkNRestore(){
 
         port=$(expr 10000 + `echo $ipaddr | cut -d'.' -f4`)
 
-        vlan=$(subutai list -i | grep $ipaddr | cut -f1 | awk -F'-' '{print $(NF-1)}')
+        vlan=$(subutai list i | grep $ipaddr | cut -f1 | awk -F'-' '{print $(NF-1)}')
 
         iptables -t nat -A PREROUTING -i p2p$vlan -p tcp -m tcp --dport $port -j DNAT --to-destination $ipaddr:22
 
