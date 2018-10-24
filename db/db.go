@@ -446,3 +446,47 @@ func (i *Db) PortMapList(protocol string) (list []string, err error) {
 	}
 	return list, err
 }
+
+// temporary code for port mapping migration >>>
+
+type PortMap struct {
+	Protocol       string
+	ExternalSocket string
+	InternalSocket string
+	Domain         string
+}
+
+func (i *Db) GetAllPortMappings(protocol string) (list []PortMap, err error) {
+	var instance *bolt.DB
+	if instance, err = openDb(true); err == nil {
+		defer instance.Close()
+		instance.View(func(tx *bolt.Tx) error {
+			if b := tx.Bucket(portmap); b != nil {
+				if b = b.Bucket([]byte(protocol)); b != nil {
+					b.ForEach(func(k, v []byte) error {
+						if c := b.Bucket(k); c != nil {
+							c.ForEach(func(kk, vv []byte) error {
+								if d := c.Bucket(kk); d != nil {
+									d.ForEach(func(kkk, vvv []byte) error {
+										if d.Bucket(kkk) != nil {
+											mapping := &PortMap{Protocol: protocol, ExternalSocket: string(k), InternalSocket: string(kkk)}
+											if protocol == "http" || protocol == "https" {
+												mapping.Domain = string(kk)
+											}
+											list = append(list, *mapping)
+										}
+										return nil
+									})
+								}
+								return nil
+							})
+						}
+						return nil
+					})
+				}
+			}
+			return nil
+		})
+	}
+	return list, err
+}

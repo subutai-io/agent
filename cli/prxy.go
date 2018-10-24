@@ -119,6 +119,41 @@ func init() {
 	makeDir(letsEncryptDir)
 	makeDir(letsEncryptWebRootDir)
 	makeDir(letsEncryptCertsDir)
+
+	migrate()
+}
+
+func migrate() {
+	//todo we need to convert separate mappings into ProxyNServers
+	//for tcp and udp use protocol and external socket as key
+	//for http and https use protocol ,external socket and domain as key
+
+	//for non https mappings just create proxies
+	//for https mappings we need to handle certs too
+	//for https mappings we need to make redirect == true by default
+	//that means that we need to migrate https mappings first and then migrate others
+	//and check if we can create mapping for port 80 if there is already such mapping for https
+	//for http check if domain is the same
+	//for udp/tcp just check if external port is >= 1000, skip the ones that dont meet the requirement
+	var nonHttpsMappings []db.PortMap
+	for _, v := range []string{"tcp", "udp", "http"} {
+		l, err := db.INSTANCE.GetAllPortMappings(v)
+		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
+			nonHttpsMappings = append(nonHttpsMappings, l...)
+		}
+	}
+
+
+	var httpsMappings []db.PortMap
+	for _, v := range []string{ "https"} {
+		l, err := db.INSTANCE.GetAllPortMappings(v)
+		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
+			httpsMappings = append(httpsMappings, l...)
+		}
+	}
+
+	//todo ignore balancing, it will be default roundrobin (i.e. empty)
+
 }
 
 type ProxyNServers struct {
