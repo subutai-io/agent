@@ -130,12 +130,17 @@ func cleanupNetStat(vlan string) {
 }
 
 func removePortMap(name string) {
-	if portMap, err := db.INSTANCE.GetContainerPortMapping(name);
-		!log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-		for _, v := range portMap {
-			RemovePortMapping(v["protocol"], v["internal"], v["external"], v["domain"])
+	containerIp := container.GetIp(name)
+	servers, err := db.FindProxiedServers("", "")
+	if !log.Check(log.WarnLevel, "Checking port mappings", err) {
+		for _, server := range servers {
+			if strings.HasPrefix(server.Socket, containerIp) {
+				RemoveProxiedServer(server.ProxyTag, server.Socket)
+			}
 		}
 	}
+
+	//todo shall we remove empty proxies?
 }
 
 type gradedTemplate struct {
