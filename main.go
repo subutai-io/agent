@@ -392,8 +392,9 @@ func main() {
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
 
 	case mapAddCmd.FullCommand():
-		cli.AddPortMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
-			*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
+		log.Error("Please use \"subutai prxy\" command. This command is deprecated")
+		//cli.AddPortMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
+		//	*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
 		cli.RemovePortMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
 			*mapRemoveDomain)
