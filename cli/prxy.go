@@ -190,7 +190,7 @@ func Migrate() {
 				Tag:            v.Proxy.Tag,
 				CertPath:       "/tmp/" + certName,
 				Redirect80Port: true,
-				LoadBalancing:  "",
+				LoadBalancing:  "rr",
 				SslBackend:     false,
 			}
 
@@ -245,7 +245,7 @@ func Migrate() {
 				Tag:            v.Proxy.Tag,
 				CertPath:       "",
 				Redirect80Port: false,
-				LoadBalancing:  "",
+				LoadBalancing:  "rr",
 				SslBackend:     false,
 			}
 			//create proxy
@@ -287,7 +287,7 @@ func Migrate() {
 			Domain:         v.Proxy.Domain,
 			Port:           v.Proxy.Port,
 			Tag:            v.Proxy.Tag,
-			CertPath:       "",
+			CertPath:       "rr",
 			Redirect80Port: false,
 			LoadBalancing:  "",
 			SslBackend:     false,
