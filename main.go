@@ -340,6 +340,9 @@ func main() {
 
 	vars.IsDaemon = input == daemonCmd.FullCommand()
 
+	//todo temp, remove in one version
+	cli.Migrate()
+
 	switch input {
 
 	case listContainers.FullCommand():

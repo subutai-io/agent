@@ -24,6 +24,7 @@ func MngInit(templateRef string) {
 	container.Start(container.Management)
 
 	//TODO move mapping functions from cli package and get rid of exec
+	//TODO use new subutai prxy binding
 	log.Check(log.WarnLevel, "Exposing port 8443",
 		exec.Command("subutai", "map", "add", "-p", "tcp", "-i", "10.10.10.1:8443", "-e", "8443").Run())
 	log.Check(log.WarnLevel, "Exposing port 8444",

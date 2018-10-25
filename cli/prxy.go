@@ -120,40 +120,213 @@ func init() {
 	makeDir(letsEncryptWebRootDir)
 	makeDir(letsEncryptCertsDir)
 
-	migrate()
 }
 
-func migrate() {
-	//todo we need to convert separate mappings into ProxyNServers
-	//for tcp and udp use protocol and external socket as key
-	//for http and https use protocol ,external socket and domain as key
-
-	//for non https mappings just create proxies
-	//for https mappings we need to handle certs too
-	//for https mappings we need to make redirect == true by default
-	//that means that we need to migrate https mappings first and then migrate others
-	//and check if we can create mapping for port 80 if there is already such mapping for https
-	//for http check if domain is the same
-	//for udp/tcp just check if external port is >= 1000, skip the ones that dont meet the requirement
-	var nonHttpsMappings []db.PortMap
-	for _, v := range []string{"tcp", "udp", "http"} {
+func Migrate() {
+	log.Debug("MIGRATION STARTED")
+	var streamMappings []db.PortMap
+	for _, v := range []string{"tcp", "udp"} {
 		l, err := db.INSTANCE.GetAllPortMappings(v)
 		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
-			nonHttpsMappings = append(nonHttpsMappings, l...)
+			streamMappings = append(streamMappings, l...)
+		}
+	}
+	streamMap := make(map[string]*ProxyNServers) //key format "protocol_externalsocket"
+	for _, m := range streamMappings {
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		key := fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)
+		streamMap[key] = &ProxyNServers{Proxy: db.Proxy{
+			Domain:   m.Domain,
+			Protocol: m.Protocol,
+			Port:     port,
+			Tag:      key,
+		}, Servers: []db.ProxiedServer{}}
+	}
+
+	for _, m := range streamMappings {
+		portMap := streamMap[fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)]
+		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
+	}
+
+	var webMappings []db.PortMap
+	for _, v := range []string{"http", "https"} {
+		l, err := db.INSTANCE.GetAllPortMappings(v)
+		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
+			webMappings = append(webMappings, l...)
+		}
+	}
+	webMap := make(map[string]*ProxyNServers) //key format "protocol_domain_externalsocket"
+	for _, m := range webMappings {
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		key := fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)
+		webMap[key] = &ProxyNServers{Proxy: db.Proxy{
+			Domain:   m.Domain,
+			Protocol: m.Protocol,
+			Port:     port,
+			Tag:      key,
+		}, Servers: []db.ProxiedServer{}}
+	}
+
+	for _, m := range webMappings {
+		portMap := webMap[fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)]
+		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
+	}
+
+	if len(streamMap) == 0 || len(webMap) == 0 {
+		return
+	}
+
+	//migrate https
+	for _, v := range webMap {
+		if v.Proxy.Protocol == HTTPS {
+			//copy cert into temp file
+			certName := fmt.Sprintf("%s-0.0.0.0:%d-%s", v.Proxy.Protocol, v.Proxy.Port, v.Proxy.Domain)
+			_, err := exec2.ExecuteWithBash("cat " + path.Join(selfSignedCertsDir, certName+".crt") + " " + path.Join(selfSignedCertsDir, certName+".key") + " > /tmp/" + certName)
+			log.Check(log.WarnLevel, "Copying certificate", err)
+			proxy := &db.Proxy{
+				Protocol:       v.Proxy.Protocol,
+				Domain:         v.Proxy.Domain,
+				Port:           v.Proxy.Port,
+				Tag:            v.Proxy.Tag,
+				CertPath:       "/tmp/" + certName,
+				Redirect80Port: true,
+				LoadBalancing:  "",
+				SslBackend:     false,
+			}
+
+			//create proxy
+			log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+			//copy certs
+			certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+			log.Check(log.WarnLevel, "Creating cert dir", os.MkdirAll(certDir, 0755))
+			crt, key := util.ParsePem(proxy.CertPath)
+			log.Check(log.WarnLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
+			log.Check(log.WarnLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
+
+			//add servers
+			for _, s := range v.Servers {
+				proxiedServer := &db.ProxiedServer{
+					ProxyTag: s.ProxyTag,
+					Socket:   s.Socket,
+				}
+
+				log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+			}
+
+			cfg := createHttpHttpsConfig(proxy, v.Servers)
+			//apply config
+			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+			//remove old mapping
+			for _, server := range v.Servers {
+				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
+			}
+
 		}
 	}
 
+	//migrate http
+	for _, v := range webMap {
+		if v.Proxy.Protocol == HTTP {
+			//for port 80 check if domain is not reserved by redirected https
+			if v.Proxy.Port == 80 {
+				proxies, _ := db.FindProxies(HTTPS, v.Proxy.Domain, 0)
+				if len(proxies) > 0 {
+					//remove old mapping
+					for _, server := range v.Servers {
+						MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
+					}
+					//skip it
+					continue
+				}
+			}
 
-	var httpsMappings []db.PortMap
-	for _, v := range []string{ "https"} {
-		l, err := db.INSTANCE.GetAllPortMappings(v)
-		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
-			httpsMappings = append(httpsMappings, l...)
+			proxy := &db.Proxy{
+				Protocol:       v.Proxy.Protocol,
+				Domain:         v.Proxy.Domain,
+				Port:           v.Proxy.Port,
+				Tag:            v.Proxy.Tag,
+				CertPath:       "",
+				Redirect80Port: false,
+				LoadBalancing:  "",
+				SslBackend:     false,
+			}
+			//create proxy
+			log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+			//add servers
+			for _, s := range v.Servers {
+				proxiedServer := &db.ProxiedServer{
+					ProxyTag: s.ProxyTag,
+					Socket:   s.Socket,
+				}
+
+				log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+			}
+
+			cfg := createHttpHttpsConfig(proxy, v.Servers)
+			//apply config
+			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+			//remove old mapping
+			for _, server := range v.Servers {
+				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
+			}
+
 		}
 	}
 
-	//todo ignore balancing, it will be default roundrobin (i.e. empty)
+	//migrate tcp/udp
+	for _, v := range streamMap {
+		//check if the same port is not used by other mappings
+		proxies, _ := db.FindProxies("", "", v.Proxy.Port)
+		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65536) {
+			//remove old mapping
+			for _, server := range v.Servers {
+				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
+			}
+			//skip it
+			continue
+		}
 
+		proxy := &db.Proxy{
+			Protocol:       v.Proxy.Protocol,
+			Domain:         v.Proxy.Domain,
+			Port:           v.Proxy.Port,
+			Tag:            v.Proxy.Tag,
+			CertPath:       "",
+			Redirect80Port: false,
+			LoadBalancing:  "",
+			SslBackend:     false,
+		}
+		//create proxy
+		log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+		//add servers
+		for _, s := range v.Servers {
+			proxiedServer := &db.ProxiedServer{
+				ProxyTag: s.ProxyTag,
+				Socket:   s.Socket,
+			}
+
+			log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+		}
+
+		cfg := createTcpUdpConfig(proxy, v.Servers)
+		//apply config
+		log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+
+		//remove old mapping
+		for _, server := range v.Servers {
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
+		}
+	}
+
+	reloadNginx()
+
+	log.Debug("MIGRATION ENDED")
 }
 
 type ProxyNServers struct {
@@ -190,7 +363,9 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		"Unsupported protocol %s", protocol)
 
 	//check if port is specified and valid
-	checkArgument(port == 80 || port == 443 || (port >= 1000 && port <= 65536),
+	checkArgument(port == 80 || port == 443 ||
+		port == 8443 || port == 8444 || port == 8086 ||
+		(port >= 1000 && port <= 65536),
 		"External port must be one of [80, 443, 1000-65536] ")
 
 	//check domain
@@ -240,14 +415,22 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		})
 
 	} else {
-		//for http/https check if tcp/udp is not reserved
+		//HTTP/HTTPS
+		//check if the same tcp/udp port is not reserved
+		//and check if the same http/https port and domain is not reserved
 		//check port availability
 		tcpProxies, err := db.FindProxies(TCP, "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		udpProxies, err := db.FindProxies(UDP, "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		httpProxies, err := db.FindProxies(HTTP, domain, port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		httpsProxies, err := db.FindProxies(HTTPS, domain, port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 
 		proxies := append(tcpProxies, udpProxies...)
+		proxies = append(proxies, httpProxies...)
+		proxies = append(proxies, httpsProxies...)
 
 		checkCondition(len(proxies) == 0, func() {
 			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
@@ -324,6 +507,11 @@ func AddProxiedServer(tag, socket string) {
 	checkState(len(proxiedServers) == 0, "Proxied server already exists")
 
 	checkArgument(isValidSocket(socket), "Server socket is not valid")
+
+	if proxy.Port == 8443 || proxy.Port == 8444 || proxy.Port == 8086 {
+		//check that server is management container
+		checkArgument("10.10.10.1:"+strconv.Itoa(proxy.Port) == socket, "Reserved system port")
+	}
 
 	proxiedServer := &db.ProxiedServer{
 		ProxyTag: tag,
@@ -510,13 +698,15 @@ func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 
 	//ssl
 	sslConfig := ""
-	if proxy.CertPath == "" {
-		//adjust path to LE cert
-		certDir := figureOutDomainFolderName(proxy.Domain)
-		sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
-	} else {
-		certDir := proxy.Domain + "-" + strconv.Itoa(proxy.Port)
-		sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", certDir, -1)
+	if proxy.Protocol == HTTPS {
+		if proxy.CertPath == "" {
+			//adjust path to LE cert
+			certDir := figureOutDomainFolderName(proxy.Domain)
+			sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
+		} else {
+			certDir := proxy.Domain + "-" + strconv.Itoa(proxy.Port)
+			sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", certDir, -1)
+		}
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
 

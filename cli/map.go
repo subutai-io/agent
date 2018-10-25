@@ -48,7 +48,7 @@ func RemovePortMapping(protocol, sockInt, sockExt, domain string) {
 	}
 
 	//remove mapping
-	mapRemove(protocol, sockExt, domain, sockInt)
+	MapRemove(protocol, sockExt, domain, sockInt)
 
 	//restart nginx
 	restart()
@@ -137,7 +137,7 @@ func mapList(protocol string) (list []string) {
 	return
 }
 
-func mapRemove(protocol, sockExt, domain, sockInt string) {
+func MapRemove(protocol, sockExt, domain, sockInt string) {
 	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
 
 	if sockInt != "" {
