@@ -172,7 +172,7 @@ func Migrate() {
 		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
 	}
 
-	if len(streamMap) == 0 || len(webMap) == 0 {
+	if len(streamMap) == 0 && len(webMap) == 0 {
 		return
 	}
 
@@ -219,9 +219,7 @@ func Migrate() {
 			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 
 			//remove old mapping
-			for _, server := range v.Servers {
-				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
-			}
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
 
 		}
 	}
@@ -234,9 +232,7 @@ func Migrate() {
 				proxies, _ := db.FindProxies(HTTPS, v.Proxy.Domain, 0)
 				if len(proxies) > 0 {
 					//remove old mapping
-					for _, server := range v.Servers {
-						MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
-					}
+					MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
 					//skip it
 					continue
 				}
@@ -270,9 +266,7 @@ func Migrate() {
 			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 
 			//remove old mapping
-			for _, server := range v.Servers {
-				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
-			}
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
 
 		}
 	}
@@ -283,9 +277,7 @@ func Migrate() {
 		proxies, _ := db.FindProxies("", "", v.Proxy.Port)
 		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65536) {
 			//remove old mapping
-			for _, server := range v.Servers {
-				MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
-			}
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
 			//skip it
 			continue
 		}
@@ -317,11 +309,8 @@ func Migrate() {
 		//apply config
 		log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 
-
 		//remove old mapping
-		for _, server := range v.Servers {
-			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, server.Socket)
-		}
+		MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
 	}
 
 	reloadNginx()
