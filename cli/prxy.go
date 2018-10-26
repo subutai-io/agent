@@ -173,6 +173,7 @@ func Migrate() {
 	}
 
 	if len(streamMap) == 0 && len(webMap) == 0 {
+		log.Debug("MIGRATION ENDED")
 		return
 	}
 
