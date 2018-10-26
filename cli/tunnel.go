@@ -18,8 +18,6 @@ import (
 	"path"
 )
 
-//TODO to support existing tunnels, we need to remove all old tunnels and create new tunnels
-
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
 // In Subutai, tunnels are used to access the SS management server's web UI from the Hub, and open direct connection to containers, etc.
 // There are two types of channels - local (default), which is created from destination address to host and global (-g flag), from destination to Subutai Helper node.
@@ -64,7 +62,7 @@ func AddSshTunnel(socket, timeout string, ssh bool) {
 		socket = socket + ":22"
 	}
 
-	if item := getTunnel(socket); item != nil {
+	if item, _ := db.FindTunnelByLocalSocket(socket); item != nil {
 		if len(timeout) > 0 {
 			tout, err := strconv.Atoi(timeout)
 			log.Check(log.ErrorLevel, "Converting timeout to int", err)
@@ -190,12 +188,4 @@ func tunOpen(remote, local string) bool {
 		return false
 	}
 	return true
-}
-
-func getTunnel(socket string) *db.SshTunnel {
-	tunnel, err := db.FindTunnelByLocalSocket(socket)
-	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
-		return tunnel
-	}
-	return nil
 }

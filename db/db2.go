@@ -231,6 +231,10 @@ func FindTunnelsByPid(pid int) (tunnels []SshTunnel, err error) {
 
 	err = db.Find("Pid", pid, &tunnels)
 
+	if err == storm.ErrNotFound {
+		err = nil
+	}
+
 	return
 }
 
