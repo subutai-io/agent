@@ -98,13 +98,10 @@ func AddSshTunnel(socket, timeout string, ssh bool) {
 	log.Error("Cannot get tunnel port")
 }
 
-func GetSshTunnels() (list []string) {
+func GetSshTunnels() (list []db.SshTunnel) {
 	tunnels, err := db.GetAllTunnels()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
-		for i := 0; i < len(tunnels); i++ {
-			list = append(list, fmt.Sprintf("%s\t%s\t%d\n",
-				tunnels[i].RemoteSocket, tunnels[i].LocalSocket, tunnels[i].Ttl))
-		}
+		return tunnels
 	}
 	return
 }

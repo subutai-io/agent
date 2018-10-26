@@ -485,8 +485,9 @@ func main() {
 	case tunnelCheckCmd.FullCommand():
 		cli.CheckSshTunnels()
 	case tunnelListCmd.FullCommand():
-		for _, tun := range cli.GetSshTunnels() {
-			fmt.Println(tun)
+		for _, tunnel := range cli.GetSshTunnels() {
+			fmt.Printf("%s\t%s\t%d\n",
+				tunnel.RemoteSocket, tunnel.LocalSocket, tunnel.Ttl)
 		}
 
 	case vxlanAddCmd.FullCommand():
