@@ -122,7 +122,7 @@ func init() {
 
 }
 
-func Migrate() {
+func MigrateMappings() {
 	log.Debug("MIGRATION STARTED")
 	var streamMappings []db.PortMap
 	for _, v := range []string{"tcp", "udp"} {
