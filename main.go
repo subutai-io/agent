@@ -175,7 +175,7 @@ var (
 	subutai map list
 	subutai map list tcp
 	*/
-	mapList         = mapCmd.Command("list", "list mapped ports").Alias("ls")
+	mapList         = mapCmd.Command("list", "List mapped ports").Alias("ls")
 	mapListProtocol = mapList.Flag("protocol", "http, https, tcp or udp").Short('p').String()
 
 	//metrics command
