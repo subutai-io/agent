@@ -1,307 +1,796 @@
 package cli
 
 import (
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"strconv"
 	"strings"
-	"time"
-
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/log"
+	"fmt"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/config"
 	"path"
+	"os"
+	"strconv"
+	"io/ioutil"
+	"regexp"
+	"os/exec"
+	exec2 "github.com/subutai-io/agent/lib/exec"
+	"path/filepath"
+	"sort"
+	"net"
 	"github.com/subutai-io/agent/agent/util"
 )
 
-var (
-	conftmpl   = "/etc/subutai/nginx/tmpl"
-	confinc    = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes/http")
-	webSslPath = path.Join(config.Agent.DataPrefix, "/web/ssl")
-)
+const HTTP = "http"
+const HTTPS = "https"
+const UDP = "udp"
+const TCP = "tcp"
 
-// The reverse proxy component in Subutai provides and easy way to assign domain name and forward HTTP(S) traffic to certain environment.
-// The proxy binding is used to manage Subutai reverse proxies.
-// Each proxy subcommand works with config patterns: adding, removing or checking certain lines, and reloading the proxy daemon if needed, etc.
-// The reverse proxy functionality supports three common load balancing strategies - round-robin, load based and "sticky" sessions.
-// It can also accept SSL certificates in .pem file format and install it for a domain.
+//for http and LE certs only
+//place-holders: {domain}
+const letsEncryptWellKnownSection = `
+location /.well-known {                                                                                                                                                                    
+	default_type "text/plain";                                                                                                                                                             
+	rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
+	root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
+}
+`
 
-func AddProxyHost(vlan, host string) {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
-	} else if host == "" {
-		log.Error("Please specify host (container ip[:port])")
-	}
+//for https only
+//place-holders: {domain}
+const redirect80Section = `
 
-	if hostExists(vlan, host) {
-		log.Error("Host is already in domain")
-	}
-	addHost(vlan, host)
-	restart()
+server {
+	listen 80;
+	server_name {domain};
+	return 301 https://$host:{port}$request_uri;  # enforce https
 }
 
-func AddProxyDomain(vlan, domain, policy, cert string) {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
-	} else if domain == "" {
-		log.Error("Please specify domain")
-	}
+`
 
-	if vlanExists(vlan) {
-		log.Error("Domain already exists")
-	}
+//place-holders: {protocol}, {port}, {load-balancing}, {servers},
+const streamConfig = `
+upstream {protocol}-{port} {
+    {load-balancing}
 
-	if crt := strings.Split(cert, ":"); len(crt) > 1 && container.LxcInstanceExists(crt[0]) {
-		if !strings.HasPrefix(crt[1], "/opt/") && !strings.HasPrefix(crt[1], "/var/") && !strings.HasPrefix(crt[1], "/home/") {
-			crt[0] += "/rootfs"
+{servers}
+}
+
+server {
+	listen {port};
+	proxy_pass {protocol}-{port};
+}
+
+`
+
+//http & https
+//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
+const webConfig = `
+upstream {protocol}-{port}-{domain}{
+    {load-balancing}
+
+{servers}
+}                                                                                                                                                                                       
+
+server {
+    listen {port};
+    server_name {domain};
+    client_max_body_size 1G;
+	
+{ssl}
+	
+    error_page 497	https://$host$request_uri;
+	
+    location / {
+        proxy_pass         http{ssl-backend}://{protocol}-{port}-{domain}; 
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   Host $http_host;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+	{well-known}
+}
+
+`
+
+//place-holders: {domain}
+const letsEncryptSslDirectives = `
+    ssl on;
+    ssl_certificate /var/lib/subutai/letsencrypt/live/{domain}/cert.pem;
+    ssl_certificate_key /var/lib/subutai/letsencrypt/live/{domain}/privkey.pem;
+`
+
+//place-holders: {domain}
+const selfSignedSslDirectives = `
+    ssl on;
+    ssl_certificate /var/lib/subutai/web/ssl/{domain}/cert.pem;
+    ssl_certificate_key /var/lib/subutai/web/ssl/{domain}/privkey.pem;
+`
+
+var selfSignedCertsDir = path.Join(config.Agent.DataPrefix, "/web/ssl")
+var letsEncryptDir = path.Join(config.Agent.DataPrefix, "/letsencrypt")
+var letsEncryptWebRootDir = path.Join(letsEncryptDir, "/webroot")
+var letsEncryptCertsDir = path.Join(letsEncryptDir, "/live")
+
+func init() {
+	makeDir(selfSignedCertsDir)
+	makeDir(letsEncryptDir)
+	makeDir(letsEncryptWebRootDir)
+	makeDir(letsEncryptCertsDir)
+
+}
+
+func MigrateMappings() {
+	log.Debug("MIGRATION STARTED")
+	var streamMappings []db.PortMap
+	for _, v := range []string{"tcp", "udp"} {
+		l, err := db.INSTANCE.GetAllPortMappings(v)
+		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
+			streamMappings = append(streamMappings, l...)
 		}
-		cert = path.Join(config.Agent.LxcPrefix, crt[0], strings.Join(crt[1:], ":"))
+	}
+	streamMap := make(map[string]*ProxyNServers) //key format "protocol_externalsocket"
+	for _, m := range streamMappings {
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		key := fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)
+		streamMap[key] = &ProxyNServers{Proxy: db.Proxy{
+			Domain:   m.Domain,
+			Protocol: m.Protocol,
+			Port:     port,
+			Tag:      key,
+		}, Servers: []db.ProxiedServer{}}
 	}
 
-	addDomain(vlan, domain, cert)
+	for _, m := range streamMappings {
+		portMap := streamMap[fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)]
+		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
+	}
 
-	switch policy {
+	var webMappings []db.PortMap
+	for _, v := range []string{"http", "https"} {
+		l, err := db.INSTANCE.GetAllPortMappings(v)
+		if !log.Check(log.WarnLevel, "Reading old port mappings from db", err) {
+			webMappings = append(webMappings, l...)
+		}
+	}
+	webMap := make(map[string]*ProxyNServers) //key format "protocol_domain_externalsocket"
+	for _, m := range webMappings {
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		key := fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)
+		webMap[key] = &ProxyNServers{Proxy: db.Proxy{
+			Domain:   m.Domain,
+			Protocol: m.Protocol,
+			Port:     port,
+			Tag:      key,
+		}, Servers: []db.ProxiedServer{}}
+	}
+
+	for _, m := range webMappings {
+		portMap := webMap[fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)]
+		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
+	}
+
+	if len(streamMap) == 0 && len(webMap) == 0 {
+		log.Debug("MIGRATION ENDED")
+		return
+	}
+
+	//migrate https
+	for _, v := range webMap {
+		if v.Proxy.Protocol == HTTPS {
+			//copy cert into temp file
+			certName := fmt.Sprintf("%s-0.0.0.0:%d-%s", v.Proxy.Protocol, v.Proxy.Port, v.Proxy.Domain)
+			_, err := exec2.ExecuteWithBash("cat " + path.Join(selfSignedCertsDir, certName+".crt") + " " + path.Join(selfSignedCertsDir, certName+".key") + " > /tmp/" + certName)
+			log.Check(log.WarnLevel, "Copying certificate", err)
+			proxy := &db.Proxy{
+				Protocol:       v.Proxy.Protocol,
+				Domain:         v.Proxy.Domain,
+				Port:           v.Proxy.Port,
+				Tag:            v.Proxy.Tag,
+				CertPath:       "/tmp/" + certName,
+				Redirect80Port: true,
+				LoadBalancing:  "rr",
+				SslBackend:     false,
+			}
+
+			//create proxy
+			log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+			//copy certs
+			certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+			log.Check(log.WarnLevel, "Creating cert dir", os.MkdirAll(certDir, 0755))
+			crt, key := util.ParsePem(proxy.CertPath)
+			log.Check(log.WarnLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
+			log.Check(log.WarnLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
+
+			//add servers
+			for _, s := range v.Servers {
+				proxiedServer := &db.ProxiedServer{
+					ProxyTag: s.ProxyTag,
+					Socket:   s.Socket,
+				}
+
+				log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+			}
+
+			cfg := createHttpHttpsConfig(proxy, v.Servers)
+			//apply config
+			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+			//remove old mapping
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
+
+		}
+	}
+
+	//migrate http
+	for _, v := range webMap {
+		if v.Proxy.Protocol == HTTP {
+			//for port 80 check if domain is not reserved by redirected https
+			if v.Proxy.Port == 80 {
+				proxies, _ := db.FindProxies(HTTPS, v.Proxy.Domain, 0)
+				if len(proxies) > 0 {
+					//remove old mapping
+					MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
+					//skip it
+					continue
+				}
+			}
+
+			proxy := &db.Proxy{
+				Protocol:       v.Proxy.Protocol,
+				Domain:         v.Proxy.Domain,
+				Port:           v.Proxy.Port,
+				Tag:            v.Proxy.Tag,
+				CertPath:       "",
+				Redirect80Port: false,
+				LoadBalancing:  "rr",
+				SslBackend:     false,
+			}
+			//create proxy
+			log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+			//add servers
+			for _, s := range v.Servers {
+				proxiedServer := &db.ProxiedServer{
+					ProxyTag: s.ProxyTag,
+					Socket:   s.Socket,
+				}
+
+				log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+			}
+
+			cfg := createHttpHttpsConfig(proxy, v.Servers)
+			//apply config
+			log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+			//remove old mapping
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Domain, "")
+
+		}
+	}
+
+	//migrate tcp/udp
+	for _, v := range streamMap {
+		//check if the same port is not used by other mappings
+		proxies, _ := db.FindProxies("", "", v.Proxy.Port)
+		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65536) {
+			//remove old mapping
+			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
+			//skip it
+			continue
+		}
+
+		proxy := &db.Proxy{
+			Protocol:       v.Proxy.Protocol,
+			Domain:         v.Proxy.Domain,
+			Port:           v.Proxy.Port,
+			Tag:            v.Proxy.Tag,
+			CertPath:       "rr",
+			Redirect80Port: false,
+			LoadBalancing:  "",
+			SslBackend:     false,
+		}
+		//create proxy
+		log.Check(log.WarnLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+		//add servers
+		for _, s := range v.Servers {
+			proxiedServer := &db.ProxiedServer{
+				ProxyTag: s.ProxyTag,
+				Socket:   s.Socket,
+			}
+
+			log.Check(log.WarnLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+		}
+
+		cfg := createTcpUdpConfig(proxy, v.Servers)
+		//apply config
+		log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+
+		//remove old mapping
+		MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
+	}
+
+	reloadNginx()
+
+	log.Debug("MIGRATION ENDED")
+}
+
+type ProxyNServers struct {
+	Proxy   db.Proxy
+	Servers []db.ProxiedServer
+}
+
+func GetProxies(protocol string) []ProxyNServers {
+	var proxyNServers []ProxyNServers
+
+	proxies, err := db.FindProxies(protocol, "", 0)
+	log.Check(log.ErrorLevel, "Getting proxies from db", err)
+
+	for _, proxy := range proxies {
+		proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
+		log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+		proxyNServers = append(proxyNServers, ProxyNServers{Proxy: proxy, Servers: proxiedServers})
+	}
+
+	return proxyNServers
+}
+
+//subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
+//subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
+func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80Port, sslBackend bool, certPath string) {
+	protocol = strings.ToLower(protocol)
+	domain = strings.ToLower(domain)
+	loadBalancing = strings.ToLower(loadBalancing)
+	tag = strings.ToLower(tag)
+
+	//check if protocol is https or https
+	checkArgument(protocol == HTTP || protocol == HTTPS || protocol == TCP || protocol == UDP,
+		"Unsupported protocol %s", protocol)
+
+	//check if port is specified and valid
+	checkArgument(port == 80 || port == 443 ||
+		port == 8443 || port == 8444 || port == 8086 ||
+		(port >= 1000 && port <= 65536),
+		"External port must be one of [80, 443, 1000-65536] ")
+
+	//check domain
+	if protocol == HTTP || protocol == HTTPS {
+		checkArgument(domain != "", "Domain is required for http/https proxies")
+	}
+
+	if loadBalancing != "" {
+		checkArgument(loadBalancing == "rr" || loadBalancing == "lcon" ||
+			loadBalancing == "sticky",
+			"Balancing policy must be one of [round_robin,least_time,hash,ip_hash]")
+	}
+	//default policy to round-robin
+	checkCondition(len(loadBalancing) > 0, func() {
+		loadBalancing = "rr"
+	})
+
+	if protocol == HTTPS {
+		//check if supplied certificate file exists
+		checkArgument(certPath == "" || fs.FileExists(certPath), "Certificate file %s does not exist", certPath)
+
+		//check if supplied certificate file is valid
+		checkArgument(certPath == "" || gpg.ValidatePem(certPath), "Certificate file %s is not valid", certPath)
+	}
+
+	//check if tag is new
+	proxy, err := db.FindProxyByTag(tag)
+	log.Check(log.ErrorLevel, "Checking proxy in db", err)
+	checkState(proxy == nil, "Proxy with tag %s already exists", tag)
+
+	//check if proxy with the same combination of protocol+domain+port does not exist
+	proxies, err := db.FindProxies(protocol, domain, port)
+	log.Check(log.ErrorLevel, "Checking proxy in db", err)
+	checkState(len(proxies) == 0, "Proxy with such combination of protocol, domain and port already exists")
+
+	if protocol == TCP || protocol == UDP {
+		//check port range
+		checkArgument(port >= 1000, "For tcp/udp protocols port must be >= 1000")
+
+		//check port availability
+		proxies, err := db.FindProxies("", "", port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+		checkCondition(len(proxies) == 0, func() {
+			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
+				proxies[0].Protocol, proxies[0].Domain, port))
+		})
+
+	} else {
+		//HTTP/HTTPS
+		//check if the same tcp/udp port is not reserved
+		//and check if the same http/https port and domain is not reserved
+		//check port availability
+		tcpProxies, err := db.FindProxies(TCP, "", port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		udpProxies, err := db.FindProxies(UDP, "", port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		httpProxies, err := db.FindProxies(HTTP, domain, port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		httpsProxies, err := db.FindProxies(HTTPS, domain, port)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+		proxies := append(tcpProxies, udpProxies...)
+		proxies = append(proxies, httpProxies...)
+		proxies = append(proxies, httpsProxies...)
+
+		checkCondition(len(proxies) == 0, func() {
+			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
+				proxies[0].Protocol, proxies[0].Domain, port))
+		})
+	}
+
+	//if redirection is requested (https only, otherwise ignored), check if port 80 for http+domain is not already reserved
+	if protocol == HTTPS && redirect80Port {
+		//check all http proxies with 80 port
+		proxies, err := db.FindProxies(HTTP, domain, 80)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		checkState(len(proxies) == 0, "Proxy to http://%s:80 already exists, can not redirect", domain)
+
+		//check https proxies with redirect to 80 port
+		proxies, err = db.FindProxies(HTTPS, domain, 0)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		for _, prxy := range proxies {
+			checkState(!prxy.Redirect80Port,
+				"Proxy to https://%s:%d with port 80 redirection already exists, can not redirect", domain, prxy.Port)
+		}
+	} else if protocol == HTTP && port == 80 {
+		proxies, err = db.FindProxies(HTTPS, domain, 0)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		for _, prxy := range proxies {
+			checkState(!prxy.Redirect80Port,
+				"Proxy to https://%s:%d with port 80 redirection already exists, can not create proxy", domain, prxy.Port)
+		}
+	}
+
+	//make optional flags consistent
+	if protocol == HTTP || protocol == TCP || protocol == UDP {
+		redirect80Port = false
+		sslBackend = false
+		certPath = ""
+	} else if protocol == HTTPS && port == 80 && redirect80Port {
+		redirect80Port = false
+	}
+
+	//save proxy
+	proxy = &db.Proxy{
+		Protocol:       protocol,
+		Domain:         domain,
+		Port:           port,
+		Tag:            tag,
+		CertPath:       certPath,
+		Redirect80Port: redirect80Port,
+		LoadBalancing:  loadBalancing,
+		SslBackend:     sslBackend,
+	}
+
+	log.Check(log.ErrorLevel, "Saving proxy to db", db.SaveProxy(proxy))
+
+	applyConfig(tag, true)
+}
+
+func RemoveProxy(tag string) {
+	proxy, err := db.FindProxyByTag(tag)
+	log.Check(log.ErrorLevel, "Getting proxy from db", err)
+	checkNotNil(proxy, "Proxy not found by tag %s", tag)
+
+	deleteProxy(proxy)
+
+	reloadNginx()
+}
+
+func AddProxiedServer(tag, socket string) {
+	proxy, err := db.FindProxyByTag(tag)
+	log.Check(log.ErrorLevel, "Getting proxy from db", err)
+	checkNotNil(proxy, "Proxy not found by tag %s", tag)
+
+	proxiedServers, err := db.FindProxiedServers(tag, socket)
+	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+	checkState(len(proxiedServers) == 0, "Proxied server already exists")
+
+	checkArgument(isValidSocket(socket), "Server socket is not valid")
+
+	if proxy.Port == 8443 || proxy.Port == 8444 || proxy.Port == 8086 {
+		//check that server is management container
+		checkArgument("10.10.10.1:"+strconv.Itoa(proxy.Port) == socket, "Reserved system port")
+	}
+
+	proxiedServer := &db.ProxiedServer{
+		ProxyTag: tag,
+		Socket:   socket,
+	}
+
+	log.Check(log.ErrorLevel, "Saving proxied server to db", db.SaveProxiedServer(proxiedServer))
+
+	applyConfig(tag, false)
+}
+
+func RemoveProxiedServer(tag, socket string) {
+	proxy, err := db.FindProxyByTag(tag)
+	log.Check(log.ErrorLevel, "Getting proxy from db", err)
+	checkNotNil(proxy, "Proxy not found by tag %s", tag)
+
+	proxiedServers, err := db.FindProxiedServers(tag, socket)
+	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+	checkState(len(proxiedServers) > 0, "Proxied server not found")
+
+	log.Check(log.ErrorLevel, "Removing proxied server from db", db.RemoveProxiedServer(&proxiedServers[0]))
+
+	applyConfig(tag, false)
+}
+
+func applyConfig(tag string, creating bool) {
+	proxy, err := db.FindProxyByTag(tag)
+	log.Check(log.ErrorLevel, "Getting proxy from db", err)
+	checkNotNil(proxy, "Proxy not found by tag %s", tag)
+
+	proxiedServers, err := db.FindProxiedServers(tag, "")
+	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+	if len(proxiedServers) > 0 {
+		//create config
+		createConfig(proxy, proxiedServers)
+	} else {
+		if creating {
+			//Install certificates for https
+			if proxy.Protocol == HTTPS {
+				if proxy.CertPath == "" {
+					installLECert(proxy)
+				} else {
+					installSelfSignedCert(proxy)
+				}
+			}
+			//return since we don't apply config for newly created proxy without added servers, no need to reload nginx
+			return
+		} else {
+			removeConfig(*proxy)
+		}
+	}
+
+	reloadNginx()
+}
+
+func installLECert(proxy *db.Proxy) {
+	makeDir(path.Join(letsEncryptWebRootDir, proxy.Domain))
+	//1) create http config with LE section
+	generateTempLEConfig(proxy)
+	//2) reload nginx
+	reloadNginx()
+	//3) run certbot
+	obtainLECerts(proxy)
+	//4) remove http config created in step 1
+	removeTempLEConfig(proxy)
+}
+
+func obtainLECerts(proxy *db.Proxy) {
+	err := exec2.Exec("certbot", "certonly", "--config-dir", letsEncryptDir,
+		"--email", "hostmaster@subutai.io", "--agree-tos", "--webroot",
+		"--webroot-path", path.Join(letsEncryptWebRootDir, proxy.Domain),
+		"-d", proxy.Domain, "-n")
+	log.Check(log.ErrorLevel, "Obtaining LE certs", err)
+}
+
+func removeCert(proxy *db.Proxy) {
+	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	if proxy.CertPath == "" {
+		//LE certs
+		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
+	}
+	log.Check(log.ErrorLevel, "Removing certs", fs.DeleteDir(certDir))
+}
+
+func installSelfSignedCert(proxy *db.Proxy) {
+	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	makeDir(certDir)
+	crt, key := util.ParsePem(proxy.CertPath)
+	log.Check(log.ErrorLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
+	log.Check(log.ErrorLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
+}
+
+func generateTempLEConfig(proxy *db.Proxy) {
+	effectiveConfig := webConfig
+	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", HTTP, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(80), -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", "    server localhost:81;", -1)
+
+	//remove other placeholders
+	r := regexp.MustCompile("{\\S+}")
+	effectiveConfig = r.ReplaceAllString(effectiveConfig, "")
+
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"), []byte(effectiveConfig), 0744))
+}
+
+func removeTempLEConfig(proxy *db.Proxy) {
+	log.Check(log.ErrorLevel, "Removing nginx config", fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf")))
+}
+
+func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
+	cfg := ""
+
+	if proxy.Protocol == HTTPS || proxy.Protocol == HTTP {
+		cfg = createHttpHttpsConfig(proxy, servers)
+	} else {
+		cfg = createTcpUdpConfig(proxy, servers)
+	}
+
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
+}
+
+func createTcpUdpConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
+	//place-holders: {protocol}, {port}, {load-balancing}, {servers},
+	effectiveConfig := strings.Replace(streamConfig, "{protocol}", proxy.Protocol, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
+
+	//load balancing
+	loadBalancing := ""
+	switch proxy.LoadBalancing {
 	case "rr":
-		setPolicy(vlan, "")
-	case "lb":
-		setPolicy(vlan, "least_conn;")
-	case "hash":
-		setPolicy(vlan, "ip_hash;")
-	}
+		//no-op
+	case "sticky":
+		loadBalancing = "ip_hash;"
+	case "lcon":
+		loadBalancing = "least_conn;"
 
-	restart()
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{load-balancing}", loadBalancing, -1)
+
+	//servers
+	serversConfig := ""
+	for i := 0; i < len(servers); i++ {
+		serversConfig += "    server " + servers[i].Socket + ";\n"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
+
+	return effectiveConfig
 }
 
-func DelProxyDomain(vlan string) {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
+func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
+	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
+	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", "", -1)
+
+	if proxy.Redirect80Port {
+		effectiveConfig += strings.Replace(strings.Replace(redirect80Section, "{domain}", proxy.Domain, -1),
+			"{port}", strconv.Itoa(proxy.Port), -1)
 	}
 
-	if vlanExists(vlan) {
-		delDomain(vlan)
-		restart()
+	//load balancing
+	loadBalancing := ""
+	switch proxy.LoadBalancing {
+	case "rr":
+		//no-op
+	case "sticky":
+		loadBalancing = "ip_hash;"
+	case "lcon":
+		loadBalancing = "least_conn;"
+
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{load-balancing}", loadBalancing, -1)
+
+	//servers
+	serversConfig := ""
+	for i := 0; i < len(servers); i++ {
+		serversConfig += "    server " + servers[i].Socket + ";\n"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
+
+	//ssl
+	sslConfig := ""
+	if proxy.Protocol == HTTPS {
+		if proxy.CertPath == "" {
+			//adjust path to LE cert
+			certDir := figureOutDomainFolderName(proxy.Domain)
+			sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
+		} else {
+			certDir := proxy.Domain + "-" + strconv.Itoa(proxy.Port)
+			sslConfig = strings.Replace(selfSignedSslDirectives, "{domain}", certDir, -1)
+		}
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{ssl}", sslConfig, -1)
+
+	sslBackend := ""
+	if proxy.SslBackend {
+		sslBackend = "s"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{ssl-backend}", sslBackend, -1)
+
+	return effectiveConfig
+}
+
+//workaround for https://github.com/certbot/certbot/issues/2128
+func figureOutDomainFolderName(domain string) string {
+	var validCertDirName = regexp.MustCompile(fmt.Sprintf("^%s(-\\d\\d\\d\\d)?$", domain))
+
+	files, err := ioutil.ReadDir(letsEncryptCertsDir)
+	log.Check(log.ErrorLevel, "Reading certificate directory", err)
+
+	//collect all matching directory names
+	var res []string
+	for _, f := range files {
+		if f.IsDir() && ( validCertDirName.MatchString(f.Name())) {
+			res = append(res, filepath.Join(f.Name()))
+		}
+	}
+
+	//sort
+	sort.Strings(res)
+
+	//reverse
+	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
+		res[i], res[j] = res[j], res[i]
+	}
+
+	checkState(len(res) > 0, "Certificates for domain %s not found", domain)
+
+	//since certbot does not generate certificates if they already exist, we assume that lexicographically last one is the dir
+	return res[0]
+}
+
+func removeConfig(proxy db.Proxy) {
+	//remove tmp config just in case
+	fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"))
+	//remove config
+	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
+	if !os.IsNotExist(err) {
+		log.Check(log.ErrorLevel, "Removing nginx config", err)
 	}
 }
 
-func DelProxyHost(vlan, host string) {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
+func deleteProxy(proxy *db.Proxy) {
+	//remove cfg file
+	removeConfig(*proxy)
+
+	if proxy.Protocol == HTTPS {
+		//remove certificates
+		removeCert(proxy)
 	}
 
-	if host == "" {
-		log.Error("Please specify host (container ip[:port])")
+	proxiedServers, err := db.FindProxiedServers(proxy.Tag, "")
+	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+	//remove proxied servers from db
+	for _, server := range proxiedServers {
+		log.Check(log.ErrorLevel, "Removing proxied server from db", db.RemoveProxiedServer(&server))
 	}
 
-	if vlanExists(vlan) {
-		delHost(vlan, host)
-		restart()
-	}
+	//remove proxy from db
+	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
 }
 
-func GetProxyDomain(vlan string) string {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
-	}
-
-	return getDomain(vlan)
-}
-
-func IsHostInDomain(vlan, host string) bool {
-	if vlan == "" {
-		log.Error("Please specify VLAN")
-	}
-
-	if host == "" {
-		log.Error("Please specify host (container ip[:port])")
-	}
-
-	return hostExists(vlan, host)
-}
-
-// restart reloads nginx process
-func restart() {
+func reloadNginx() {
 	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
 	log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
 
-// addDomain creates new domain config from pattern and adjusts it
-func addDomain(vlan, domain, cert string) {
-	if _, err := os.Stat(confinc); os.IsNotExist(err) {
-		err := os.MkdirAll(confinc, 0755)
-		if err != nil {
-			log.Info("Cannot create nginx-include directory " + confinc)
-		}
-	}
-	vlanConf := path.Join(confinc, vlan+".conf")
-	if cert != "" && gpg.ValidatePem(cert) {
-		currentDT := strconv.Itoa(int(time.Now().Unix()))
+//utilities
 
-		if _, err := os.Stat(webSslPath); os.IsNotExist(err) {
-			err := os.MkdirAll(webSslPath, 0755)
-			if err != nil {
-				log.Info("Cannot create ssl directory " + webSslPath)
-				os.Exit(1)
+func isValidSocket(socket string) bool {
+	if addr := strings.Split(socket, ":"); len(addr) == 2 {
+		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
+			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
+				return true
 			}
 		}
-
-		fs.Copy(path.Join(conftmpl, "vhost-ssl.example"), vlanConf)
-		crt, key := util.ParsePem(cert)
-		err := ioutil.WriteFile(path.Join(webSslPath, currentDT+".crt"), crt, 0644)
-		if err != nil {
-			log.Info("Cannot create crt file " + path.Join(webSslPath, currentDT+".crt"))
-			os.Exit(1)
-		}
-		err = ioutil.WriteFile(path.Join(webSslPath, currentDT+".key"), key, 0644)
-		if err != nil {
-			log.Info("Cannot create key file " + path.Join(webSslPath, currentDT+".key"))
-			os.Exit(1)
-		}
-		addLine(vlanConf, "ssl_certificate "+path.Join(webSslPath, "UNIXDATE.crt;"),
-			"	ssl_certificate "+path.Join(webSslPath, currentDT+".crt;"), true)
-		addLine(vlanConf, "ssl_certificate_key "+path.Join(webSslPath, "UNIXDATE.key;"),
-			"	ssl_certificate_key "+path.Join(webSslPath, currentDT+".key;"), true)
-	} else {
-		fs.Copy(path.Join(conftmpl, "vhost.example"), vlanConf)
-	}
-	addLine(vlanConf, "upstream DOMAIN-upstream {", "upstream "+domain+"-upstream {", true)
-	addLine(vlanConf, "server_name DOMAIN;", "	server_name "+domain+";", true)
-	addLine(vlanConf, "proxy_pass http://DOMAIN-upstream/;", "	proxy_pass http://"+domain+"-upstream/;", true)
-}
-
-// addHost adds configuration lines to domain configuration
-func addHost(vlan, node string) {
-	vlanConf := path.Join(confinc, vlan+".conf")
-
-	delLine(vlanConf, "server localhost:81;")
-	addLine(vlanConf, "#Add new host here", "	server "+node+"; #$node", false)
-}
-
-// delDomain removes domain configuration file and all related stuff
-func delDomain(vlan string) {
-	vlanConf := path.Join(confinc, vlan+".conf")
-
-	// get and remove cert files
-	f, err := ioutil.ReadFile(vlanConf)
-	if err != nil {
-		log.Fatal("Cannot read nginx virtualhost file:" + vlanConf)
-	}
-	lines := strings.Split(string(f), "\n")
-	for _, v := range lines {
-		if strings.Contains(v, "ssl_certificate") || strings.Contains(v, "ssl_certificate_key") {
-			line := strings.Fields(v)
-			if len(line) > 1 {
-				os.Remove(strings.Trim(line[1], ";"))
-			}
-		}
-	}
-
-	os.Remove(vlanConf)
-}
-
-// delHost removes node configuration entries from domain config
-func delHost(vlan, node string) {
-	vlanConf := path.Join(confinc, vlan+".conf")
-
-	delLine(vlanConf, "server "+node+"; #$node")
-	delLine(vlanConf, "server "+node+": #$node")
-	if hostCount(vlan) == 0 {
-		addLine(vlanConf, "#Add new host here", "   server localhost:81;", false)
-	}
-}
-
-// getDomain returns domain name assigned to specified vlan
-func getDomain(vlan string) string {
-	f, err := ioutil.ReadFile(path.Join(confinc, vlan+".conf"))
-	if err != nil {
-		return ""
-	}
-	lines := strings.Split(string(f), "\n")
-	for _, v := range lines {
-		if strings.Contains(v, "server_name") {
-			line := strings.Fields(v)
-			if len(line) > 1 {
-				return strings.Trim(line[1], ";")
-			}
-		}
-	}
-	return ""
-}
-
-// vlanExists is true is domain was configured on specified vlan and false if not
-func vlanExists(vlan string) bool {
-	if _, err := os.Stat(path.Join(confinc, vlan+".conf")); err == nil {
-		return true
 	}
 	return false
 }
 
-// hostExists is true if specified node belongs to vlan, otherwise it is false
-func hostExists(vlan, host string) bool {
-	return addLine(path.Join(confinc, vlan+".conf"), "server "+host+";", "", false)
-}
-
-// hostCount returns the number of nodes assigned to domain on specified vlan
-func hostCount(vlan string) int {
-	vlanConf := path.Join(confinc, vlan+".conf")
-	f, err := ioutil.ReadFile(vlanConf)
-	if !log.Check(log.DebugLevel, "Cannot read file "+vlanConf, err) {
-		return strings.Count(string(f), "#$node")
-	}
-	return 0
-}
-
-// setPolicy configures load balance policy for domain on specified vlan
-func setPolicy(vlan, policy string) {
-	vlanConf := path.Join(confinc, vlan+".conf")
-	delLine(vlanConf, "ip_hash;")
-	delLine(vlanConf, "least_time header;")
-	addLine(vlanConf, "#Add new host here", "	"+policy, false)
-}
-
-// addLine adds, removes, replaces and checks if line exists in specified file
-func addLine(path, after, line string, replace bool) bool {
-	f, err := ioutil.ReadFile(path)
-	if !log.Check(log.DebugLevel, "Cannot read file "+path, err) {
-		lines := strings.Split(string(f), "\n")
-		for k, v := range lines {
-			if strings.Contains(v, after) {
-				if line != "" {
-					if replace {
-						log.Debug("Replacing " + lines[k] + " with " + line)
-						lines[k] = line
-					} else {
-						log.Debug("Adding " + line + " after " + lines[k])
-						lines[k] = after + "\n" + line
-					}
-				} else {
-					return true
-				}
-			}
+func makeDir(path string) {
+	if !fs.FileExists(path) {
+		err := os.MkdirAll(path, 0755)
+		if err != nil {
+			log.Error("Failed to create directory " + path)
 		}
-		str := strings.Join(lines, "\n")
-		log.Check(log.FatalLevel, "Writing new proxy config",
-			ioutil.WriteFile(path, []byte(str), 0744))
-	}
-	return false
-}
-
-// delLine removes specified line from file
-func delLine(path, line string) {
-	var lines2 []string
-	f, err := ioutil.ReadFile(path)
-	if !log.Check(log.DebugLevel, "Reading config "+path, err) {
-
-		lines := strings.Split(string(f), "\n")
-		for _, v := range lines {
-			if !strings.Contains(v, line) {
-				lines2 = append(lines2, v)
-			}
-		}
-		str := strings.Join(lines2, "\n")
-		log.Check(log.FatalLevel, "Writing new proxy config",
-			ioutil.WriteFile(path, []byte(str), 0744))
 	}
 }

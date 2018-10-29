@@ -58,12 +58,6 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 
 		if len(c) != 0 {
 
-			if ip, ok := c["ip"]; ok {
-				if vlan, ok := c["vlan"]; ok {
-					DelProxyHost(vlan, ip)
-				}
-			}
-
 			removePortMap(id)
 
 			net.DelIface(c["interface"])
@@ -116,7 +110,6 @@ func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
 	p2p.RemoveByIface("p2p" + id)
 	cleanupNetStat(id)
-	DelProxyDomain(id)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
@@ -134,7 +127,8 @@ func removePortMap(name string) {
 	servers, err := db.FindProxiedServers("", "")
 	if !log.Check(log.WarnLevel, "Fetching port mappings", err) {
 		for _, server := range servers {
-			if strings.HasPrefix(server.Socket, containerIp) {
+			sock := strings.Split(server.Socket, ":")
+			if sock[0] == containerIp {
 				RemoveProxiedServer(server.ProxyTag, server.Socket)
 			}
 		}

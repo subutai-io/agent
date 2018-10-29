@@ -153,21 +153,22 @@ var (
 	*/
 	mapCmd               = app.Command("map", "Map ports")
 	mapAddCmd            = mapCmd.Command("add", "Add port mapping")
-	mapAddProtocol       = mapAddCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
-	mapAddInternalSocket = mapAddCmd.Flag("internal", "internal socket").Short('i').Required().String()
-	mapAddExternalSocket = mapAddCmd.Flag("external", "external socket").Short('e').String()
+	mapAddProtocol       = mapAddCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
+	mapAddExternalPort   = mapAddCmd.Flag("external port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	mapAddInternalServer = mapAddCmd.Flag("internal server", "ip:port").Short('i').Required().String()
 	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('n').String()
-	mapAddCert           = mapAddCmd.Flag("cert", "https certificate").Short('c').String()
-	mapAddPolicy         = mapAddCmd.Flag("policy", "load balancing policy (round_robin|hash|ip_hash|least_time)").Short('b').String()
-	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Bool()
+	mapAddCertificate    = mapAddCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
+	mapAddBalancing      = mapAddCmd.Flag("balancing", "load balancing policy [rr(round_robin),sticky(ip_hash),lcon(least_conn)]").Short('b').String()
+	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Short('s').Bool()
+	mapAddRedirect       = mapAddCmd.Flag("redirect", "redirect port 80 to external port").Short('r').Bool()
 
 	/*
 	subutai map rm tcp ...
 	*/
 	mapRemoveCmd            = mapCmd.Command("rm", "Remove port mapping").Alias("del")
-	mapRemoveProtocol       = mapRemoveCmd.Flag("protocol", "http, https, tcp or udp").Short('p').Required().String()
-	mapRemoveExternalSocket = mapRemoveCmd.Flag("external", "external socket").Short('e').Required().String()
-	mapRemoveInternalSocket = mapRemoveCmd.Flag("internal", "internal socket").Short('i').String()
+	mapRemoveProtocol       = mapRemoveCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
+	mapRemoveExternalPort   = mapRemoveCmd.Flag("external port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	mapRemoveInternalServer = mapRemoveCmd.Flag("internal server", "ip:port").Short('i').String()
 	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('n').String()
 
 	/*
@@ -185,7 +186,7 @@ var (
 	metricsEnd   = metricsCmd.Flag("end", "metrics end time 'yyyy-mm-dd hh:mi:ss'").Short('e').Required().String()
 
 	//prxy command
-	prxyCmd = app.Command("prxy", "Subutai proxy")
+	prxyCmd = app.Command("proxy", "Subutai proxy")
 
 	prxyCreateCmd           = prxyCmd.Command("create", "Create proxy")
 	prxyCreateDomain        = prxyCreateCmd.Flag("domain", "proxy domain").Short('n').String()
@@ -217,41 +218,6 @@ var (
 
 	prxyServerListCmd = prxyServerCmd.Command("list", "List servers for proxy").Alias("ls")
 	prxyServerListTag = prxyServerListCmd.Flag("tag", "proxy tag").Short('t').Required().String()
-
-	//proxy command
-	proxyCmd       = app.Command("proxy", "Subutai reverse proxy")
-	proxyDomainCmd = proxyCmd.Command("domain", "Manage vlan-domain mappings").Alias("dom")
-	proxyHostCmd   = proxyCmd.Command("host", "Manage domain hosts")
-
-	//proxy dom add 123 test.com ...
-	proxyDomainAddCmd    = proxyDomainCmd.Command("add", "Add vlan-domain mapping")
-	proxyDomainAddVlan   = proxyDomainAddCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyDomainAddDomain = proxyDomainAddCmd.Arg("domain", "environment domain").Required().String()
-	proxyDomainAddCert   = proxyDomainAddCmd.Flag("file", "certificate in PEM format").Short('f').String()
-	proxyDomainAddPolicy = proxyDomainAddCmd.Flag("policy", "load balance policy (rr|lb|hash)").Short('b').String()
-
-	//proxy dom del 123
-	proxyDomainDelCmd  = proxyDomainCmd.Command("del", "Remove vlan-domain mapping").Alias("rm")
-	proxyDomainDelVlan = proxyDomainDelCmd.Arg("vlan", "environment vlan").Required().String()
-
-	//proxy dom check 123
-	proxyDomainCheckCmd  = proxyDomainCmd.Command("check", "Check vlan-domain mapping")
-	proxyDomainCheckVlan = proxyDomainCheckCmd.Arg("vlan", "environment vlan").Required().String()
-
-	//proxy host add 123 {container ip[:port]}
-	proxyHostAddCmd  = proxyHostCmd.Command("add", "Add host to domain")
-	proxyHostAddVlan = proxyHostAddCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyHostAddHost = proxyHostAddCmd.Arg("host", "container ip[:port]").Required().String()
-
-	//proxy host del 123 {container ip[:port]}
-	proxyHostDelCmd  = proxyHostCmd.Command("del", "Remove host from domain").Alias("rm")
-	proxyHostDelVlan = proxyHostDelCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyHostDelHost = proxyHostDelCmd.Arg("host", "container ip[:port]").Required().String()
-
-	//proxy host check {vlan} {ip} command
-	proxyHostCheckCmd  = proxyHostCmd.Command("check", "Check host in domain")
-	proxyHostCheckVlan = proxyHostCheckCmd.Arg("vlan", "environment vlan").Required().String()
-	proxyHostCheckHost = proxyHostCheckCmd.Arg("host", "container ip[:port]").Required().String()
 
 	//quota command
 	quotaCmd    = app.Command("quota", "Manage container quotas")
@@ -393,12 +359,10 @@ func main() {
 		cli.LxcHostname(*hostnameContainerName, *hostnameContainerNewHostname)
 
 	case mapAddCmd.FullCommand():
-		log.Error("Please use \"subutai prxy\" command. This command is deprecated")
-		//cli.AddPortMapping(*mapAddProtocol, *mapAddInternalSocket, *mapAddExternalSocket,
-		//	*mapAddDomain, *mapAddPolicy, *mapAddCert, *mapAddSslBackend)
+		cli.AddPortMapping(*mapAddProtocol, *mapAddDomain, *mapAddBalancing, *mapAddExternalPort,
+			*mapAddInternalServer, *mapAddCertificate, *mapAddRedirect, *mapAddSslBackend)
 	case mapRemoveCmd.FullCommand():
-		cli.RemovePortMapping(*mapRemoveProtocol, *mapRemoveInternalSocket, *mapRemoveExternalSocket,
-			*mapRemoveDomain)
+		cli.RemovePortMapping(*mapRemoveProtocol, *mapRemoveDomain, *mapRemoveExternalPort, *mapRemoveInternalServer)
 
 	case mapList.FullCommand():
 		for _, v := range cli.GetPortMappings(*mapListProtocol) {
@@ -445,28 +409,6 @@ func main() {
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 
-	case proxyDomainAddCmd.FullCommand():
-		cli.AddProxyDomain(*proxyDomainAddVlan, *proxyDomainAddDomain, *proxyDomainAddPolicy, *proxyDomainAddCert)
-	case proxyDomainDelCmd.FullCommand():
-		cli.DelProxyDomain(*proxyDomainDelVlan)
-	case proxyDomainCheckCmd.FullCommand():
-		domain := cli.GetProxyDomain(*proxyDomainCheckVlan)
-		if domain != "" {
-			fmt.Println(domain)
-		} else {
-			fmt.Println("No domain")
-		}
-	case proxyHostAddCmd.FullCommand():
-		cli.AddProxyHost(*proxyHostAddVlan, *proxyHostAddHost)
-	case proxyHostDelCmd.FullCommand():
-		cli.DelProxyHost(*proxyHostDelVlan, *proxyHostDelHost)
-	case proxyHostCheckCmd.FullCommand():
-		res := cli.IsHostInDomain(*proxyHostCheckVlan, *proxyHostCheckHost)
-		if res {
-			log.Info("Host is in domain")
-		} else {
-			log.Info("Host is not in domain")
-		}
 	case quotaGetCmd.FullCommand():
 		cli.LxcQuota(*quotaGetContainer, *quotaGetResource, "", "")
 	case quotaSetCmd.FullCommand():
