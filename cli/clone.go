@@ -82,7 +82,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 
 	meta["interface"] = container.GetProperty(child, "lxc.network.veth.pair")
 
-	log.Check(log.ErrorLevel, "Writing container metadata to database", db.INSTANCE.ContainerAdd(child, meta))
+	log.Check(log.ErrorLevel, "Writing container metadata to database", db.INSTANCE.SaveContainer(child, meta))
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
@@ -112,10 +112,10 @@ func addNetConf(name, addr string) string {
 
 func getEnvGw(vlan string) (gw string) {
 
-	list, _ := db.INSTANCE.ContainerByKey("vlan", vlan)
+	list, _ := db.INSTANCE.GetContainerByKey("vlan", vlan)
 
 	if len(list) > 0 {
-		meta, _ := db.INSTANCE.ContainerByName(list[0])
+		meta, _ := db.INSTANCE.GetContainerByName(list[0])
 		gw = meta["gw"]
 	}
 

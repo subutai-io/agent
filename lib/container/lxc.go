@@ -28,6 +28,7 @@ import (
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
 	"io"
+	"github.com/subutai-io/agent/lib/net/p2p"
 )
 
 const (
@@ -101,7 +102,7 @@ func AddMetadata(name string, meta map[string]string) error {
 	if !LxcInstanceExists(name) {
 		return errors.New("Container does not exist")
 	}
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(name, meta))
+	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.SaveContainer(name, meta))
 	return nil
 }
 
@@ -309,7 +310,7 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.ErrorLevel, "Removing container", err)
 
-	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.ContainerDel(name))
+	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.RemoveContainer(name))
 
 	return nil
 }
@@ -535,38 +536,9 @@ func QuotaNet(name string, size string) string {
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
-//TODO use the new lxc config type
 func SetContainerConf(container string, conf [][]string) error {
 	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
-	newconf := ""
-
-	file, err := os.Open(confPath)
-	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
-		return err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(bufio.NewReader(file))
-	for scanner.Scan() {
-		newline := scanner.Text() + "\n"
-		for i := 0; i < len(conf); i++ {
-			line := strings.Split(scanner.Text(), "=")
-			if len(line) > 1 && strings.Trim(line[0], " ") == conf[i][0] {
-				if newline = ""; len(conf[i][1]) > 0 {
-					newline = conf[i][0] + " = " + conf[i][1] + "\n"
-				}
-				conf = append(conf[:i], conf[i+1:]...)
-				break
-			}
-		}
-		newconf = newconf + newline
-	}
-
-	for i := range conf {
-		if conf[i][1] != "" {
-			newconf = newconf + conf[i][0] + " = " + conf[i][1] + "\n"
-		}
-	}
-	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
+	return SetConfig(confPath, conf)
 }
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.
@@ -699,17 +671,8 @@ func Mac() string {
 	return mac
 }
 
-//todo move to p2p
 func Mtu() int {
-
-	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
-	output := strings.TrimSpace(string(out))
-	log.Check(log.FatalLevel, "Getting p2p mtu: "+output, err)
-
-	mtu, err := strconv.Atoi(output)
-	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
-
-	return mtu - 50
+	return p2p.Mtu()
 }
 
 func GetIp(name string) string {

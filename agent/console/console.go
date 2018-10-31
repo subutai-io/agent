@@ -337,7 +337,7 @@ func containers(details bool) []Container {
 		}
 		configPath := path.Join(config.Agent.LxcPrefix, c, "config")
 
-		if meta, err := db.INSTANCE.ContainerByName(c); err == nil {
+		if meta, err := db.INSTANCE.GetContainerByName(c); err == nil {
 
 			vlan := meta["vlan"]
 			envId := meta["environment"]

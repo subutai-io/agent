@@ -106,8 +106,7 @@ func (i *Db) GetTunList() (list []map[string]string, err error) {
 	return list, err
 }
 
-// DiscoverySave stores information from auto discovery service in DB.
-func (i *Db) DiscoverySave(ip string) (err error) {
+func (i *Db) SaveDiscoveredIp(ip string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
 		defer instance.Close()
@@ -122,8 +121,7 @@ func (i *Db) DiscoverySave(ip string) (err error) {
 	return err
 }
 
-// DiscoveryLoad returns information from auto discovery service stored in DB.
-func (i *Db) DiscoveryLoad() (ip string, err error) {
+func (i *Db) GetDiscoveredIp() (ip string, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
@@ -137,7 +135,7 @@ func (i *Db) DiscoveryLoad() (ip string, err error) {
 	return ip, err
 }
 
-func (i *Db) ContainerAdd(name string, options map[string]string) (err error) {
+func (i *Db) SaveContainer(name string, options map[string]string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
 		defer instance.Close()
@@ -158,7 +156,7 @@ func (i *Db) ContainerAdd(name string, options map[string]string) (err error) {
 	return err
 }
 
-func (i *Db) ContainerDel(name string) (err error) {
+func (i *Db) RemoveContainer(name string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
 		defer instance.Close()
@@ -174,7 +172,7 @@ func (i *Db) ContainerDel(name string) (err error) {
 	return err
 }
 
-func (i *Db) ContainerMapping(name, protocol, external, domain, internal string) (err error) {
+func (i *Db) SaveContainerPortMapping(name, protocol, external, domain, internal string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
 		defer instance.Close()
@@ -200,7 +198,7 @@ func (i *Db) ContainerMapping(name, protocol, external, domain, internal string)
 	return err
 }
 
-func (i *Db) GetContainerMapping(name string) (list []map[string]string, err error) {
+func (i *Db) GetContainerPortMapping(name string) (list []map[string]string, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
@@ -228,7 +226,7 @@ func (i *Db) GetContainerMapping(name string) (list []map[string]string, err err
 	return list, err
 }
 
-func (i *Db) ContainerList() (list []string, err error) {
+func (i *Db) GetContainers() (list []string, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
@@ -245,7 +243,7 @@ func (i *Db) ContainerList() (list []string, err error) {
 	return list, err
 }
 
-func (i *Db) ContainerByName(name string) (c map[string]string, err error) {
+func (i *Db) GetContainerByName(name string) (c map[string]string, err error) {
 	c = make(map[string]string)
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
@@ -265,7 +263,7 @@ func (i *Db) ContainerByName(name string) (c map[string]string, err error) {
 	return c, err
 }
 
-func (i *Db) ContainerByKey(key, value string) (list []string, err error) {
+func (i *Db) GetContainerByKey(key, value string) (list []string, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
@@ -289,6 +287,46 @@ func (i *Db) ContainerByKey(key, value string) (list []string, err error) {
 	return list, err
 }
 
+func (i *Db) SetBalancingPolicy(protocol, external, domain, policy string) (err error) {
+	var instance *bolt.DB
+	if instance, err = openDb(false); err == nil {
+		defer instance.Close()
+		instance.Update(func(tx *bolt.Tx) error {
+			if b := tx.Bucket(portmap); b != nil {
+				if b = b.Bucket([]byte(protocol)); b != nil {
+					if b = b.Bucket([]byte(external)); b != nil {
+						if b = b.Bucket([]byte(domain)); b != nil {
+							return b.Put([]byte("policy"), []byte(policy))
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
+	return err
+}
+
+func (i *Db) GetBalancingPolicy(protocol, external, domain string) (policy string, err error) {
+	var instance *bolt.DB
+	if instance, err = openDb(true); err == nil {
+		defer instance.Close()
+		instance.View(func(tx *bolt.Tx) error {
+			if b := tx.Bucket(portmap); b != nil {
+				if b = b.Bucket([]byte(protocol)); b != nil {
+					if b = b.Bucket([]byte(external)); b != nil {
+						if b = b.Bucket([]byte(domain)); b != nil {
+							policy = string(b.Get([]byte("policy")))
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
+	return policy, err
+}
+
 func (i *Db) PortMapSet(protocol, external, domain, internal string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
@@ -310,46 +348,6 @@ func (i *Db) PortMapSet(protocol, external, domain, internal string) (err error)
 		})
 	}
 	return err
-}
-
-func (i *Db) SetMapMethod(protocol, external, domain, policy string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		instance.Update(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					if b = b.Bucket([]byte(external)); b != nil {
-						if b = b.Bucket([]byte(domain)); b != nil {
-							return b.Put([]byte("policy"), []byte(policy))
-						}
-					}
-				}
-			}
-			return nil
-		})
-	}
-	return err
-}
-
-func (i *Db) GetMapMethod(protocol, external, domain string) (policy string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					if b = b.Bucket([]byte(external)); b != nil {
-						if b = b.Bucket([]byte(domain)); b != nil {
-							policy = string(b.Get([]byte("policy")))
-						}
-					}
-				}
-			}
-			return nil
-		})
-	}
-	return policy, err
 }
 
 func (i *Db) PortMapDelete(protocol, external, domain, internal string) (left int, err error) {
@@ -413,7 +411,7 @@ func (i *Db) PortInMap(protocol, external, domain, internal string) (res bool, e
 	return res, err
 }
 
-func (i *Db) PortmapList(protocol string) (list []string, err error) {
+func (i *Db) PortMapList(protocol string) (list []string, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
@@ -432,6 +430,50 @@ func (i *Db) PortmapList(protocol string) (list []string, err error) {
 												}
 												list = append(list, line)
 											}
+										}
+										return nil
+									})
+								}
+								return nil
+							})
+						}
+						return nil
+					})
+				}
+			}
+			return nil
+		})
+	}
+	return list, err
+}
+
+// temporary code for port mapping migration >>>
+
+type PortMap struct {
+	Protocol       string
+	ExternalSocket string
+	InternalSocket string
+	Domain         string
+}
+
+func (i *Db) GetAllPortMappings(protocol string) (list []PortMap, err error) {
+	var instance *bolt.DB
+	if instance, err = openDb(true); err == nil {
+		defer instance.Close()
+		instance.View(func(tx *bolt.Tx) error {
+			if b := tx.Bucket(portmap); b != nil {
+				if b = b.Bucket([]byte(protocol)); b != nil {
+					b.ForEach(func(k, v []byte) error {
+						if c := b.Bucket(k); c != nil {
+							c.ForEach(func(kk, vv []byte) error {
+								if d := c.Bucket(kk); d != nil {
+									d.ForEach(func(kkk, vvv []byte) error {
+										if d.Bucket(kkk) != nil {
+											mapping := &PortMap{Protocol: protocol, ExternalSocket: string(k), InternalSocket: string(kkk)}
+											if protocol == "http" || protocol == "https" {
+												mapping.Domain = string(kk)
+											}
+											list = append(list, *mapping)
 										}
 										return nil
 									})

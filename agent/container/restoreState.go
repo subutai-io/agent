@@ -36,7 +36,7 @@ func doRestore() {
 }
 
 func getRunningContainers() []string {
-	list, err := db.INSTANCE.ContainerByKey("state", container.Running)
+	list, err := db.INSTANCE.GetContainerByKey("state", container.Running)
 
 	if !log.Check(log.WarnLevel, "Getting list of running containers", err) {
 		return list
