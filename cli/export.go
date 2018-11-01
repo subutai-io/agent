@@ -219,7 +219,7 @@ func templateExists(name, owner, version string) bool {
 	theUrl := config.CdnUrl + "/template?name=" + name + "&owner=" + owner + "&version=" + version
 
 	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
-	resp, err := clnt.Get(theUrl)
+	resp, err := clnt.Head(theUrl)
 
 	log.Check(log.ErrorLevel, "Checking template", err)
 
