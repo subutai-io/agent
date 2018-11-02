@@ -43,12 +43,6 @@ build: vendor
 	test $(BINARY_NAME)
 	go build -o $(BINARY_NAME) -ldflags "-X main.version=$(VERSION)"
 
-build-deb:      ## Build DEB package (needs other tools)
-	test $(BINARY_NAME)
-	test $(DEB_PACKAGE_NAME)
-	test "$(DEB_PACKAGE_DESCRIPTION)"
-	exec ${BUILD_SCRIPT}
-
 test: vendor
 	go test -race $(packages)
 
