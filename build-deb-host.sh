@@ -4,9 +4,11 @@ set -xe
 BUILD_ARTIFACTS_DIR="artifacts"
 VERSION=$(git describe --tags)
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD | grep -iv head)
-ifneq (${GIT_BRANCH}, )
-	VERSION:=$(VERSION)-$(GIT_BRANCH)
-endif
+
+if [ -z "$GIT_BRANCH" ]
+then
+      VERSION="$VERSION-$$GIT_BRANCH"
+fi
 
 
 # check all the required environment variables are supplied
