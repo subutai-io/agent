@@ -2,7 +2,7 @@
 set -xe
 
 BUILD_ARTIFACTS_DIR="artifacts"
-VERSION=$(shell git describe --tags)
+VERSION=$(git describe --tags)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
 ifneq (${GIT_BRANCH}, )
 	VERSION:=$(VERSION)-$(GIT_BRANCH)
