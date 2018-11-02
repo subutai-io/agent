@@ -77,3 +77,6 @@ _testmain.go
 subutai
 .*
 !/debian/**
+
+vendor
+Gopkg.*
