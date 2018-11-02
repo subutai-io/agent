@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-BUILD_ARTIFACTS_DIR="debian"
+BUILD_ARTIFACTS_DIR="artifacts"
 BINARY_NAME=subutai
 
 VERSION=$(shell git describe --tags)
