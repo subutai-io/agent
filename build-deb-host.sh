@@ -28,9 +28,9 @@ if which fpm; then
     fpm --output-type deb \
       --input-type dir --chdir /$BUILD_ARTIFACTS_DIR \
       --prefix /usr/bin --name $BINARY_NAME \
-      --version $VERSION_STRING \
+      --version $VERSION \
       --description '${DEB_PACKAGE_DESCRIPTION}' \
-      -p ${DEB_PACKAGE_NAME}-${VERSION_STRING}.deb \
+      -p ${DEB_PACKAGE_NAME}-${VERSION}.deb \
       $BINARY_NAME && cp *.deb /$BUILD_ARTIFACTS_DIR/
     rm -f $BUILD_ARTIFACTS_DIR/$BINARY_NAME
 else
