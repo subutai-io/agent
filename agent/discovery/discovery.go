@@ -128,6 +128,17 @@ func client() {
 	if strings.TrimSpace(config.Management.Host) == "" {
 		log.Debug("Resetting MH IP")
 		config.ManagementIP = ""
+	} else {
+		// check if peer is accessible by config.Management.Host
+		fingerprint, err := consol.GetFingerprint()
+		if err == nil {
+			//check if fingerprint matches config.Management.Fingerprint
+			if config.Management.Fingerprint == "" || config.Management.Fingerprint == fingerprint {
+				//save ip
+				save(config.Management.Host)
+				return
+			}
+		}
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
