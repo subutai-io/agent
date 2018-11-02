@@ -7,7 +7,7 @@ agentCommitId = ""
 
 try {
 	notifyBuild('STARTED')
-	node("deb") {
+	node("tempdeb") {
 		deleteDir()
 
 		stage("Checkout source")
@@ -26,7 +26,7 @@ try {
                         cdnHost = "devbazaar.subutai.io";
                         sshJumpServer = "devtun.subutai.io";
                         break;
-                    case ~/sysnet/:
+                    case ~/dep/:
                         cdnHost = "devbazaar.subutai.io";
                         sshJumpServer = "devtun.subutai.io";
                         break;
@@ -78,11 +78,14 @@ try {
 		stage("Upload Packages")
 		notifyBuildDetails = "\nFailed on Stage - Upload"
 		sh """
+			echo "Uploading Skipped"
+		"""
+		/*sh """
 			cd ${CWD}
 			touch uploading_agent
 			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
 			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
-		"""
+		"""*/
 	}
 
 } catch (e) { 
