@@ -12,15 +12,6 @@ endif
 packages = $$(go list ./... | egrep -v '/vendor/')
 files = $$(find . -name '*.go' | egrep -v '/vendor/')
 
-ifeq "$(HOST_BUILD)" "yes"
-    # Use host system for building
-    BUILD_SCRIPT =./build-deb-host.sh
-else
-    # Use docker for building
-    BUILD_SCRIPT = ./build-deb-docker.sh
-endif
-
-
 .PHONY: all
 all: lint vet test build
 
