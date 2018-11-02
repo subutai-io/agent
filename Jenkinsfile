@@ -65,7 +65,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			cd ${CWD}/agent
-			make vendor
+			go get -d
 			dpkg-buildpackage -rfakeroot -us -uc
 
 			cd ${CWD} || exit 1
