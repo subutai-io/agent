@@ -1,7 +1,6 @@
 GOPATH := $(shell go env GOPATH)
 GODEP_BIN := $(GOPATH)/bin/dep
 GOLINT := $(GOPATH)/bin/golint
-BINARY_NAME=subutai
 
 VERSION=$(shell git describe --tags)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
