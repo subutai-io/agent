@@ -65,8 +65,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			cd ${CWD}/agent
-			go get -d
-			dpkg-buildpackage -rfakeroot -us -uc
+            make build-deb
 
 			cd ${CWD} || exit 1
 			for i in *.deb; do
