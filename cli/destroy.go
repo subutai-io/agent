@@ -133,16 +133,6 @@ func removePortMap(name string) {
 			}
 		}
 	}
-
-	//for management container case remove proxies as well
-	if name == container.Management {
-		for _, server := range servers {
-			proxy, err := db.FindProxyByTag(server.ProxyTag)
-			if !log.Check(log.WarnLevel, "Fetching management proxies", err) {
-				db.RemoveProxy(proxy)
-			}
-		}
-	}
 }
 
 type gradedTemplate struct {
