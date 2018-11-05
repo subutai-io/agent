@@ -4,29 +4,7 @@ Priority: optional
 Maintainer: Aron Xu <happyaron.xu@gmail.com>
 Build-Depends: debhelper (>= 10),
                dh-golang,
-               golang-any,
-               golang-cloudfoundry-archiver-dev,
-               golang-github-boltdb-bolt-dev,
-               golang-github-fromkeith-gossdp-dev,
-               golang-github-influxdb-influxdb-dev,
-               golang-github-jhoonb-archivex-dev,
-               golang-github-mcuadros-go-version-dev,
-               golang-github-nightlyone-lockfile-dev,
-               golang-github-pkg-errors-dev,
-               golang-github-sirupsen-logrus-dev,
-               golang-github-tmc-scp-dev,
-               golang-github-urfave-cli-dev,
-               golang-github-wunderlist-ttlcache-dev,
-               golang-golang-x-net-dev (>= 1:0.0+git20180124.0ed95ab~),
-               golang-gopkg-alecthomas-kingpin.v2-dev,
-               golang-gopkg-cheggaaa-pb.v1-dev,
-               golang-gopkg-gcfg.v1-dev,
-               golang-gopkg-lxc-go-lxc.v2-dev,
-               golang-gopkg-macaroon.v1-dev,
-               golang-gopkg-mcuadros-go-syslog.v2-dev,
-               golang-gopkg-retry.v1-dev,
-               golang-gopkg-tomb.v2-dev,
-               golang-gopkg-warnings.v0-dev
+               golang-any
 Standards-Version: 4.1.3
 Homepage: http://github.com/subutai-io/agent
 XS-Go-Import-Path: github.com/subutai-io/agent
