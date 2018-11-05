@@ -81,12 +81,23 @@ try {
 		
 		stage("Upload Packages")
 		notifyBuildDetails = "\nFailed on Stage - Upload"
+		if (env.BRANCH_NAME == 'dep') {
 		sh """
 			cd ${projectRoot}/.. || exit 1
 			touch uploading_agent
-			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
-			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
+			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/dev/
+			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh dev agent
+		
 		"""
+		}
+		else {
+			sh """
+			cd ${projectRoot}/.. || exit 1
+			touch uploading_agent
+				scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
+				ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
+			"""
+		}
 
         stage("Cleanup")
         notifyBuildDetails = "\nFailed on Stage - Cleanup"
