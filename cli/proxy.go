@@ -622,6 +622,8 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 		cfg = createTcpUdpConfig(proxy, servers)
 	}
 
+	makeDir(path.Join(nginxInc, proxy.Protocol))
+
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 }
 
