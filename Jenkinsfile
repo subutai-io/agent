@@ -84,11 +84,19 @@ try {
 			echo "Uploading Skipped"
 		"""
 		/*sh """
-			cd ${projectRoot} || exit 1
+			cd ${projectRoot}/.. || exit 1
 			touch uploading_agent
 			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
 			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
 		"""*/
+
+        stage("Cleanup")
+        notifyBuildDetails = "\nFailed on Stage - Cleanup"
+   		sh """
+   			cd ${projectRoot}/.. || exit 1
+   			rm subutai*
+   		"""
+
 	}
 
 } catch (e) { 

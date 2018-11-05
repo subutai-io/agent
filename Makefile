@@ -1,6 +1,7 @@
 GOPATH := $(shell go env GOPATH)
 GODEP_BIN := $(GOPATH)/bin/dep
 GOLINT := $(GOPATH)/bin/golint
+BINARY_NAME := subutai
 
 VERSION=$(shell git describe --tags)
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD | grep -iv head)
@@ -32,16 +33,6 @@ build:          ## Build the binary
 build: vendor
 	test $(BINARY_NAME)
 	go build -o $(BINARY_NAME) -ldflags "-X main.version=$(VERSION)"
-
-BUILD_SCRIPT =./build-deb-host.sh
-DEB_PACKAGE_DESCRIPTION="subutai agent"
-DEB_PACKAGE_DESCRIPTION="subutai agent"
-build-deb:      ## Build DEB package (needs other tools)
-	test $(BINARY_NAME)
-	test $(DEB_PACKAGE_NAME)
-	test "$(DEB_PACKAGE_DESCRIPTION)"
-	exec ${BUILD_SCRIPT}
-
 
 test: vendor
 	go test -race $(packages)
