@@ -67,6 +67,9 @@ try {
 			cd ${projectRoot} || exit 1
 			make vendor
             #make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
+
+			cd ${projectRoot} || exit 1
+
             dpkg-buildpackage -rfakeroot -us -uc
 
 			for i in *.deb; do
