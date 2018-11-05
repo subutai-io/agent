@@ -65,6 +65,7 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			cd ${projectRoot} || exit 1
+			make vendor
             #make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
             dpkg-buildpackage -rfakeroot -us -uc
 
