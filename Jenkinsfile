@@ -68,9 +68,11 @@ try {
 			make vendor
             #make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
 
-			cd ${projectRoot} || exit 1
+            pwd
 
             dpkg-buildpackage -rfakeroot -us -uc
+
+			cd ${projectRoot} || exit 1
 
 			for i in *.deb; do
     		            echo '\$i:';
