@@ -19,6 +19,7 @@ Depends: gnupg1 | gnupg (<< 2.0.0~),
          subutai-ovs,
          subutai-p2p,
          zfsutils-linux,
+         certbot,
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: uidmap
