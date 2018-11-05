@@ -365,7 +365,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	if loadBalancing != "" {
 		checkArgument(loadBalancing == "rr" || loadBalancing == "lcon" ||
 			loadBalancing == "sticky",
-			"Balancing policy must be one of [round_robin,least_time,hash,ip_hash]")
+			"Balancing policy must be one of [rr,sticky,lcon]")
 	}
 	//default policy to round-robin
 	checkCondition(len(loadBalancing) > 0, func() {
