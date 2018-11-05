@@ -95,7 +95,8 @@ try {
         notifyBuildDetails = "\nFailed on Stage - Cleanup"
    		sh """
    			cd ${projectRoot}/.. || exit 1
-   			rm subutai*
+   			rm subutai-agent*
+   			rm subutai*.deb
    		"""
 
 	}
