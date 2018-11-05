@@ -65,8 +65,8 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
 			cd ${projectRoot} || exit 1
-			#todo return dpkg-build
-            make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
+            #make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
+            dpkg-buildpackage -rfakeroot -us -uc
 
 			for i in *.deb; do
     		            echo '\$i:';
