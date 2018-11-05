@@ -47,6 +47,7 @@ try {
 			go get github.com/subutai-io/agent
 			cd ${projectRoot} || exit 1
 			git checkout ${release}
+			git pull
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
