@@ -44,7 +44,7 @@ try {
 			rm -rf *
 
 			# Clone agent code
-			go get https://github.com/subutai-io/agent
+			go get github.com/subutai-io/agent
 			cd ${projectRoot} || exit 1
 			git checkout ${release}
 		"""		
