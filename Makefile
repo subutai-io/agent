@@ -13,7 +13,7 @@ packages = $$(go list ./... | egrep -v '/vendor/')
 files = $$(find . -name '*.go' | egrep -v '/vendor/')
 
 .PHONY: all
-all: lint vet test build
+all: vet test build
 
 $(GODEP):
 	go get -u github.com/golang/dep/cmd/dep
