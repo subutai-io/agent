@@ -15,59 +15,59 @@ try {
 		notifyBuildDetails = "\nFailed on Stage - Checkout source"
 				
 		String date = new Date().format( 'yyyyMMddHHMMSS' )
-		def CWD = pwd()
 
-                switch (env.BRANCH_NAME) {
-                    case ~/master/: 
-                        cdnHost = "masterbazaar.subutai.io";
-                        sshJumpServer = "mastertun.subutai.io";
-                        break;
-                    case ~/dev/: 
-                        cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "devtun.subutai.io";
-                        break;
-                    case ~/dep/:
-                        cdnHost = "devbazaar.subutai.io";
-                        sshJumpServer = "devtun.subutai.io";
-                        break;
-                    default:
-                        cdnHost = "bazaar.subutai.io";
-                        sshJumpServer = "tun.subutai.io";
-                }
-                def release = env.BRANCH_NAME
+		def projectRoot = "/home/jenkins/go/src/github.com/subutai-io/agent"
+
+        switch (env.BRANCH_NAME) {
+            case ~/master/:
+                cdnHost = "masterbazaar.subutai.io";
+                sshJumpServer = "mastertun.subutai.io";
+                break;
+            case ~/dev/:
+                cdnHost = "devbazaar.subutai.io";
+                sshJumpServer = "devtun.subutai.io";
+                break;
+            case ~/dep/:
+                cdnHost = "devbazaar.subutai.io";
+                sshJumpServer = "devtun.subutai.io";
+                break;
+            default:
+                cdnHost = "bazaar.subutai.io";
+                sshJumpServer = "tun.subutai.io";
+        }
+        def release = env.BRANCH_NAME
 
 		sh """
 			#set +x
 			export LC_ALL=C.UTF-8
 			export LANG=C.UTF-8
 			rm -rf *
-			cd ${CWD} || exit 1
 
 			# Clone agent code
-			git clone https://github.com/subutai-io/agent
-			cd agent
+			go get https://github.com/subutai-io/agent
+			cd ${projectRoot} || exit 1
 			git checkout ${release}
 		"""		
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
-                        cd ${CWD}/agent || exit 1
-                        agent_version=\$(git describe --abbrev=0 --tags)+\$(date +%Y%m%d%H%M%S0)
+            cd ${projectRoot} || exit 1
+            agent_version=\$(git describe --abbrev=0 --tags)+\$(date +%Y%m%d%H%M%S0)
 			echo "VERSION is \$agent_version"
 
-			cd ${CWD}/agent && sed -i 's/quilt/native/' debian/source/format
-            cd ${CWD}/agent && sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
-            cd ${CWD}/agent && sed -i 's/@sshJumpServer@/${sshJumpServer}/' debian/tree/agent.conf
+			sed -i 's/quilt/native/' debian/source/format
+            sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
+            sed -i 's/@sshJumpServer@/${sshJumpServer}/' debian/tree/agent.conf
 			dch -v "\$agent_version" -D stable "Test build for \$agent_version" 1>/dev/null 2>/dev/null
 		"""
 
 		stage("Build Agent package")
 		notifyBuildDetails = "\nFailed on Stage - Build package"
 		sh """
-			cd ${CWD}/agent
+			cd ${projectRoot} || exit 1
+			#todo return dpkg-build
             make build-deb BINARY_NAME=subutai DEB_PACKAGE_DESCRIPTION="subutai agent deb" DEB_PACKAGE_NAME=subutai
 
-			cd ${CWD} || exit 1
 			for i in *.deb; do
     		            echo '\$i:';
     		            dpkg -c \$i;
@@ -80,7 +80,7 @@ try {
 			echo "Uploading Skipped"
 		"""
 		/*sh """
-			cd ${CWD}
+			cd ${projectRoot} || exit 1
 			touch uploading_agent
 			scp uploading_agent subutai*.deb dak@debup.subutai.io:incoming/${release}/
 			ssh dak@debup.subutai.io sh /var/reprepro/scripts/scan-incoming.sh ${release} agent
