@@ -2,9 +2,8 @@
 Description=LetsEncrypt certificates updater timer
 
 [Timer]
-OnCalendar=weekly
-Persistent=true
-Unit=subutai-le.service
+OnBootSec=1h
+OnUnitActiveSec=1w
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=timers.target
