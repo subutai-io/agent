@@ -36,9 +36,9 @@ func RemovePortMapping(protocol, domain string, port int, server string) {
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 
-	tag := fmt.Sprintf("%s-%d-%s", protocol, port, domain)
+	tag := fmt.Sprintf(TAGFORMAT, protocol, port, domain)
 	if protocol == TCP || protocol == UDP {
-		tag = fmt.Sprintf("%s-%d-stream", protocol, port)
+		tag = fmt.Sprintf(TAGFORMAT, protocol, port, "stream")
 	}
 
 	if server != "" {
@@ -60,9 +60,9 @@ func AddPortMapping(protocol, domain, loadBalancing string, port int, server, ce
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 
-	tag := fmt.Sprintf("%s-%d-%s", protocol, port, domain)
+	tag := fmt.Sprintf(TAGFORMAT, protocol, port, domain)
 	if protocol == TCP || protocol == UDP {
-		tag = fmt.Sprintf("%s-%d-stream", protocol, port)
+		tag = fmt.Sprintf(TAGFORMAT, protocol, port, "stream")
 	}
 
 	proxy, err := db.FindProxyByTag(tag)
