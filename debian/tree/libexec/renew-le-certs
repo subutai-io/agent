@@ -1,0 +1,5 @@
+#!/bin/bash
+
+#this script renews letsencrypt certificates
+
+certbot renew --config-dir /var/lib/subutai/letsencrypt --email hostmaster@subutai.io --agree-tos

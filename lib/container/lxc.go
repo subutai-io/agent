@@ -538,7 +538,35 @@ func QuotaNet(name string, size string) string {
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
 func SetContainerConf(container string, conf [][]string) error {
 	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
-	return SetConfig(confPath, conf)
+	newconf := ""
+
+	file, err := os.Open(confPath)
+	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
+		return err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(bufio.NewReader(file))
+	for scanner.Scan() {
+		newline := scanner.Text() + "\n"
+		for i := 0; i < len(conf); i++ {
+			line := strings.Split(scanner.Text(), "=")
+			if len(line) > 1 && strings.Trim(line[0], " ") == conf[i][0] {
+				if newline = ""; len(conf[i][1]) > 0 {
+					newline = conf[i][0] + " = " + conf[i][1] + "\n"
+				}
+				conf = append(conf[:i], conf[i+1:]...)
+				break
+			}
+		}
+		newconf = newconf + newline
+	}
+
+	for i := range conf {
+		if conf[i][1] != "" {
+			newconf = newconf + conf[i][0] + " = " + conf[i][1] + "\n"
+		}
+	}
+	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
 }
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.

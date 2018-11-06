@@ -26,6 +26,8 @@ const HTTPS = "https"
 const UDP = "udp"
 const TCP = "tcp"
 
+const TAGFORMAT = "%s-%d-%s"
+
 //for http and LE certs only
 //place-holders: {domain}
 const letsEncryptWellKnownSection = `
@@ -133,7 +135,7 @@ func MigrateMappings() {
 	streamMap := make(map[string]*ProxyNServers) //key format "protocol_externalsocket"
 	for _, m := range streamMappings {
 		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
-		key := fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)
+		key := fmt.Sprintf(TAGFORMAT, m.Protocol, port, "stream")
 		streamMap[key] = &ProxyNServers{Proxy: db.Proxy{
 			Domain:   m.Domain,
 			Protocol: m.Protocol,
@@ -143,7 +145,8 @@ func MigrateMappings() {
 	}
 
 	for _, m := range streamMappings {
-		portMap := streamMap[fmt.Sprintf("%s_%s", m.Protocol, m.ExternalSocket)]
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		portMap := streamMap[fmt.Sprintf(TAGFORMAT, m.Protocol, port, "stream")]
 		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
 	}
 
@@ -157,7 +160,7 @@ func MigrateMappings() {
 	webMap := make(map[string]*ProxyNServers) //key format "protocol_domain_externalsocket"
 	for _, m := range webMappings {
 		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
-		key := fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)
+		key := fmt.Sprintf(TAGFORMAT, m.Protocol, port, m.Domain)
 		webMap[key] = &ProxyNServers{Proxy: db.Proxy{
 			Domain:   m.Domain,
 			Protocol: m.Protocol,
@@ -167,7 +170,8 @@ func MigrateMappings() {
 	}
 
 	for _, m := range webMappings {
-		portMap := webMap[fmt.Sprintf("%s_%s_%s", m.Protocol, m.Domain, m.ExternalSocket)]
+		port, _ := strconv.Atoi(strings.Split(m.ExternalSocket, ":")[1])
+		portMap := webMap[fmt.Sprintf(TAGFORMAT, m.Protocol, port, m.Domain)]
 		portMap.Servers = append(portMap.Servers, db.ProxiedServer{ProxyTag: portMap.Proxy.Tag, Socket: m.InternalSocket})
 	}
 
@@ -365,7 +369,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	if loadBalancing != "" {
 		checkArgument(loadBalancing == "rr" || loadBalancing == "lcon" ||
 			loadBalancing == "sticky",
-			"Balancing policy must be one of [round_robin,least_time,hash,ip_hash]")
+			"Balancing policy must be one of [rr,sticky,lcon]")
 	}
 	//default policy to round-robin
 	checkCondition(len(loadBalancing) > 0, func() {
@@ -621,6 +625,8 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	} else {
 		cfg = createTcpUdpConfig(proxy, servers)
 	}
+
+	makeDir(path.Join(nginxInc, proxy.Protocol))
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 }

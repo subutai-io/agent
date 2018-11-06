@@ -126,20 +126,20 @@ func removePortMap(name string) {
 	containerIp := container.GetIp(name)
 	servers, err := db.FindProxiedServers("", "")
 	if !log.Check(log.WarnLevel, "Fetching port mappings", err) {
+		var removedServers []db.ProxiedServer
+
 		for _, server := range servers {
 			sock := strings.Split(server.Socket, ":")
 			if sock[0] == containerIp {
 				RemoveProxiedServer(server.ProxyTag, server.Socket)
+				removedServers = append(removedServers, server)
 			}
 		}
-	}
 
-	//for management container case remove proxies as well
-	if name == container.Management {
-		for _, server := range servers {
-			proxy, err := db.FindProxyByTag(server.ProxyTag)
-			if !log.Check(log.WarnLevel, "Fetching management proxies", err) {
-				db.RemoveProxy(proxy)
+		//remove proxies for management container
+		if name == container.Management {
+			for _, server := range removedServers {
+				RemoveProxy(server.ProxyTag)
 			}
 		}
 	}
