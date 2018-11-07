@@ -154,7 +154,7 @@ var (
 	mapCmd               = app.Command("map", "Map ports")
 	mapAddCmd            = mapCmd.Command("add", "Add port mapping")
 	mapAddProtocol       = mapAddCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
-	mapAddExternalPort   = mapAddCmd.Flag("external port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	mapAddExternalPort   = mapAddCmd.Flag("external port", "external port in range [80,443,1000-65535]").Short('e').Required().Int()
 	mapAddInternalServer = mapAddCmd.Flag("internal server", "ip:port").Short('i').Required().String()
 	mapAddDomain         = mapAddCmd.Flag("domain", "domain name").Short('n').String()
 	mapAddCertificate    = mapAddCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
@@ -167,7 +167,7 @@ var (
 	*/
 	mapRemoveCmd            = mapCmd.Command("rm", "Remove port mapping").Alias("del")
 	mapRemoveProtocol       = mapRemoveCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
-	mapRemoveExternalPort   = mapRemoveCmd.Flag("external port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	mapRemoveExternalPort   = mapRemoveCmd.Flag("external port", "external port in range [80,443,1000-65535]").Short('e').Required().Int()
 	mapRemoveInternalServer = mapRemoveCmd.Flag("internal server", "ip:port").Short('i').String()
 	mapRemoveDomain         = mapRemoveCmd.Flag("domain", "domain name").Short('n').String()
 
@@ -191,7 +191,7 @@ var (
 	prxyCreateCmd           = prxyCmd.Command("create", "Create proxy")
 	prxyCreateDomain        = prxyCreateCmd.Flag("domain", "proxy domain").Short('n').String()
 	prxyCreateProtocol      = prxyCreateCmd.Flag("protocol", "protocol [http,https,tcp,udp]").Short('p').Required().String()
-	prxyCreatePort          = prxyCreateCmd.Flag("port", "external port in range [80,443,1000-65536]").Short('e').Required().Int()
+	prxyCreatePort          = prxyCreateCmd.Flag("port", "external port in range [80,443,1000-65535]").Short('e').Required().Int()
 	prxyCreateTag           = prxyCreateCmd.Flag("tag", "unique tag for proxy").Short('t').Required().String()
 	prxyCreateLoadBalancing = prxyCreateCmd.Flag("balancing", "load balancing policy [rr(round_robin),sticky(ip_hash),lcon(least_conn)]").Short('b').String()
 	prxyCreateCertificate   = prxyCreateCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
