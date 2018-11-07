@@ -1,8 +1,6 @@
 package db
 
 import (
-	"strconv"
-
 	"github.com/boltdb/bolt"
 
 	"github.com/subutai-io/agent/config"
@@ -43,27 +41,6 @@ func openDb(readOnly bool) (*bolt.DB, error) {
 	}
 
 	return boltDB, nil
-}
-
-func (i *Db) AddTunEntry(options map[string]string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			var b *bolt.Bucket
-			if b, err = tx.CreateBucketIfNotExists(sshtunnels); err == nil {
-				if c, err := b.CreateBucketIfNotExists([]byte(options["pid"])); err == nil {
-					for k, v := range options {
-						if err := c.Put([]byte(k), []byte(v)); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			return err
-		})
-	}
-	return err
 }
 
 func (i *Db) DelTunEntry(pid string) (err error) {
@@ -135,6 +112,8 @@ func (i *Db) GetDiscoveredIp() (ip string, err error) {
 	return ip, err
 }
 
+//>>>>>>>>>>>>>containers
+
 func (i *Db) SaveContainer(name string, options map[string]string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
@@ -170,60 +149,6 @@ func (i *Db) RemoveContainer(name string) (err error) {
 		})
 	}
 	return err
-}
-
-func (i *Db) SaveContainerPortMapping(name, protocol, external, domain, internal string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(containers); b != nil {
-				if b = b.Bucket([]byte(name)); b != nil {
-					if b, err = b.CreateBucketIfNotExists([]byte("portmap")); err == nil {
-						var n uint64
-						if n, err = b.NextSequence(); err == nil {
-							if b, err = b.CreateBucketIfNotExists([]byte(strconv.Itoa(int(n)))); err == nil {
-								b.Put([]byte("protocol"), []byte(protocol))
-								b.Put([]byte("external"), []byte(external))
-								b.Put([]byte("domain"), []byte(domain))
-								b.Put([]byte("internal"), []byte(internal))
-							}
-						}
-					}
-				}
-			}
-			return err
-		})
-	}
-	return err
-}
-
-func (i *Db) GetContainerPortMapping(name string) (list []map[string]string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(containers); b != nil {
-				if b = b.Bucket([]byte(name)); b != nil {
-					if b = b.Bucket([]byte("portmap")); b != nil {
-						b.ForEach(func(k, v []byte) error {
-							l := make(map[string]string)
-							if c := b.Bucket(k); c != nil {
-								c.ForEach(func(kk, vv []byte) error {
-									l[string(kk)] = string(vv)
-									return nil
-								})
-							}
-							list = append(list, l)
-							return nil
-						})
-					}
-				}
-			}
-			return nil
-		})
-	}
-	return list, err
 }
 
 func (i *Db) GetContainers() (list []string, err error) {
@@ -287,68 +212,7 @@ func (i *Db) GetContainerByKey(key, value string) (list []string, err error) {
 	return list, err
 }
 
-func (i *Db) SetBalancingPolicy(protocol, external, domain, policy string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		instance.Update(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					if b = b.Bucket([]byte(external)); b != nil {
-						if b = b.Bucket([]byte(domain)); b != nil {
-							return b.Put([]byte("policy"), []byte(policy))
-						}
-					}
-				}
-			}
-			return nil
-		})
-	}
-	return err
-}
-
-func (i *Db) GetBalancingPolicy(protocol, external, domain string) (policy string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					if b = b.Bucket([]byte(external)); b != nil {
-						if b = b.Bucket([]byte(domain)); b != nil {
-							policy = string(b.Get([]byte("policy")))
-						}
-					}
-				}
-			}
-			return nil
-		})
-	}
-	return policy, err
-}
-
-func (i *Db) PortMapSet(protocol, external, domain, internal string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			var b *bolt.Bucket
-			if b, err = tx.CreateBucketIfNotExists(portmap); err == nil {
-				if b, err = b.CreateBucketIfNotExists([]byte(protocol)); err == nil {
-					if b, err = b.CreateBucketIfNotExists([]byte(external)); err == nil {
-						if b, err = b.CreateBucketIfNotExists([]byte(domain)); err == nil {
-							if b, err = b.CreateBucketIfNotExists([]byte(internal)); err != nil {
-								return err
-							}
-						}
-					}
-				}
-			}
-			return err
-		})
-	}
-	return err
-}
+//<<<<<<<<<<<<containers
 
 func (i *Db) PortMapDelete(protocol, external, domain, internal string) (left int, err error) {
 	var instance *bolt.DB
@@ -411,41 +275,6 @@ func (i *Db) PortInMap(protocol, external, domain, internal string) (res bool, e
 	return res, err
 }
 
-func (i *Db) PortMapList(protocol string) (list []string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					b.ForEach(func(k, v []byte) error {
-						if c := b.Bucket(k); c != nil {
-							c.ForEach(func(kk, vv []byte) error {
-								if d := c.Bucket(kk); d != nil {
-									d.ForEach(func(kkk, vvv []byte) error {
-										if d.Bucket(kkk) != nil {
-											if line := protocol + "\t" + string(k) + "\t" + string(kkk); len(line) > 0 {
-												if protocol == "http" || protocol == "https" {
-													line = line + "\t" + string(kk)
-												}
-												list = append(list, line)
-											}
-										}
-										return nil
-									})
-								}
-								return nil
-							})
-						}
-						return nil
-					})
-				}
-			}
-			return nil
-		})
-	}
-	return list, err
-}
 
 // temporary code for port mapping migration >>>
 
