@@ -279,7 +279,7 @@ func MigrateMappings() {
 	for _, v := range streamMap {
 		//check if the same port is not used by other mappings
 		proxies, _ := db.FindProxies("", "", v.Proxy.Port)
-		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65536) {
+		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65535) {
 			//remove old mapping
 			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
 			//skip it
@@ -358,8 +358,8 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	//check if port is specified and valid
 	checkArgument(port == 80 || port == 443 ||
 		port == 8443 || port == 8444 || port == 8086 ||
-		(port >= 1000 && port <= 65536),
-		"External port must be one of [80, 443, 1000-65536] ")
+		(port >= 1000 && port <= 65535),
+		"External port must be one of [80, 443, 1000-65535] ")
 
 	//check domain
 	if protocol == HTTP || protocol == HTTPS {
