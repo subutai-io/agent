@@ -121,6 +121,10 @@ func init() {
 	makeDir(letsEncryptWebRootDir)
 	makeDir(letsEncryptCertsDir)
 
+	makeDir(path.Join(nginxInc, HTTPS))
+	makeDir(path.Join(nginxInc, HTTP))
+	makeDir(path.Join(nginxInc, TCP))
+	makeDir(path.Join(nginxInc, UDP))
 }
 
 func MigrateMappings() {
@@ -625,8 +629,6 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	} else {
 		cfg = createTcpUdpConfig(proxy, servers)
 	}
-
-	makeDir(path.Join(nginxInc, proxy.Protocol))
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
 }
