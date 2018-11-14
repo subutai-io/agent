@@ -15,8 +15,6 @@ import (
 	"github.com/subutai-io/agent/agent/console"
 )
 
-const MhIp = "10.10.10.1"
-
 type handler struct {
 }
 
@@ -30,7 +28,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 
 	managementHostIp := config.ManagementIP
-	if managementHostIp == MhIp {
+	if managementHostIp == container.ManagementIp {
 		managementHostIp = ""
 	}
 
@@ -82,7 +80,7 @@ func Monitor() {
 }
 
 func server() {
-	save(MhIp)
+	save(container.ManagementIp)
 
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {

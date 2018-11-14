@@ -128,7 +128,7 @@ func init() {
 }
 
 func MigrateMappings() {
-	log.Debug("MIGRATION STARTED")
+	log.Debug("MAPPING MIGRATION STARTED")
 	var streamMappings []db.PortMap
 	for _, v := range []string{"tcp", "udp"} {
 		l, err := db.INSTANCE.GetAllPortMappings(v)
@@ -180,7 +180,7 @@ func MigrateMappings() {
 	}
 
 	if len(streamMap) == 0 && len(webMap) == 0 {
-		log.Debug("MIGRATION ENDED")
+		log.Debug("MAPPING MIGRATION ENDED")
 		return
 	}
 
@@ -323,7 +323,7 @@ func MigrateMappings() {
 
 	reloadNginx()
 
-	log.Debug("MIGRATION ENDED")
+	log.Debug("MAPPING MIGRATION ENDED")
 }
 
 type ProxyNServers struct {

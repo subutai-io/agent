@@ -26,6 +26,8 @@ import (
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
 
 func MigrateTunnels() {
+	log.Debug("TUNNEL MIGRATION STARTED")
+
 	var oldTunnelRecords []db.SshTunnel
 	list, err := db.INSTANCE.GetTunList()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
@@ -50,6 +52,9 @@ func MigrateTunnels() {
 		//remove from old table
 		db.INSTANCE.DelTunEntry(strconv.Itoa(tun.Pid))
 	}
+
+	log.Debug("TUNNEL MIGRATION ENDED")
+
 }
 
 // TunAdd adds tunnel to specified network socket

@@ -37,10 +37,10 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 		}
 		log.Error("Container " + contId + " not found")
 	} else if vlan {
-		list, err := db.INSTANCE.GetContainerByKey("vlan", id)
+		list, err := db.FindContainers("", "", id)
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 			for _, c := range list {
-				LxcDestroy(c, false, true)
+				LxcDestroy(c.Name, false, true)
 			}
 			msg = "Vlan " + id + " is destroyed"
 		}
@@ -51,16 +51,16 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 			return
 		}
 
-		c, err := db.INSTANCE.GetContainerByName(id)
+		c, err := db.FindContainerByName(id)
 		log.Check(log.WarnLevel, "Reading container metadata from db", err)
 
 		msg = "Container " + id + " is destroyed"
 
-		if len(c) != 0 {
+		if c != nil {
 
 			removePortMap(id)
 
-			net.DelIface(c["interface"])
+			net.DelIface(c.Interface)
 
 			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
 
@@ -76,15 +76,12 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	}
 
 	if id == "everything" {
-		list, err := db.INSTANCE.GetContainers()
+		list, err := db.FindContainers("", "", "")
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-			for _, name := range list {
-				LxcDestroy(name, false, true)
-				c, err := db.INSTANCE.GetContainerByName(name)
-				if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-					if v, ok := c["vlan"]; ok {
-						cleanupNet(v)
-					}
+			for _, cont := range list {
+				LxcDestroy(cont.Name, false, true)
+				if cont.Vlan != "" {
+					cleanupNet(cont.Vlan)
 				}
 			}
 		}

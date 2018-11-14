@@ -39,11 +39,12 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 
 	log.Debug("Parent template is " + t.Name + "@" + t.Owner + ":" + t.Version)
 
-	meta := make(map[string]string)
-	meta["parent"] = t.Name
-	meta["parent.owner"] = t.Owner
-	meta["parent.version"] = t.Version
-	meta["parent.id"] = t.Id
+	cont := &db.Container{}
+	cont.Name = child
+	cont.Template = t.Name
+	cont.TemplateOwner = t.Owner
+	cont.TemplateVersion = t.Version
+	cont.TemplateId = t.Id
 
 	fullRef := strings.Join([]string{t.Name, t.Owner, t.Version}, ":")
 
@@ -59,16 +60,16 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 	}
 
 	if len(envID) != 0 {
-		meta["environment"] = envID
+		cont.EnvironmentId = envID
 	}
 
 	if ip := strings.Fields(addr); len(ip) > 1 {
-		meta["gw"] = addNetConf(child, addr)
-		meta["ip"] = strings.Split(ip[0], "/")[0]
-		meta["vlan"] = ip[1]
+		cont.Gateway = addNetConf(child, addr)
+		cont.Ip = strings.Split(ip[0], "/")[0]
+		cont.Vlan = ip[1]
 	}
 
-	meta["uid"], _ = container.SetContainerUID(child)
+	cont.Uid, _ = container.SetContainerUID(child)
 
 	//Need to change it in parent templates
 	container.SetDNS(child)
@@ -80,9 +81,9 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 
 	LxcStart(child)
 
-	meta["interface"] = container.GetProperty(child, "lxc.network.veth.pair")
+	cont.Interface = container.GetProperty(child, "lxc.network.veth.pair")
 
-	log.Check(log.ErrorLevel, "Writing container metadata to database", db.INSTANCE.SaveContainer(child, meta))
+	log.Check(log.ErrorLevel, "Writing container metadata to database", db.SaveContainer(cont))
 
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
@@ -112,11 +113,10 @@ func addNetConf(name, addr string) string {
 
 func getEnvGw(vlan string) (gw string) {
 
-	list, _ := db.INSTANCE.GetContainerByKey("vlan", vlan)
+	list, _ := db.FindContainers("", "", vlan)
 
 	if len(list) > 0 {
-		meta, _ := db.INSTANCE.GetContainerByName(list[0])
-		gw = meta["gw"]
+		gw = list[0].Gateway
 	}
 
 	return

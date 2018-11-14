@@ -7,7 +7,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/lib/fs"
 	"time"
-	bolt "go.etcd.io/bbolt"
+	"go.etcd.io/bbolt"
 	"github.com/asdine/storm/q"
 	"fmt"
 )
@@ -27,6 +27,42 @@ func init() {
 		log.Check(log.ErrorLevel, "Initializing proxy storage", db.Init(&Proxy{}))
 		log.Check(log.ErrorLevel, "Initializing proxied servers storage", db.Init(&ProxiedServer{}))
 	}
+
+	migrateContainers()
+}
+
+func migrateContainers() {
+	log.Debug("CONTAINER MIGRATION STARTED")
+
+	list, _ := INSTANCE.GetContainers()
+
+	for _, name := range list {
+		meta, err := INSTANCE.GetContainerByName(name)
+
+		if meta != nil && err == nil {
+
+			cont := Container{}
+			cont.Name = name
+			cont.State = meta["state"]
+			cont.Vlan = meta["vlan"]
+			cont.EnvironmentId = meta["environment"]
+			cont.Gateway = meta["gw"]
+			cont.Ip = meta["ip"]
+			cont.Interface = meta["interface"]
+			cont.Uid = meta["uid"]
+			cont.Template = meta["parent"]
+			cont.TemplateOwner = meta["parent.owner"]
+			cont.TemplateId = meta["parent.id"]
+			cont.TemplateVersion = meta["parent.version"]
+
+			SaveContainer(&cont)
+
+			INSTANCE.RemoveContainer(name)
+		}
+	}
+
+	log.Debug("CONTAINER MIGRATION STARTED")
+
 }
 
 func getDb(readOnly bool) (*storm.DB, error) {
@@ -41,6 +77,79 @@ func getDb(readOnly bool) (*storm.DB, error) {
 
 	return boltDB, nil
 }
+
+//Container>>>>>>>
+func SaveContainer(container *Container) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Save(container)
+}
+
+func RemoveContainer(container *Container) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.DeleteStruct(container)
+}
+
+func FindContainers(name, state, vlan string) (containers []Container, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var matchers []q.Matcher
+
+	if name != "" {
+		matchers = append(matchers, q.Eq("Name", name))
+	}
+
+	if state != "" {
+		matchers = append(matchers, q.Eq("State", state))
+	}
+
+	if vlan != "" {
+		matchers = append(matchers, q.Eq("Vlan", vlan))
+	}
+
+	err = db.Select(matchers...).Find(&containers)
+
+	if err != nil && err == storm.ErrNotFound {
+		err = nil
+	}
+
+	return containers, err
+}
+
+func FindContainerByName(name string) (container *Container, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	result := Container{}
+	err = db.One("Name", name, &result)
+	if err != nil && err == storm.ErrNotFound {
+		return nil, nil
+	}
+
+	return &result, err
+}
+
+//<<<<<<<Container
 
 //Proxy>>>>>>>
 

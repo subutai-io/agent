@@ -16,31 +16,32 @@ func StateRestore() {
 }
 
 func doRestore() {
-	active := getRunningContainers()
+	active := getContainersSupposedToBeRunning()
 
 	for _, v := range active {
-		if container.State(v) != container.Running {
-			log.Debug("Starting container " + v)
-			startErr := container.Start(v)
+		if container.State(v.Name) != container.Running {
+			log.Debug("Starting container " + v.Name)
+			startErr := container.Start(v.Name)
 			for i := 0; i < 5 && startErr != nil; i++ {
-				log.Debug("Retrying container " + v + " start")
+				log.Debug("Retrying container " + v.Name + " start")
 				time.Sleep(time.Second * time.Duration(5+i))
-				startErr = container.Start(v)
+				startErr = container.Start(v.Name)
 			}
 			if startErr != nil {
-				log.Warn("Failed to start container " + v + ": " + startErr.Error())
-				container.AddMetadata(v, map[string]string{"state": container.Stopped})
+				log.Warn("Failed to start container " + v.Name + ": " + startErr.Error())
+				v.State = container.Stopped
+				db.SaveContainer(&v)
 			}
 		}
 	}
 }
 
-func getRunningContainers() []string {
-	list, err := db.INSTANCE.GetContainerByKey("state", container.Running)
+func getContainersSupposedToBeRunning() []db.Container {
+	list, err := db.FindContainers("", container.Running, "")
 
 	if !log.Check(log.WarnLevel, "Getting list of running containers", err) {
 		return list
 	}
 
-	return []string{}
+	return []db.Container{}
 }
