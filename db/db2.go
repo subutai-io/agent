@@ -75,6 +75,35 @@ func getDb(readOnly bool) (*storm.DB, error) {
 	return boltDB, nil
 }
 
+func SaveDiscoveredIp(ip string) (err error) {
+	var instance *storm.DB
+	if instance, err = getDb(false); err == nil {
+		defer instance.Close()
+		return instance.Bolt.Update(func(tx *bolt.Tx) error {
+			var b *bolt.Bucket
+			if b, err = tx.CreateBucketIfNotExists([]byte("config")); err == nil {
+				err = b.Put([]byte("DiscoveredIP"), []byte(ip))
+			}
+			return err
+		})
+	}
+	return err
+}
+
+func GetDiscoveredIp() (ip string, err error) {
+	var instance *storm.DB
+	if instance, err = getDb(true); err == nil {
+		defer instance.Close()
+		instance.Bolt.View(func(tx *bolt.Tx) error {
+			if b := tx.Bucket([]byte("config")); b != nil {
+				ip = string(b.Get([]byte("DiscoveredIP")))
+			}
+			return nil
+		})
+	}
+	return ip, err
+}
+
 //Container>>>>>>>
 func SaveContainer(container *Container) (err error) {
 	var db *storm.DB
