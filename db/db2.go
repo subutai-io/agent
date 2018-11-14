@@ -32,7 +32,6 @@ func init() {
 }
 
 func migrateContainers() {
-	log.Debug("CONTAINER MIGRATION STARTED")
 
 	list, _ := INSTANCE.GetContainers()
 
@@ -60,8 +59,6 @@ func migrateContainers() {
 			INSTANCE.RemoveContainer(name)
 		}
 	}
-
-	log.Debug("CONTAINER MIGRATION STARTED")
 
 }
 
