@@ -43,6 +43,7 @@ func openDb(readOnly bool) (*bolt.DB, error) {
 	return boltDB, nil
 }
 
+// temporary code for tunnel migration >>>
 func (i *Db) DelTunEntry(pid string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
@@ -83,58 +84,7 @@ func (i *Db) GetTunList() (list []map[string]string, err error) {
 	return list, err
 }
 
-func (i *Db) SaveDiscoveredIp(ip string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			var b *bolt.Bucket
-			if b, err = tx.CreateBucketIfNotExists([]byte("config")); err == nil {
-				err = b.Put([]byte("DiscoveredIP"), []byte(ip))
-			}
-			return err
-		})
-	}
-	return err
-}
-
-func (i *Db) GetDiscoveredIp() (ip string, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket([]byte("config")); b != nil {
-				ip = string(b.Get([]byte("DiscoveredIP")))
-			}
-			return nil
-		})
-	}
-	return ip, err
-}
-
-//>>>>>>>>>>>>>containers
-
-func (i *Db) SaveContainer(name string, options map[string]string) (err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(false); err == nil {
-		defer instance.Close()
-		return instance.Update(func(tx *bolt.Tx) error {
-			var b *bolt.Bucket
-			if b, err = tx.CreateBucketIfNotExists(containers); err == nil {
-				if b, err = b.CreateBucketIfNotExists([]byte(name)); err == nil {
-					for k, v := range options {
-						if err = b.Put([]byte(k), []byte(v)); err != nil {
-							return err
-						}
-					}
-				}
-			}
-			return err
-		})
-	}
-	return err
-}
-
+// temporary code for container migration >>>
 func (i *Db) RemoveContainer(name string) (err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(false); err == nil {
@@ -188,31 +138,48 @@ func (i *Db) GetContainerByName(name string) (c map[string]string, err error) {
 	return c, err
 }
 
-func (i *Db) GetContainerByKey(key, value string) (list []string, err error) {
+// temporary code for port mapping migration >>>
+type PortMap struct {
+	Protocol       string
+	ExternalSocket string
+	InternalSocket string
+	Domain         string
+}
+
+func (i *Db) GetAllPortMappings(protocol string) (list []PortMap, err error) {
 	var instance *bolt.DB
 	if instance, err = openDb(true); err == nil {
 		defer instance.Close()
 		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(containers); b != nil {
-				b.ForEach(func(k, v []byte) error {
-					if c := b.Bucket(k); c != nil {
-						c.ForEach(func(kk, vv []byte) error {
-							if string(kk) == key && string(vv) == value {
-								list = append(list, string(k))
-							}
-							return nil
-						})
-					}
-					return nil
-				})
+			if b := tx.Bucket(portmap); b != nil {
+				if b = b.Bucket([]byte(protocol)); b != nil {
+					b.ForEach(func(k, v []byte) error {
+						if c := b.Bucket(k); c != nil {
+							c.ForEach(func(kk, vv []byte) error {
+								if d := c.Bucket(kk); d != nil {
+									d.ForEach(func(kkk, vvv []byte) error {
+										if d.Bucket(kkk) != nil {
+											mapping := &PortMap{Protocol: protocol, ExternalSocket: string(k), InternalSocket: string(kkk)}
+											if protocol == "http" || protocol == "https" {
+												mapping.Domain = string(kk)
+											}
+											list = append(list, *mapping)
+										}
+										return nil
+									})
+								}
+								return nil
+							})
+						}
+						return nil
+					})
+				}
 			}
 			return nil
 		})
 	}
 	return list, err
 }
-
-//<<<<<<<<<<<<containers
 
 func (i *Db) PortMapDelete(protocol, external, domain, internal string) (left int, err error) {
 	var instance *bolt.DB
@@ -273,49 +240,4 @@ func (i *Db) PortInMap(protocol, external, domain, internal string) (res bool, e
 		})
 	}
 	return res, err
-}
-
-
-// temporary code for port mapping migration >>>
-
-type PortMap struct {
-	Protocol       string
-	ExternalSocket string
-	InternalSocket string
-	Domain         string
-}
-
-func (i *Db) GetAllPortMappings(protocol string) (list []PortMap, err error) {
-	var instance *bolt.DB
-	if instance, err = openDb(true); err == nil {
-		defer instance.Close()
-		instance.View(func(tx *bolt.Tx) error {
-			if b := tx.Bucket(portmap); b != nil {
-				if b = b.Bucket([]byte(protocol)); b != nil {
-					b.ForEach(func(k, v []byte) error {
-						if c := b.Bucket(k); c != nil {
-							c.ForEach(func(kk, vv []byte) error {
-								if d := c.Bucket(kk); d != nil {
-									d.ForEach(func(kkk, vvv []byte) error {
-										if d.Bucket(kkk) != nil {
-											mapping := &PortMap{Protocol: protocol, ExternalSocket: string(k), InternalSocket: string(kkk)}
-											if protocol == "http" || protocol == "https" {
-												mapping.Domain = string(kk)
-											}
-											list = append(list, *mapping)
-										}
-										return nil
-									})
-								}
-								return nil
-							})
-						}
-						return nil
-					})
-				}
-			}
-			return nil
-		})
-	}
-	return list, err
 }

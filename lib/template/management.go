@@ -20,7 +20,6 @@ func MngInit(templateRef string) {
 	})
 	gpg.GenerateKey(container.Management)
 	container.SetDNS(container.Management)
-	container.AddMetadata(container.Management, map[string]string{"ip": "10.10.10.1"})
 	container.Start(container.Management)
 
 	//TODO move mapping functions from cli package and get rid of exec
@@ -37,7 +36,10 @@ func MngInit(templateRef string) {
 	log.Check(log.WarnLevel, "Redirecting port 8086 to management container",
 		exec.Command("subutai", "proxy", "srv", "add", "-t", "management-8086", "-s", "10.10.10.1:8086").Run())
 
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.SaveContainer(container.Management, map[string]string{"ip": "10.10.10.1"}))
+	mgmtCont := &db.Container{}
+	mgmtCont.Name = container.Management
+	mgmtCont.Ip = container.ManagementIp
+	log.Check(log.ErrorLevel, "Writing container data to database", db.SaveContainer(mgmtCont))
 
 	log.Info("********************")
 	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")

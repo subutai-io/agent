@@ -40,6 +40,7 @@ const (
 //TODO add methods IsRunning, IsStopped
 
 const Management = "management"
+const ManagementIp = "10.10.10.1"
 const ContainerDefaultIface = "eth0"
 
 var crc32Table = crc32.MakeTable(0xD5828281)
@@ -97,15 +98,6 @@ func State(name string) (state string) {
 	return Unknown
 }
 
-// AddMetadata adds container information to database
-func AddMetadata(name string, meta map[string]string) error {
-	if !LxcInstanceExists(name) {
-		return errors.New("Container does not exist")
-	}
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.SaveContainer(name, meta))
-	return nil
-}
-
 // Start starts the Subutai container.
 func Start(name string) error {
 
@@ -122,7 +114,11 @@ func Start(name string) error {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Running})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Running
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -142,7 +138,11 @@ func Stop(name string) error {
 		return errors.New("Unable to stop container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Stopped})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Stopped
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -165,7 +165,11 @@ func Restart(name string) error {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Running})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Running
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -310,7 +314,10 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.ErrorLevel, "Removing container", err)
 
-	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.RemoveContainer(name))
+	cont, _ := db.FindContainerByName(name)
+	if cont != nil {
+		log.Check(log.WarnLevel, "Deleting container metadata entry", db.RemoveContainer(cont))
+	}
 
 	return nil
 }

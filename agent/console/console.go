@@ -337,21 +337,17 @@ func containers(details bool) []Container {
 		}
 		configPath := path.Join(config.Agent.LxcPrefix, c, "config")
 
-		if meta, err := db.INSTANCE.GetContainerByName(c); err == nil {
-
-			vlan := meta["vlan"]
-			envId := meta["environment"]
-			ip := meta["ip"]
+		if ct, err := db.FindContainerByName(c); err == nil && ct != nil {
 
 			aContainer := Container{
-				Name:     c,
+				Name:     ct.Name,
 				Hostname: strings.TrimSpace(string(hostname)),
 				Status:   cont.State(c),
-				Vlan:     vlan,
-				EnvId:    envId,
+				Vlan:     ct.Vlan,
+				EnvId:    ct.EnvironmentId,
 			}
 
-			aContainer.Interfaces = interfaces(c, ip)
+			aContainer.Interfaces = interfaces(c, ct.Ip)
 
 			//cacheable properties>>>
 

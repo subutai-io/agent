@@ -7,7 +7,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/lib/fs"
 	"time"
-	bolt "go.etcd.io/bbolt"
+	"go.etcd.io/bbolt"
 	"github.com/asdine/storm/q"
 	"fmt"
 )
@@ -27,6 +27,39 @@ func init() {
 		log.Check(log.ErrorLevel, "Initializing proxy storage", db.Init(&Proxy{}))
 		log.Check(log.ErrorLevel, "Initializing proxied servers storage", db.Init(&ProxiedServer{}))
 	}
+
+	migrateContainers()
+}
+
+func migrateContainers() {
+
+	list, _ := INSTANCE.GetContainers()
+
+	for _, name := range list {
+		meta, err := INSTANCE.GetContainerByName(name)
+
+		if meta != nil && err == nil {
+
+			cont := Container{}
+			cont.Name = name
+			cont.State = meta["state"]
+			cont.Vlan = meta["vlan"]
+			cont.EnvironmentId = meta["environment"]
+			cont.Gateway = meta["gw"]
+			cont.Ip = meta["ip"]
+			cont.Interface = meta["interface"]
+			cont.Uid = meta["uid"]
+			cont.Template = meta["parent"]
+			cont.TemplateOwner = meta["parent.owner"]
+			cont.TemplateId = meta["parent.id"]
+			cont.TemplateVersion = meta["parent.version"]
+
+			SaveContainer(&cont)
+
+			INSTANCE.RemoveContainer(name)
+		}
+	}
+
 }
 
 func getDb(readOnly bool) (*storm.DB, error) {
@@ -41,6 +74,108 @@ func getDb(readOnly bool) (*storm.DB, error) {
 
 	return boltDB, nil
 }
+
+func SaveDiscoveredIp(ip string) (err error) {
+	var instance *storm.DB
+	if instance, err = getDb(false); err == nil {
+		defer instance.Close()
+		return instance.Bolt.Update(func(tx *bolt.Tx) error {
+			var b *bolt.Bucket
+			if b, err = tx.CreateBucketIfNotExists([]byte("config")); err == nil {
+				err = b.Put([]byte("DiscoveredIP"), []byte(ip))
+			}
+			return err
+		})
+	}
+	return err
+}
+
+func GetDiscoveredIp() (ip string, err error) {
+	var instance *storm.DB
+	if instance, err = getDb(true); err == nil {
+		defer instance.Close()
+		instance.Bolt.View(func(tx *bolt.Tx) error {
+			if b := tx.Bucket([]byte("config")); b != nil {
+				ip = string(b.Get([]byte("DiscoveredIP")))
+			}
+			return nil
+		})
+	}
+	return ip, err
+}
+
+//Container>>>>>>>
+func SaveContainer(container *Container) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.Save(container)
+}
+
+func RemoveContainer(container *Container) (err error) {
+	var db *storm.DB
+	db, err = getDb(false);
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.DeleteStruct(container)
+}
+
+func FindContainers(name, state, vlan string) (containers []Container, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	var matchers []q.Matcher
+
+	if name != "" {
+		matchers = append(matchers, q.Eq("Name", name))
+	}
+
+	if state != "" {
+		matchers = append(matchers, q.Eq("State", state))
+	}
+
+	if vlan != "" {
+		matchers = append(matchers, q.Eq("Vlan", vlan))
+	}
+
+	err = db.Select(matchers...).Find(&containers)
+
+	if err != nil && err == storm.ErrNotFound {
+		err = nil
+	}
+
+	return containers, err
+}
+
+func FindContainerByName(name string) (container *Container, err error) {
+	var db *storm.DB
+	db, err = getDb(true);
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	result := Container{}
+	err = db.One("Name", name, &result)
+	if err != nil && err == storm.ErrNotFound {
+		return nil, nil
+	}
+
+	return &result, err
+}
+
+//<<<<<<<Container
 
 //Proxy>>>>>>>
 

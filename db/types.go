@@ -25,3 +25,19 @@ type SshTunnel struct {
 	RemoteSocket string
 	Ttl          int
 }
+
+type Container struct {
+	Id              int    `storm:"id,increment"`
+	Name            string `storm:"index"`
+	State           string
+	Vlan            string
+	EnvironmentId   string
+	Gateway         string
+	Ip              string
+	Interface       string
+	Uid             string
+	Template        string
+	TemplateOwner   string
+	TemplateVersion string
+	TemplateId      string
+}
