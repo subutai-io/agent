@@ -24,10 +24,11 @@ type agentConfig struct {
 	GpgPassword   string
 	GpgHome       string
 	SshJumpServer string
+	LeStaging     bool
 }
 
 type managementConfig struct {
-	Host    string
+	Host string
 	//TODO remove or add securePort
 	Port    string
 	Secret  string
