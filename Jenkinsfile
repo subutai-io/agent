@@ -22,19 +22,19 @@ try {
             case ~/master/:
                 cdnHost = "masterbazaar.subutai.io";
                 sshJumpServer = "mastertun.subutai.io";
+                leStaging = "false"
                 break;
             case ~/dev/:
                 cdnHost = "devbazaar.subutai.io";
                 sshJumpServer = "devtun.subutai.io";
-                break;
-            case ~/dep/:
-                cdnHost = "devbazaar.subutai.io";
-                sshJumpServer = "devtun.subutai.io";
+                leStaging = "true"
                 break;
             default:
                 cdnHost = "bazaar.subutai.io";
                 sshJumpServer = "tun.subutai.io";
+                leStaging = "false"
         }
+
         def release = env.BRANCH_NAME
 
 		sh """
@@ -59,6 +59,7 @@ try {
 			sed -i 's/quilt/native/' debian/source/format
             sed -i 's/@cdnHost@/${cdnHost}/' debian/tree/agent.conf
             sed -i 's/@sshJumpServer@/${sshJumpServer}/' debian/tree/agent.conf
+            sed -i 's/@leStaging@/${leStaging}/' debian/tree/agent.conf
 			dch -v "\$agent_version" -D stable "Test build for \$agent_version" 1>/dev/null 2>/dev/null
 		"""
 

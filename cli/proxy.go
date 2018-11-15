@@ -576,10 +576,14 @@ func installLECert(proxy *db.Proxy) {
 }
 
 func obtainLECerts(proxy *db.Proxy) {
-	err := exec2.Exec("certbot", "certonly", "--config-dir", letsEncryptDir,
+	args := []string{"certonly", "--config-dir", letsEncryptDir,
 		"--email", "hostmaster@subutai.io", "--agree-tos", "--webroot",
 		"--webroot-path", path.Join(letsEncryptWebRootDir, proxy.Domain),
-		"-d", proxy.Domain, "-n")
+		"-d", proxy.Domain, "-n"}
+	if config.Agent.LeStaging {
+		args = append(args, "--staging")
+	}
+	err := exec2.Exec("certbot", args...)
 	log.Check(log.ErrorLevel, "Obtaining LE certs", err)
 }
 
