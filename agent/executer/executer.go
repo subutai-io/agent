@@ -317,13 +317,10 @@ func execInContainer(name string, req RequestOptions, outCh chan<- ResponseOptio
 	outputSender(stdout, stderr, outCh, &response)
 	if exitCode == 0 {
 		response.Type = "EXECUTE_RESPONSE"
-		response.ExitCode = strconv.Itoa(exitCode)
-	} else {
-		if exitCode/256 == 124 {
-			response.Type = "EXECUTE_TIMEOUT"
-		}
-		response.ExitCode = strconv.Itoa(exitCode / 256)
+	} else if exitCode == 124 {
+		response.Type = "EXECUTE_TIMEOUT"
 	}
+	response.ExitCode = strconv.Itoa(exitCode)
 
 	outCh <- response
 
