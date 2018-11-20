@@ -46,9 +46,9 @@ try {
 			# Clone agent code
 			go get github.com/subutai-io/agent
 			cd ${projectRoot} || exit 1
-			git checkout ${release}
 			git reset --hard origin/${release}
 			git clean -f -d
+			git checkout ${release}
 			git pull
 		"""		
 		stage("Tweaks for version")
