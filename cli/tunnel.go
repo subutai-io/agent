@@ -18,18 +18,41 @@ import (
 	"path"
 )
 
-type SshTunnel struct {
-	Remote string
-	Local  string
-	Ttl    string
-}
-
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
 // In Subutai, tunnels are used to access the SS management server's web UI from the Hub, and open direct connection to containers, etc.
 // There are two types of channels - local (default), which is created from destination address to host and global (-g flag), from destination to Subutai Helper node.
 // Tunnels may also be set to be permanent (default) or temporary (ttl in seconds). The default destination port is 22.
 // Subutai tunnels have a continuous state checking mechanism which keeps opened tunnels alive and closes outdated tunnels to keep the system network connections clean.
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
+
+func MigrateTunnels() {
+
+	var oldTunnelRecords []db.SshTunnel
+	list, err := db.INSTANCE.GetTunList()
+	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
+		for _, item := range list {
+			ttl, err := strconv.Atoi(item["ttl"])
+			pid, err2 := strconv.Atoi(item["pid"])
+			if err == nil && err2 == nil {
+				oldTunnelRecords = append(oldTunnelRecords,
+					db.SshTunnel{RemoteSocket: item["remote"], LocalSocket: item["local"], Ttl: ttl, Pid: pid})
+			}
+		}
+	}
+
+	for _, tun := range oldTunnelRecords {
+		//save into new table
+		tunnels, err := db.FindTunnelsByPid(tun.Pid)
+		if !log.Check(log.WarnLevel, "Fetching tunnels by pid", err) {
+			if len(tunnels) == 0 {
+				log.Check(log.WarnLevel, "Adding new tunnel entry", db.SaveTunnel(&tun))
+			}
+		}
+		//remove from old table
+		db.INSTANCE.DelTunEntry(strconv.Itoa(tun.Pid))
+	}
+
+}
 
 // TunAdd adds tunnel to specified network socket
 func AddSshTunnel(socket, timeout string, ssh bool) {
@@ -41,20 +64,20 @@ func AddSshTunnel(socket, timeout string, ssh bool) {
 		socket = socket + ":22"
 	}
 
-	if item := getTunnel(socket); item != nil {
+	if item, _ := db.FindTunnelByLocalSocket(socket); item != nil {
 		if len(timeout) > 0 {
 			tout, err := strconv.Atoi(timeout)
 			log.Check(log.ErrorLevel, "Converting timeout to int", err)
-			item["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
+			item.Ttl = int(time.Now().Unix()) + tout
 		} else {
-			item["ttl"] = "-1"
+			item.Ttl = -1
 		}
-		log.Check(log.ErrorLevel, "Updating tunnel entry", db.INSTANCE.AddTunEntry(item))
+		log.Check(log.ErrorLevel, "Updating tunnel entry", db.UpdateTunnel(item))
 		if ssh {
-			tunnel := strings.Split(item["remote"], ":")
+			tunnel := strings.Split(item.RemoteSocket, ":")
 			fmt.Println("ssh root@" + tunnel[0] + " -p " + tunnel[1])
 		} else {
-			fmt.Println(item["remote"])
+			fmt.Println(item.RemoteSocket)
 		}
 
 		return
@@ -82,18 +105,18 @@ func AddSshTunnel(socket, timeout string, ssh bool) {
 			} else {
 				fmt.Println(tunsrv + ":" + port[2])
 			}
-			tunnel := map[string]string{
-				"pid":    strconv.Itoa(cmd.Process.Pid),
-				"local":  socket,
-				"remote": tunsrv + ":" + port[2],
-				"ttl":    "-1",
+			tunnel := &db.SshTunnel{
+				Pid:          cmd.Process.Pid,
+				Ttl:          -1,
+				LocalSocket:  socket,
+				RemoteSocket: tunsrv + ":" + port[2],
 			}
 			if len(timeout) > 0 {
 				tout, err := strconv.Atoi(timeout)
 				log.Check(log.ErrorLevel, "Converting timeout to int", err)
-				tunnel["ttl"] = strconv.Itoa(int(time.Now().Unix()) + tout)
+				tunnel.Ttl = int(time.Now().Unix()) + tout
 			}
-			log.Check(log.WarnLevel, "Adding new tunnel entry", db.INSTANCE.AddTunEntry(tunnel))
+			log.Check(log.WarnLevel, "Adding new tunnel entry", db.SaveTunnel(tunnel))
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -102,29 +125,24 @@ func AddSshTunnel(socket, timeout string, ssh bool) {
 	log.Error("Cannot get tunnel port")
 }
 
-func GetSshTunnels() []SshTunnel {
-	res := []SshTunnel{}
-	list, err := db.INSTANCE.GetTunList()
+func GetSshTunnels() (list []db.SshTunnel) {
+	tunnels, err := db.GetAllTunnels()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
-		for _, item := range list {
-			res = append(res, SshTunnel{Remote: item["remote"], Local: item["local"], Ttl: item["ttl"]})
-		}
+		return tunnels
 	}
-	return res
+	return
 }
 
 // TunDel removes tunnel entry from list and kills running tunnel process
-func DelSshTunnel(socket string, pid ...string) {
-	list, err := db.INSTANCE.GetTunList()
+func DelSshTunnel(socket string, pid ...int) {
+	list, err := db.GetAllTunnels()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
-			if item["local"] == socket && (len(pid) == 0 || (len(pid[0]) != 0 && item["pid"] == pid[0])) {
-				log.Check(log.WarnLevel, "Deleting tunnel entry", db.INSTANCE.DelTunEntry(item["pid"]))
-				f, err := ioutil.ReadFile("/proc/" + item["pid"] + "/cmdline")
-				if err == nil && strings.Contains(string(f), item["local"]) {
-					pid, err := strconv.Atoi(item["pid"])
-					log.Check(log.FatalLevel, "Converting pid to int", err)
-					log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(pid, 15))
+			if item.LocalSocket == socket && (len(pid) == 0 || (len(pid) > 0 && item.Pid == pid[0])) {
+				log.Check(log.WarnLevel, "Deleting tunnel entry", db.RemoveTunnelsByPid(item.Pid))
+				f, err := ioutil.ReadFile("/proc/" + strconv.Itoa(item.Pid) + "/cmdline")
+				if err == nil && strings.Contains(string(f), item.LocalSocket) {
+					log.Check(log.FatalLevel, "Killing tunnel process", syscall.Kill(item.Pid, 15))
 				}
 			}
 		}
@@ -133,20 +151,19 @@ func DelSshTunnel(socket string, pid ...string) {
 
 // TunCheck reads list, checks tunnel ttl, its state and then adds or removes required tunnels
 func CheckSshTunnels() {
-	list, err := db.INSTANCE.GetTunList()
+	list, err := db.GetAllTunnels()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
-			ttl, err := strconv.Atoi(item["ttl"])
-			log.Check(log.ErrorLevel, "Checking tunnel "+item["local"]+" ttl", err)
-			if ttl <= int(time.Now().Unix()) && ttl != -1 {
-				DelSshTunnel(item["local"], item["pid"])
-			} else if !tunOpen(item["remote"], item["local"]) {
-				DelSshTunnel(item["local"], item["pid"])
+			log.Check(log.ErrorLevel, "Checking tunnel "+item.LocalSocket+" ttl", err)
+			if item.Ttl <= int(time.Now().Unix()) && item.Ttl != -1 {
+				DelSshTunnel(item.LocalSocket, item.Pid)
+			} else if !tunOpen(item.RemoteSocket, item.LocalSocket) {
+				DelSshTunnel(item.LocalSocket, item.Pid)
 				newttl := ""
-				if ttl-int(time.Now().Unix()) > 0 {
-					newttl = strconv.Itoa(ttl - int(time.Now().Unix()))
+				if item.Ttl-int(time.Now().Unix()) > 0 {
+					newttl = strconv.Itoa(item.Ttl - int(time.Now().Unix()))
 				}
-				AddSshTunnel(item["local"], newttl, false)
+				AddSshTunnel(item.LocalSocket, newttl, false)
 			}
 		}
 	}
@@ -173,16 +190,4 @@ func tunOpen(remote, local string) bool {
 		return false
 	}
 	return true
-}
-
-func getTunnel(socket string) map[string]string {
-	list, err := db.INSTANCE.GetTunList()
-	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
-		for _, item := range list {
-			if item["local"] == socket {
-				return item
-			}
-		}
-	}
-	return nil
 }

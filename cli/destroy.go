@@ -37,10 +37,10 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 		}
 		log.Error("Container " + contId + " not found")
 	} else if vlan {
-		list, err := db.INSTANCE.ContainerByKey("vlan", id)
+		list, err := db.FindContainers("", "", id)
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
 			for _, c := range list {
-				LxcDestroy(c, false, true)
+				LxcDestroy(c.Name, false, true)
 			}
 			msg = "Vlan " + id + " is destroyed"
 		}
@@ -51,22 +51,16 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 			return
 		}
 
-		c, err := db.INSTANCE.ContainerByName(id)
+		c, err := db.FindContainerByName(id)
 		log.Check(log.WarnLevel, "Reading container metadata from db", err)
 
 		msg = "Container " + id + " is destroyed"
 
-		if len(c) != 0 {
-
-			if ip, ok := c["ip"]; ok {
-				if vlan, ok := c["vlan"]; ok {
-					DelProxyHost(vlan, ip)
-				}
-			}
+		if c != nil {
 
 			removePortMap(id)
 
-			net.DelIface(c["interface"])
+			net.DelIface(c.Interface)
 
 			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
 
@@ -82,15 +76,12 @@ func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	}
 
 	if id == "everything" {
-		list, err := db.INSTANCE.ContainerList()
+		list, err := db.FindContainers("", "", "")
 		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-			for _, name := range list {
-				LxcDestroy(name, false, true)
-				c, err := db.INSTANCE.ContainerByName(name)
-				if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-					if v, ok := c["vlan"]; ok {
-						cleanupNet(v)
-					}
+			for _, cont := range list {
+				LxcDestroy(cont.Name, false, true)
+				if cont.Vlan != "" {
+					cleanupNet(cont.Vlan)
 				}
 			}
 		}
@@ -116,7 +107,6 @@ func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
 	p2p.RemoveByIface("p2p" + id)
 	cleanupNetStat(id)
-	DelProxyDomain(id)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
@@ -130,10 +120,24 @@ func cleanupNetStat(vlan string) {
 }
 
 func removePortMap(name string) {
-	if portMap, err := db.INSTANCE.GetContainerMapping(name);
-		!log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-		for _, v := range portMap {
-			RemovePortMapping(v["protocol"], v["internal"], v["external"], v["domain"])
+	containerIp := container.GetIp(name)
+	servers, err := db.FindProxiedServers("", "")
+	if !log.Check(log.WarnLevel, "Fetching port mappings", err) {
+		var removedServers []db.ProxiedServer
+
+		for _, server := range servers {
+			sock := strings.Split(server.Socket, ":")
+			if sock[0] == containerIp {
+				RemoveProxiedServer(server.ProxyTag, server.Socket)
+				removedServers = append(removedServers, server)
+			}
+		}
+
+		//remove proxies for management container
+		if name == container.Management {
+			for _, server := range removedServers {
+				RemoveProxy(server.ProxyTag)
+			}
 		}
 	}
 }

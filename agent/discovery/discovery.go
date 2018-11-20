@@ -15,8 +15,6 @@ import (
 	"github.com/subutai-io/agent/agent/console"
 )
 
-const MhIp = "10.10.10.1"
-
 type handler struct {
 }
 
@@ -30,7 +28,7 @@ func (h handler) Response(message gossdp.ResponseMessage) {
 	log.Debug("Found server " + message.Location + "/" + message.DeviceId + "/" + message.Server)
 
 	managementHostIp := config.ManagementIP
-	if managementHostIp == MhIp {
+	if managementHostIp == container.ManagementIp {
 		managementHostIp = ""
 	}
 
@@ -82,7 +80,7 @@ func Monitor() {
 }
 
 func server() {
-	save(MhIp)
+	save(container.ManagementIp)
 
 	s, err := gossdp.NewSsdpWithLogger(nil, handler{})
 	if err == nil {
@@ -128,6 +126,17 @@ func client() {
 	if strings.TrimSpace(config.Management.Host) == "" {
 		log.Debug("Resetting MH IP")
 		config.ManagementIP = ""
+	} else {
+		// check if peer is accessible by config.Management.Host
+		fingerprint, err := consol.GetFingerprint()
+		if err == nil {
+			//check if fingerprint matches config.Management.Fingerprint
+			if config.Management.Fingerprint == "" || config.Management.Fingerprint == fingerprint {
+				//save ip
+				save(config.Management.Host)
+				return
+			}
+		}
 	}
 
 	c, err := gossdp.NewSsdpClientWithLogger(handler{}, handler{})
@@ -148,7 +157,7 @@ func client() {
 func save(ip string) {
 	ip = strings.TrimSpace(ip)
 
-	log.Check(log.WarnLevel, "Saving Console IP "+ip, db.INSTANCE.DiscoverySave(ip))
+	log.Check(log.WarnLevel, "Saving Console IP "+ip, db.SaveDiscoveredIp(ip))
 
 	config.ManagementIP = ip
 
@@ -158,7 +167,7 @@ func save(ip string) {
 
 func loadManagementIp() {
 	if strings.TrimSpace(config.Management.Host) == "" {
-		ip, err := db.INSTANCE.DiscoveryLoad()
+		ip, err := db.GetDiscoveredIp()
 		if !log.Check(log.ErrorLevel, "Loading discovered Console ip from db", err) {
 			config.ManagementIP = strings.TrimSpace(ip)
 		}

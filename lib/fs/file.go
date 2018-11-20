@@ -83,3 +83,11 @@ func Sha256Sum(filePath string) (string, error) {
 	}
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
+
+func DeleteFile(filePath string) error {
+	return os.Remove(filePath)
+}
+
+func DeleteDir(dirPath string) error {
+	return os.RemoveAll(dirPath)
+}

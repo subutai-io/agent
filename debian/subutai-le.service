@@ -1,0 +1,9 @@
+[Unit]
+Description=LetsEncrypt certificates updater service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/subutai/libexec/renew-le-certs
+
+[Install]
+WantedBy=multi-user.target

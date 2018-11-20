@@ -28,6 +28,7 @@ import (
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
 	"io"
+	"github.com/subutai-io/agent/lib/net/p2p"
 )
 
 const (
@@ -39,6 +40,7 @@ const (
 //TODO add methods IsRunning, IsStopped
 
 const Management = "management"
+const ManagementIp = "10.10.10.1"
 const ContainerDefaultIface = "eth0"
 
 var crc32Table = crc32.MakeTable(0xD5828281)
@@ -96,15 +98,6 @@ func State(name string) (state string) {
 	return Unknown
 }
 
-// AddMetadata adds container information to database
-func AddMetadata(name string, meta map[string]string) error {
-	if !LxcInstanceExists(name) {
-		return errors.New("Container does not exist")
-	}
-	log.Check(log.ErrorLevel, "Writing container data to database", db.INSTANCE.ContainerAdd(name, meta))
-	return nil
-}
-
 // Start starts the Subutai container.
 func Start(name string) error {
 
@@ -121,7 +114,11 @@ func Start(name string) error {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Running})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Running
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -141,7 +138,11 @@ func Stop(name string) error {
 		return errors.New("Unable to stop container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Stopped})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Stopped
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -164,7 +165,11 @@ func Restart(name string) error {
 		return errors.New("Unable to start container " + name)
 	}
 
-	AddMetadata(name, map[string]string{"state": Running})
+	v, _ := db.FindContainerByName(name)
+	if v != nil {
+		v.State = Running
+		db.SaveContainer(v)
+	}
 
 	return nil
 }
@@ -309,7 +314,10 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.ErrorLevel, "Removing container", err)
 
-	log.Check(log.WarnLevel, "Deleting container metadata entry", db.INSTANCE.ContainerDel(name))
+	cont, _ := db.FindContainerByName(name)
+	if cont != nil {
+		log.Check(log.WarnLevel, "Deleting container metadata entry", db.RemoveContainer(cont))
+	}
 
 	return nil
 }
@@ -535,7 +543,6 @@ func QuotaNet(name string, size string) string {
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
-//TODO use the new lxc config type
 func SetContainerConf(container string, conf [][]string) error {
 	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
 	newconf := ""
@@ -699,17 +706,8 @@ func Mac() string {
 	return mac
 }
 
-//todo move to p2p
 func Mtu() int {
-
-	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
-	output := strings.TrimSpace(string(out))
-	log.Check(log.FatalLevel, "Getting p2p mtu: "+output, err)
-
-	mtu, err := strconv.Atoi(output)
-	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
-
-	return mtu - 50
+	return p2p.Mtu()
 }
 
 func GetIp(name string) string {

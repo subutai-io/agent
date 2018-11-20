@@ -91,8 +91,14 @@ func VerifyLxcName(name string) {
 	*/
 
 	hostnameRegex := regexp.MustCompile(`^[[:alpha:]][[:alnum:]\-]{0,61}[[:alnum:]]$`)
+	singleLetterHostnameRegex := regexp.MustCompile(`^[[:alpha:]]$`)
 
-	if !hostnameRegex.MatchString(name) {
+	if len(name) == 1 {
+		if !singleLetterHostnameRegex.MatchString(name) {
+			log.Error(fmt.Sprintf("value '%s' does not match %s",
+				name, singleLetterHostnameRegex.String()))
+		}
+	} else if !hostnameRegex.MatchString(name) {
 		log.Error(fmt.Sprintf("value '%s' does not match %s",
 			name, hostnameRegex.String()))
 	}

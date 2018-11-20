@@ -14,6 +14,32 @@ import (
 // executes command
 // returns stdout and nil if command executes successfully
 // returns stderr and error if command executes with error
+func ExecB(command string, args ...string) ([]byte, error) {
+
+	log.Debug("Executing command " + command + " " + strings.Join(args, " "))
+
+	cmd := exec.Command(command, args...)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "IPFS_PATH="+config.CDN.IpfsPath)
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	if err != nil {
+		return []byte(fmt.Sprint(err) + ": " + stderr.String()), err
+	}
+
+	return out.Bytes(), nil
+}
+
+// executes command
+// returns stdout and nil if command executes successfully
+// returns stderr and error if command executes with error
 func Execute(command string, args ...string) (string, error) {
 
 	log.Debug("Executing command " + command + " " + strings.Join(args, " "))
