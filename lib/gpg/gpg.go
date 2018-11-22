@@ -236,11 +236,10 @@ func GetFingerprint(email string) string {
 	var out []byte
 	var err error
 	if email == config.Agent.GpgUser {
-		out, err = exec.Command(GPG, "--fingerprint", email).Output()
+		out, err = exec2.ExecB(GPG, "--fingerprint", email)
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	} else {
-		out, err = exec.Command(GPG, "--fingerprint", "--keyring", path.Join(config.Agent.LxcPrefix, email, "public.pub"), email).Output()
-
+		out, err = exec2.ExecB(GPG, "--fingerprint", "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix, email, "public.pub"))
 		log.Check(log.DebugLevel, "Getting fingerprint by "+email, err)
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(out))
