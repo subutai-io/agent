@@ -19,6 +19,9 @@ import (
 	"sort"
 	"net"
 	"github.com/subutai-io/agent/agent/util"
+	"github.com/nightlyone/lockfile"
+	"time"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 const HTTP = "http"
@@ -348,6 +351,13 @@ func GetProxies(protocol string) []ProxyNServers {
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
 //subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
 func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80Port, sslBackend bool, certPath string) {
+	var err error = nil
+	var lock lockfile.Lockfile
+	for lock, err = common.LockFile("port", "proxy"); err != nil; lock, err = common.LockFile("port", "proxy") {
+		time.Sleep(time.Second * 1)
+	}
+	defer lock.Unlock()
+
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 	loadBalancing = strings.ToLower(loadBalancing)
@@ -493,6 +503,14 @@ func RemoveProxy(tag string) {
 }
 
 func AddProxiedServer(tag, socket string) {
+
+	var err error = nil
+	var lock lockfile.Lockfile
+	for lock, err = common.LockFile("port", "server"); err != nil; lock, err = common.LockFile("port", "server") {
+		time.Sleep(time.Second * 1)
+	}
+	defer lock.Unlock()
+
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	checkNotNil(proxy, "Proxy not found by tag %s", tag)
