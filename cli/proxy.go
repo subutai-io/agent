@@ -50,7 +50,7 @@ server {
 
 `
 
-//place-holders: {protocol}, {port}, {load-balancing}, {servers},
+//place-holders: {protocol}, {port}, {load-balancing}, {servers}, {udp}
 const streamConfig = `
 upstream {protocol}-{port} {
     {load-balancing}
@@ -59,7 +59,7 @@ upstream {protocol}-{port} {
 }
 
 server {
-	listen {port};
+	listen {port} {udp};
 	proxy_pass {protocol}-{port};
 }
 
@@ -659,6 +659,13 @@ func createTcpUdpConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 		serversConfig += "    server " + servers[i].Socket + ";\n"
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", serversConfig, -1)
+
+	//udp
+	if proxy.Protocol == UDP {
+		effectiveConfig = strings.Replace(effectiveConfig, "{udp}", "udp", -1)
+	} else {
+		effectiveConfig = strings.Replace(effectiveConfig, "{udp}", "", -1)
+	}
 
 	return effectiveConfig
 }
