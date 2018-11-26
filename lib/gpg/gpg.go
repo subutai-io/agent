@@ -106,8 +106,10 @@ func GetContainerPk(name string) string {
 // GetPk returns GPG Public Key from the Resource Host.
 func GetPk(name string) string {
 	stdout, err := exec.Command(GPG, "--export", "-a", name).Output()
-	log.Check(log.WarnLevel, "Getting public key", err)
-	return string(stdout)
+	if !log.Check(log.WarnLevel, "Getting public key", err) {
+		return string(stdout)
+	}
+	return ""
 }
 
 // DecryptWrapper decrypts GPG message.
