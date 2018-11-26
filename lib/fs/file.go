@@ -7,6 +7,7 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"fmt"
+	"path/filepath"
 )
 
 // Copy creates a copy of passed "source" file to "dest" file
@@ -90,4 +91,11 @@ func DeleteFile(filePath string) error {
 
 func DeleteDir(dirPath string) error {
 	return os.RemoveAll(dirPath)
+}
+
+func RemoveFilesWildcard(wildcard string) {
+	list, _ := filepath.Glob(wildcard)
+	for _, f := range list {
+		os.Remove(f)
+	}
 }
