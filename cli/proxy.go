@@ -623,6 +623,9 @@ func installSelfSignedCert(proxy *db.Proxy) {
 }
 
 func generateTempLEConfig(proxy *db.Proxy) {
+	//remove stale temporary nginx config files
+	fs.RemoveFilesWildcard(path.Join(nginxInc, HTTP, "http-80-*.tmp.conf"))
+
 	effectiveConfig := webConfig
 	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
 	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", HTTP, -1)

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/subutai-io/agent/agent/util"
 	"net/http"
+	"github.com/subutai-io/agent/lib/fs"
 )
 
 var (
@@ -196,18 +197,12 @@ func GenerateKey(name string) error {
 	if !container.LxcInstanceExists(name) {
 		out, err := exec.Command(GPG, "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
-			for _, f := range list {
-				os.Remove(f)
-			}
+			fs.RemoveFilesWildcard(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			return err
 		}
 		out, err = exec.Command(GPG, "--import", "/root/.gnupg/public.pub").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
-			for _, f := range list {
-				os.Remove(f)
-			}
+			fs.RemoveFilesWildcard(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			return err
 		}
 	}
