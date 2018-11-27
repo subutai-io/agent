@@ -13,7 +13,7 @@ type Proxy struct {
 }
 
 func (p Proxy) IsLE() bool {
-	return p.CertPath == ""
+	return p.Protocol == "https" && p.CertPath == ""
 }
 
 type ProxiedServer struct {
