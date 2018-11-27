@@ -368,9 +368,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		"Unsupported protocol %s", protocol)
 
 	//check if port is specified and valid
-	checkArgument(port == 80 || port == 443 ||
-		port == 8443 || port == 8444 || port == 8086 ||
-		(port >= 1000 && port <= 65535),
+	checkArgument(port == 80 || port == 443 || (port >= 1000 && port <= 65535),
 		"External port must be one of [80, 443, 1000-65535] ")
 
 	//check domain
@@ -423,7 +421,6 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		//HTTP/HTTPS
 		//check if the same tcp/udp port is not reserved
 		//and check if the same http/https port and domain is not reserved
-		//check port availability
 		tcpProxies, err := db.FindProxies(TCP, "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		udpProxies, err := db.FindProxies(UDP, "", port)
@@ -444,25 +441,34 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	}
 
 	//if redirection is requested (https only, otherwise ignored), check if port 80 for http+domain is not already reserved
-	if protocol == HTTPS && redirect80Port {
+	//also check in case mapping with LE certificate is requested
+	if protocol == HTTPS && (redirect80Port || proxy.IsLE()) {
 		//check all http proxies with 80 port
 		proxies, err := db.FindProxies(HTTP, domain, 80)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
-		checkState(len(proxies) == 0, "Proxy to http://%s:80 already exists, can not redirect", domain)
+		checkState(len(proxies) == 0, "Proxy to http://%s:80 already exists, can not create proxy", domain)
 
 		//check https proxies with redirect to 80 port
 		proxies, err = db.FindProxies(HTTPS, domain, 0)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		for _, prxy := range proxies {
+			//find proxies with redirected 80 port
 			checkState(!prxy.Redirect80Port,
-				"Proxy to https://%s:%d with port 80 redirection already exists, can not redirect", domain, prxy.Port)
+				"Proxy to https://%s:%d with port 80 redirection already exists, can not create proxy", domain, prxy.Port)
+			//find LE proxies with the same domain
+			checkState(!prxy.IsLE(),
+				"Proxy to https://%s:%d with LE already exists (80 port is reserved), can not create proxy", domain, prxy.Port)
 		}
 	} else if protocol == HTTP && port == 80 {
 		proxies, err = db.FindProxies(HTTPS, domain, 0)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		for _, prxy := range proxies {
+			//find proxies with redirected 80 port
 			checkState(!prxy.Redirect80Port,
 				"Proxy to https://%s:%d with port 80 redirection already exists, can not create proxy", domain, prxy.Port)
+			//find LE proxies with the same domain
+			checkState(!prxy.IsLE(),
+				"Proxy to https://%s:%d with LE already exists (80 port is reserved), can not create proxy", domain, prxy.Port)
 		}
 	}
 
@@ -471,7 +477,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		redirect80Port = false
 		sslBackend = false
 		certPath = ""
-	} else if protocol == HTTPS && port == 80 && redirect80Port {
+	} else if protocol == HTTPS && (( port == 80 && redirect80Port) || proxy.IsLE()) {
 		redirect80Port = false
 	}
 
@@ -565,7 +571,7 @@ func applyConfig(tag string, creating bool) {
 		if creating {
 			//Install certificates for https
 			if proxy.Protocol == HTTPS {
-				if proxy.CertPath == "" {
+				if proxy.IsLE() {
 					installLECert(proxy)
 				} else {
 					installSelfSignedCert(proxy)
@@ -607,7 +613,7 @@ func obtainLECerts(proxy *db.Proxy) {
 
 func removeCert(proxy *db.Proxy) {
 	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
-	if proxy.CertPath == "" {
+	if proxy.IsLE() {
 		//LE certs
 		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
 	}
@@ -726,7 +732,7 @@ func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 	//ssl
 	sslConfig := ""
 	if proxy.Protocol == HTTPS {
-		if proxy.CertPath == "" {
+		if proxy.IsLE() {
 			//adjust path to LE cert
 			certDir := figureOutDomainFolderName(proxy.Domain)
 			sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
