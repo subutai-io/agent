@@ -581,13 +581,11 @@ func applyConfig(tag string, creating bool) {
 func installLECert(proxy *db.Proxy) {
 	makeDir(path.Join(letsEncryptWebRootDir, proxy.Domain))
 	//1) create http config with LE section
-	generateTempLEConfig(proxy)
+	generateLEConfig(proxy)
 	//2) reload nginx
 	reloadNginx()
 	//3) run certbot
 	obtainLECerts(proxy)
-	//4) remove http config created in step 1
-	removeTempLEConfig(proxy)
 }
 
 func obtainLECerts(proxy *db.Proxy) {
@@ -619,7 +617,17 @@ func installSelfSignedCert(proxy *db.Proxy) {
 	log.Check(log.ErrorLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
 }
 
-func generateTempLEConfig(proxy *db.Proxy) {
+//TODO
+//check if http-80 mapping already exists for this domain
+//if exists then append well-known section to it
+//otherwise create normal (not temp) http-80 port mapping with well-known section
+
+//for case when user wants to add custom 80 port mapping when LE already exists
+//we need to allow to edit servers section of 80 port mapping )(probably this already works in subutai map binding)
+//in applyConfig when saving config to file we need to consider if mapping http-80 has corresponding LE mapping for the same domain
+//if has then we need to append well-known section there too
+
+func generateLEConfig(proxy *db.Proxy) {
 	//remove stale temporary nginx config files
 	fs.RemoveFilesWildcard(path.Join(nginxInc, HTTP, "http-80-*.tmp.conf"))
 
@@ -635,10 +643,6 @@ func generateTempLEConfig(proxy *db.Proxy) {
 	effectiveConfig = r.ReplaceAllString(effectiveConfig, "")
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"), []byte(effectiveConfig), 0744))
-}
-
-func removeTempLEConfig(proxy *db.Proxy) {
-	log.Check(log.ErrorLevel, "Removing nginx config", fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf")))
 }
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
