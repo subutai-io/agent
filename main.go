@@ -382,7 +382,7 @@ func main() {
 				servers := v.Servers
 				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%s\t%t\t%t\t%t\t%t",
 					proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, proxy.LoadBalancing, proxy.Redirect80Port,
-					proxy.SslBackend, proxy.CertPath == "", len(servers) > 0))
+					proxy.SslBackend, proxy.IsLE(), len(servers) > 0))
 			}
 		}
 		output(lines)
