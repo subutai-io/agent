@@ -670,8 +670,13 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 	}
 
 	if proxy.IsLE() && proxy.Redirect80Port {
-		//remove self created LE config if any
-		fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+		//remove self created LE config if any in case there is no explicit http-80 mapping for this domain
+		proxies, err := db.FindProxies(HTTP, proxy.Domain, 80)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+		if len(proxies) == 0 {
+			fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+		}
 	}
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
