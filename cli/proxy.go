@@ -644,10 +644,13 @@ func generateLEConfig(proxy *db.Proxy) {
 	if fs.FileExists(filePath) {
 		//append "well-known" section to existing http-80 mapping config
 		read, err := ioutil.ReadFile(filePath)
-		log.Check(log.ErrorLevel, "Modifying existing mapping config", err)
+		log.Check(log.ErrorLevel, "Reading existing mapping config", err)
 		effectiveConfig = string(read)
+		//check if config already has well-known section defined
+		if strings.Contains(effectiveConfig, ".well-known") {
+			return
+		}
 		effectiveConfig = strings.Replace(effectiveConfig, "#well-known", letsEncryptWellKnownSection, -1)
-
 	} else {
 		//create nginx config with LE support
 		effectiveConfig = lEConfig
@@ -664,6 +667,11 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 		cfg = createHttpHttpsConfig(proxy, servers)
 	} else {
 		cfg = createTcpUdpConfig(proxy, servers)
+	}
+
+	if proxy.IsLE() && proxy.Redirect80Port {
+		//remove self created LE config if any
+		fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
 	}
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
