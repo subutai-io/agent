@@ -110,8 +110,6 @@ server {
     server_name {domain};
 
     {well-known}
-
-    return 301 https://$host$request_uri;
 }
 
 `
