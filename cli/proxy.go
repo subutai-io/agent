@@ -613,8 +613,8 @@ func obtainLECerts(proxy *db.Proxy) {
 	if config.Agent.LeStaging {
 		args = append(args, "--staging")
 	}
-	err := exec2.Exec("certbot", args...)
-	log.Check(log.ErrorLevel, "Obtaining LE certs", err)
+	out, err := exec.Command("certbot", args...).CombinedOutput()
+	log.Check(log.ErrorLevel, "Obtaining LE certs "+string(out), err)
 }
 
 func removeCert(proxy *db.Proxy) {
