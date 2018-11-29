@@ -618,7 +618,7 @@ func obtainLECerts(proxy *db.Proxy) error {
 
 	out, err := exec.Command("certbot", args...).CombinedOutput()
 	if err != nil {
-		log.Warn("Error obtaining LE certificate", err)
+		log.Warn("Error obtaining LE certificate, ", err)
 		return errors.New(string(out) + ", " + err.Error())
 	}
 
@@ -628,7 +628,7 @@ func obtainLECerts(proxy *db.Proxy) error {
 func reloadNginx() error {
 	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
 	if err != nil {
-		log.Warn("Error reloading nginx", err)
+		log.Warn("Error reloading nginx, ", err)
 		return errors.New(string(out) + ", " + err.Error())
 	}
 
