@@ -216,7 +216,7 @@ func MigrateMappings() {
 				Port:           v.Proxy.Port,
 				Tag:            v.Proxy.Tag,
 				CertPath:       "/tmp/" + certName,
-				Redirect80Port: true,
+				Redirect80Port: false,
 				LoadBalancing:  "rr",
 				SslBackend:     false,
 			}
