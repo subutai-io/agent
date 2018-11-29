@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"io/ioutil"
 	"regexp"
-	"os/exec"
 	exec2 "github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
 	"sort"
@@ -622,20 +621,20 @@ func obtainLECerts(proxy *db.Proxy) error {
 		args = append(args, "--staging")
 	}
 
-	out, err := exec.Command("certbot", args...).CombinedOutput()
+	out, err := exec2.Execute("certbot", args...)
 	if err != nil {
 		log.Warn("Error obtaining LE certificate, ", err)
-		return errors.New(string(out) + ", " + err.Error())
+		return errors.New(out + ", " + err.Error())
 	}
 
 	return nil
 }
 
 func reloadNginx() error {
-	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
+	out, err := exec2.Execute("service", "subutai-nginx", "reload")
 	if err != nil {
 		log.Warn("Error reloading nginx, ", err)
-		return errors.New(string(out) + ", " + err.Error())
+		return errors.New(out + ", " + err.Error())
 	}
 
 	return nil
