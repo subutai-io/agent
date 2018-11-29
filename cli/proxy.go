@@ -602,7 +602,13 @@ func installLECert(proxy *db.Proxy) {
 	generateLEConfig(proxy)
 	//2) reload nginx && run certbot
 	if reloadNginx() != nil || obtainLECerts(proxy) != nil {
+		//delete proxy in case of error during LE certificate obtainment
 		deleteProxy(proxy)
+		//remove self created LE config
+		proxies, _ := db.FindProxies(HTTP, proxy.Domain, 80)
+		if len(proxies) == 0 {
+			fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+		}
 		log.Error("Failed to create proxy")
 	}
 }
