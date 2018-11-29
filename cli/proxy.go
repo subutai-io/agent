@@ -22,6 +22,7 @@ import (
 	"github.com/nightlyone/lockfile"
 	"time"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/pkg/errors"
 )
 
 const HTTP = "http"
@@ -513,7 +514,7 @@ func RemoveProxy(tag string) {
 
 	deleteProxy(proxy)
 
-	reloadNginx()
+	log.Check(log.ErrorLevel, "Relading nginx", reloadNginx())
 }
 
 func AddProxiedServer(tag, socket string) {
@@ -592,20 +593,27 @@ func applyConfig(tag string, creating bool) {
 		}
 	}
 
-	reloadNginx()
+	log.Check(log.ErrorLevel, "Relading nginx", reloadNginx())
 }
 
 func installLECert(proxy *db.Proxy) {
 	makeDir(path.Join(letsEncryptWebRootDir, proxy.Domain))
 	//1) create http config with LE section
 	generateLEConfig(proxy)
-	//2) reload nginx
-	reloadNginx()
-	//3) run certbot
-	obtainLECerts(proxy)
+	//2) reload nginx && run certbot
+	if reloadNginx() != nil || obtainLECerts(proxy) != nil {
+		//delete proxy in case of error during LE certificate obtainment
+		deleteProxy(proxy)
+		//remove self created LE config
+		proxies, _ := db.FindProxies(HTTP, proxy.Domain, 80)
+		if len(proxies) == 0 {
+			fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+		}
+		log.Error("Failed to create proxy")
+	}
 }
 
-func obtainLECerts(proxy *db.Proxy) {
+func obtainLECerts(proxy *db.Proxy) error {
 	args := []string{"certonly", "--config-dir", letsEncryptDir,
 		"--email", "hostmaster@subutai.io", "--agree-tos", "--webroot",
 		"--webroot-path", path.Join(letsEncryptWebRootDir, proxy.Domain),
@@ -613,8 +621,24 @@ func obtainLECerts(proxy *db.Proxy) {
 	if config.Agent.LeStaging {
 		args = append(args, "--staging")
 	}
+
 	out, err := exec.Command("certbot", args...).CombinedOutput()
-	log.Check(log.ErrorLevel, "Obtaining LE certs "+string(out), err)
+	if err != nil {
+		log.Warn("Error obtaining LE certificate, ", err)
+		return errors.New(string(out) + ", " + err.Error())
+	}
+
+	return nil
+}
+
+func reloadNginx() error {
+	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
+	if err != nil {
+		log.Warn("Error reloading nginx, ", err)
+		return errors.New(string(out) + ", " + err.Error())
+	}
+
+	return nil
 }
 
 func removeCert(proxy *db.Proxy) {
@@ -623,7 +647,10 @@ func removeCert(proxy *db.Proxy) {
 		//LE certs
 		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
 	}
-	log.Check(log.ErrorLevel, "Removing certs", fs.DeleteDir(certDir))
+	err := fs.DeleteDir(certDir)
+	if !os.IsNotExist(err) {
+		log.Check(log.ErrorLevel, "Removing certs", err)
+	}
 }
 
 func installSelfSignedCert(proxy *db.Proxy) {
@@ -850,11 +877,6 @@ func deleteProxy(proxy *db.Proxy) {
 
 	//remove proxy from db
 	log.Check(log.ErrorLevel, "Removing proxy from db", db.RemoveProxy(proxy))
-}
-
-func reloadNginx() {
-	out, err := exec.Command("service", "subutai-nginx", "reload").CombinedOutput()
-	log.Check(log.FatalLevel, "Reloading nginx "+string(out), err)
 }
 
 //utilities
