@@ -603,6 +603,7 @@ func installLECert(proxy *db.Proxy) {
 	//2) reload nginx && run certbot
 	if reloadNginx() != nil || obtainLECerts(proxy) != nil {
 		deleteProxy(proxy)
+		log.Error("Failed to create proxy")
 	}
 }
 
