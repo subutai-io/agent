@@ -12,6 +12,10 @@ type Proxy struct {
 	SslBackend     bool
 }
 
+func (p Proxy) IsLE() bool {
+	return p.Protocol == "https" && p.CertPath == ""
+}
+
 type ProxiedServer struct {
 	Id       int    `storm:"id,increment"`
 	ProxyTag string `storm:"index"`

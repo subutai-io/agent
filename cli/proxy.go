@@ -48,6 +48,9 @@ const redirect80Section = `
 server {
 	listen 80;
 	server_name {domain};
+
+    {well-known}
+
 	return 301 https://$host:{port}$request_uri;  # enforce https
 }
 
@@ -94,7 +97,21 @@ server {
         proxy_set_header   X-Forwarded-Proto $scheme;
     }
 
+	#well-known
 	{well-known}
+}
+
+`
+
+const lEConfig = `
+
+server {
+    listen 80;
+    server_name {domain};
+
+    {well-known}
+
+    return 301 https://$host$request_uri;
 }
 
 `
@@ -199,7 +216,7 @@ func MigrateMappings() {
 				Port:           v.Proxy.Port,
 				Tag:            v.Proxy.Tag,
 				CertPath:       "/tmp/" + certName,
-				Redirect80Port: true,
+				Redirect80Port: false,
 				LoadBalancing:  "rr",
 				SslBackend:     false,
 			}
@@ -368,9 +385,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		"Unsupported protocol %s", protocol)
 
 	//check if port is specified and valid
-	checkArgument(port == 80 || port == 443 ||
-		port == 8443 || port == 8444 || port == 8086 ||
-		(port >= 1000 && port <= 65535),
+	checkArgument(port == 80 || port == 443 || (port >= 1000 && port <= 65535),
 		"External port must be one of [80, 443, 1000-65535] ")
 
 	//check domain
@@ -423,7 +438,6 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		//HTTP/HTTPS
 		//check if the same tcp/udp port is not reserved
 		//and check if the same http/https port and domain is not reserved
-		//check port availability
 		tcpProxies, err := db.FindProxies(TCP, "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		udpProxies, err := db.FindProxies(UDP, "", port)
@@ -565,7 +579,7 @@ func applyConfig(tag string, creating bool) {
 		if creating {
 			//Install certificates for https
 			if proxy.Protocol == HTTPS {
-				if proxy.CertPath == "" {
+				if proxy.IsLE() {
 					installLECert(proxy)
 				} else {
 					installSelfSignedCert(proxy)
@@ -584,13 +598,11 @@ func applyConfig(tag string, creating bool) {
 func installLECert(proxy *db.Proxy) {
 	makeDir(path.Join(letsEncryptWebRootDir, proxy.Domain))
 	//1) create http config with LE section
-	generateTempLEConfig(proxy)
+	generateLEConfig(proxy)
 	//2) reload nginx
 	reloadNginx()
 	//3) run certbot
 	obtainLECerts(proxy)
-	//4) remove http config created in step 1
-	removeTempLEConfig(proxy)
 }
 
 func obtainLECerts(proxy *db.Proxy) {
@@ -607,7 +619,7 @@ func obtainLECerts(proxy *db.Proxy) {
 
 func removeCert(proxy *db.Proxy) {
 	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
-	if proxy.CertPath == "" {
+	if proxy.IsLE() {
 		//LE certs
 		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
 	}
@@ -622,26 +634,30 @@ func installSelfSignedCert(proxy *db.Proxy) {
 	log.Check(log.ErrorLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
 }
 
-func generateTempLEConfig(proxy *db.Proxy) {
-	//remove stale temporary nginx config files
-	fs.RemoveFilesWildcard(path.Join(nginxInc, HTTP, "http-80-*.tmp.conf"))
+//check if http-80 mapping already exists for this domain
+//if exists then append well-known section to it
+//otherwise create http-80 port config with well-known section
+func generateLEConfig(proxy *db.Proxy) {
 
-	effectiveConfig := webConfig
-	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
-	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", HTTP+"-tmp", -1)
-	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(80), -1)
+	filePath := path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf")
+	var effectiveConfig string
+	if fs.FileExists(filePath) {
+		//append "well-known" section to existing http-80 mapping config
+		read, err := ioutil.ReadFile(filePath)
+		log.Check(log.ErrorLevel, "Reading existing mapping config", err)
+		effectiveConfig = string(read)
+		//check if config already has well-known section defined
+		if strings.Contains(effectiveConfig, ".well-known") {
+			return
+		}
+		effectiveConfig = strings.Replace(effectiveConfig, "#well-known", letsEncryptWellKnownSection, -1)
+	} else {
+		//create nginx config with LE support
+		effectiveConfig = lEConfig
+		effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
+	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
-	effectiveConfig = strings.Replace(effectiveConfig, "{servers}", "    server localhost:81;", -1)
-
-	//remove other placeholders
-	r := regexp.MustCompile("{\\S+}")
-	effectiveConfig = r.ReplaceAllString(effectiveConfig, "")
-
-	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"), []byte(effectiveConfig), 0744))
-}
-
-func removeTempLEConfig(proxy *db.Proxy) {
-	log.Check(log.ErrorLevel, "Removing nginx config", fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf")))
+	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(filePath, []byte(effectiveConfig), 0744))
 }
 
 func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
@@ -651,6 +667,16 @@ func createConfig(proxy *db.Proxy, servers []db.ProxiedServer) {
 		cfg = createHttpHttpsConfig(proxy, servers)
 	} else {
 		cfg = createTcpUdpConfig(proxy, servers)
+	}
+
+	if proxy.IsLE() && proxy.Redirect80Port {
+		//remove self created LE config if any in case there is no explicit http-80 mapping for this domain
+		proxies, err := db.FindProxies(HTTP, proxy.Domain, 80)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+		if len(proxies) == 0 {
+			fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+		}
 	}
 
 	log.Check(log.ErrorLevel, "Writing nginx config", ioutil.WriteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"), []byte(cfg), 0744))
@@ -693,14 +719,36 @@ func createTcpUdpConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 
 func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
-	effectiveConfig := strings.Replace(webConfig, "{protocol}", proxy.Protocol, -1)
-	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
-	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+	effectiveConfig := webConfig
+
+	//for http-80 proxy check if there is https proxy for the same domain with LE cert
+	//if such poxy exists we need to add "well-known" section for LE cert renewal support
+	if proxy.Protocol == HTTP && proxy.Port == 80 {
+		proxies, err := db.FindProxies(HTTPS, proxy.Domain, 0)
+		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		for _, prxy := range proxies {
+			if prxy.IsLE() && !prxy.Redirect80Port {
+				effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", letsEncryptWellKnownSection, -1)
+				break
+			}
+		}
+	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{well-known}", "", -1)
 
+	effectiveConfig = strings.Replace(effectiveConfig, "{protocol}", proxy.Protocol, -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{port}", strconv.Itoa(proxy.Port), -1)
+	effectiveConfig = strings.Replace(effectiveConfig, "{domain}", proxy.Domain, -1)
+
 	if proxy.Redirect80Port {
-		effectiveConfig += strings.Replace(strings.Replace(redirect80Section, "{domain}", proxy.Domain, -1),
+		redirect := redirect80Section
+		if proxy.IsLE() {
+			redirect = strings.Replace(redirect, "{well-known}", letsEncryptWellKnownSection, -1)
+		} else {
+			redirect = strings.Replace(redirect, "{well-known}", "", -1)
+		}
+		redirect = strings.Replace(strings.Replace(redirect, "{domain}", proxy.Domain, -1),
 			"{port}", strconv.Itoa(proxy.Port), -1)
+		effectiveConfig += redirect
 	}
 
 	//load balancing
@@ -726,7 +774,7 @@ func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 	//ssl
 	sslConfig := ""
 	if proxy.Protocol == HTTPS {
-		if proxy.CertPath == "" {
+		if proxy.IsLE() {
 			//adjust path to LE cert
 			certDir := figureOutDomainFolderName(proxy.Domain)
 			sslConfig = strings.Replace(letsEncryptSslDirectives, "{domain}", certDir, -1)
@@ -776,8 +824,6 @@ func figureOutDomainFolderName(domain string) string {
 }
 
 func removeConfig(proxy db.Proxy) {
-	//remove tmp config just in case
-	fs.DeleteFile(path.Join(nginxInc, HTTP, "http-80-"+proxy.Domain+".tmp.conf"))
 	//remove config
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
 	if !os.IsNotExist(err) {
