@@ -299,7 +299,17 @@ func MigrateMappings() {
 	//migrate tcp/udp
 	for _, v := range streamMap {
 		//check if the same port is not used by other mappings
-		proxies, _ := db.FindProxies("", "", v.Proxy.Port)
+		var proxies []db.Proxy
+		if v.Proxy.Protocol == UDP {
+			proxies, _ = db.FindProxies(UDP, "", v.Proxy.Port)
+		} else {
+			tcpProxies, _ := db.FindProxies(TCP, "", v.Proxy.Port)
+			httpProxies, _ := db.FindProxies(HTTP, "", v.Proxy.Port)
+			httpsProxies, _ := db.FindProxies(HTTPS, "", v.Proxy.Port)
+
+			proxies := append(tcpProxies, httpProxies...)
+			proxies = append(proxies, httpsProxies...)
+		}
 		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65535) {
 			//remove old mapping
 			MapRemove(v.Proxy.Protocol, "0.0.0.0:"+strconv.Itoa(v.Proxy.Port), v.Proxy.Protocol, "")
@@ -389,6 +399,9 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	//check domain
 	if protocol == HTTP || protocol == HTTPS {
 		checkArgument(domain != "", "Domain is required for http/https proxies")
+	} else {
+		//empty domain for tcp/udp
+		domain = ""
 	}
 
 	if loadBalancing != "" {
@@ -414,7 +427,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	log.Check(log.ErrorLevel, "Checking proxy in db", err)
 	checkState(proxy == nil, "Proxy with tag %s already exists", tag)
 
-	//check if proxy with the same combination of protocol+domain+port does not exist
+	//verify that proxy with the same combination of protocol+domain+port does not exist
 	proxies, err := db.FindProxies(protocol, domain, port)
 	log.Check(log.ErrorLevel, "Checking proxy in db", err)
 	checkState(len(proxies) == 0, "Proxy with such combination of protocol, domain and port already exists")
@@ -423,30 +436,36 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		//check port range
 		checkArgument(port >= 1000, "For tcp/udp protocols port must be >= 1000")
 
-		//check port availability
-		proxies, err := db.FindProxies("", "", port)
-		log.Check(log.ErrorLevel, "Checking proxy in db", err)
+		//check if port is not already reserved (udp can coexist with other protocols)
+		if protocol == TCP {
+			tcpProxies, err := db.FindProxies(TCP, "", port)
+			log.Check(log.ErrorLevel, "Checking proxy in db", err)
+			httpProxies, err := db.FindProxies(HTTP, "", port)
+			log.Check(log.ErrorLevel, "Checking proxy in db", err)
+			httpsProxies, err := db.FindProxies(HTTPS, "", port)
+			log.Check(log.ErrorLevel, "Checking proxy in db", err)
 
-		checkCondition(len(proxies) == 0, func() {
-			log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
-				proxies[0].Protocol, proxies[0].Domain, port))
-		})
+			proxies := append(tcpProxies, httpProxies...)
+			proxies = append(proxies, httpsProxies...)
+
+			checkCondition(len(proxies) == 0, func() {
+				log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
+					proxies[0].Protocol, proxies[0].Domain, port))
+			})
+		}
 
 	} else {
 		//HTTP/HTTPS
-		//check if the same tcp/udp port is not reserved
+		//check if the same tcp port is not reserved
 		//and check if the same http/https port and domain is not reserved
 		tcpProxies, err := db.FindProxies(TCP, "", port)
-		log.Check(log.ErrorLevel, "Checking proxy in db", err)
-		udpProxies, err := db.FindProxies(UDP, "", port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		httpProxies, err := db.FindProxies(HTTP, domain, port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 		httpsProxies, err := db.FindProxies(HTTPS, domain, port)
 		log.Check(log.ErrorLevel, "Checking proxy in db", err)
 
-		proxies := append(tcpProxies, udpProxies...)
-		proxies = append(proxies, httpProxies...)
+		proxies := append(tcpProxies, httpProxies...)
 		proxies = append(proxies, httpsProxies...)
 
 		checkCondition(len(proxies) == 0, func() {
