@@ -303,7 +303,12 @@ func MigrateMappings() {
 		if v.Proxy.Protocol == UDP {
 			proxies, _ = db.FindProxies(UDP, "", v.Proxy.Port)
 		} else {
-			proxies, _ = db.FindProxies("", "", v.Proxy.Port)
+			tcpProxies, _ := db.FindProxies(TCP, "", v.Proxy.Port)
+			httpProxies, _ := db.FindProxies(HTTP, "", v.Proxy.Port)
+			httpsProxies, _ := db.FindProxies(HTTPS, "", v.Proxy.Port)
+
+			proxies := append(tcpProxies, httpProxies...)
+			proxies = append(proxies, httpsProxies...)
 		}
 		if len(proxies) > 0 || !(v.Proxy.Port >= 1000 && v.Proxy.Port <= 65535) {
 			//remove old mapping
@@ -433,8 +438,15 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 
 		//check if port is not already reserved (udp can coexist with other protocols)
 		if protocol == TCP {
-			proxies, err := db.FindProxies("", "", port)
+			tcpProxies, err := db.FindProxies(TCP, "", port)
 			log.Check(log.ErrorLevel, "Checking proxy in db", err)
+			httpProxies, err := db.FindProxies(HTTP, "", port)
+			log.Check(log.ErrorLevel, "Checking proxy in db", err)
+			httpsProxies, err := db.FindProxies(HTTPS, "", port)
+			log.Check(log.ErrorLevel, "Checking proxy in db", err)
+
+			proxies := append(tcpProxies, httpProxies...)
+			proxies = append(proxies, httpsProxies...)
 
 			checkCondition(len(proxies) == 0, func() {
 				log.Error(fmt.Sprintf("Proxy to %s://%s:%d already exists, can not create proxy",
