@@ -190,7 +190,7 @@ func GenerateKey(name string) error {
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
 	if _, err := os.Stat(thePath + "/secret.sec"); os.IsNotExist(err) {
-		if log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", thePath+"/defaults").Run()) {
+		if log.Check(log.DebugLevel, "Generating key", exec2.Exec(GPG, "--batch", "--gen-key", thePath+"/defaults")) {
 			return err
 		}
 	}
