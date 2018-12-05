@@ -34,6 +34,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
+	defer sendHeartbeat()
 
 	t := getTemplateInfo(parent)
 
