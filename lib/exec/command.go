@@ -57,7 +57,11 @@ func Execute(command string, args ...string) (string, error) {
 	err := cmd.Run()
 
 	if err != nil {
-		return fmt.Sprint(err) + ": " + stderr.String(), err
+		errMsg := stderr.String()
+		if strings.TrimSpace(errMsg) == "" {
+			errMsg = out.String()
+		}
+		return fmt.Sprint(err) + ": " + errMsg, err
 	}
 
 	return out.String(), nil
