@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/subutai-io/agent/agent/util"
 	"net/http"
+	"github.com/subutai-io/agent/lib/fs"
 )
 
 var (
@@ -105,8 +106,10 @@ func GetContainerPk(name string) string {
 // GetPk returns GPG Public Key from the Resource Host.
 func GetPk(name string) string {
 	stdout, err := exec.Command(GPG, "--export", "-a", name).Output()
-	log.Check(log.WarnLevel, "Getting public key", err)
-	return string(stdout)
+	if !log.Check(log.WarnLevel, "Getting public key", err) {
+		return string(stdout)
+	}
+	return ""
 }
 
 // DecryptWrapper decrypts GPG message.
@@ -187,7 +190,7 @@ func GenerateKey(name string) error {
 	log.Check(log.DebugLevel, "Closing defaults for gpg", conf.Close())
 
 	if _, err := os.Stat(thePath + "/secret.sec"); os.IsNotExist(err) {
-		if log.Check(log.DebugLevel, "Generating key", exec.Command(GPG, "--batch", "--gen-key", thePath+"/defaults").Run()) {
+		if log.Check(log.DebugLevel, "Generating key", exec2.Exec(GPG, "--batch", "--gen-key", thePath+"/defaults")) {
 			return err
 		}
 	}
@@ -196,18 +199,12 @@ func GenerateKey(name string) error {
 	if !container.LxcInstanceExists(name) {
 		out, err := exec.Command(GPG, "--allow-secret-key-import", "--import", "/root/.gnupg/secret.sec").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing secret key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
-			for _, f := range list {
-				os.Remove(f)
-			}
+			fs.RemoveFilesWildcard(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			return err
 		}
 		out, err = exec.Command(GPG, "--import", "/root/.gnupg/public.pub").CombinedOutput()
 		if log.Check(log.DebugLevel, "Importing public key "+string(out), err) {
-			list, _ := filepath.Glob(filepath.Join(config.Agent.GpgHome, "*.lock"))
-			for _, f := range list {
-				os.Remove(f)
-			}
+			fs.RemoveFilesWildcard(filepath.Join(config.Agent.GpgHome, "*.lock"))
 			return err
 		}
 	}
