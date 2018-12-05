@@ -43,6 +43,7 @@ func init() {
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
 	cache = utils.GetCache(time.Minute * 30)
 	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
+	config.Management.GpgUser, _ = db.GetMhGpgUsername()
 }
 
 func GetConsole() Console {
@@ -228,7 +229,12 @@ func (c Console) ImportPubKey() error {
 		return err
 	}
 
-	config.Management.GpgUser = gpg.ExtractKeyID(key)
+	gpgUser := gpg.ExtractKeyID(key)
+
+	if gpgUser != "" {
+		config.Management.GpgUser = gpgUser
+		db.SaveMhGpgUsername(gpgUser)
+	}
 
 	return nil
 }

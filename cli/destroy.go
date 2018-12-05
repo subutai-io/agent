@@ -12,7 +12,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/agent/console"
-	"github.com/subutai-io/agent/config"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -31,7 +30,6 @@ func init() {
 }
 
 func sendHeartbeat() {
-	config.Management.GpgUser, _ = db.GetMhGpgUsername()
 	consol.SendHeartBeat(true)
 }
 
