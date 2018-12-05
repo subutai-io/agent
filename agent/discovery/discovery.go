@@ -161,7 +161,11 @@ func save(ip string) {
 
 	config.ManagementIP = ip
 
-	log.Check(log.WarnLevel, "Importing Console key", consol.ImportPubKey())
+	if !log.Check(log.WarnLevel, "Importing Console key", consol.ImportPubKey()) &&
+		len(config.Management.GpgUser) > 0 {
+		db.SaveMhGpgUsername(config.Management.GpgUser)
+	}
+
 	log.Check(log.WarnLevel, "Sending registration request to Console", consol.Register())
 }
 
