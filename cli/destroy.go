@@ -11,6 +11,8 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/console"
+	"github.com/subutai-io/agent/config"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -20,12 +22,27 @@ import (
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
 
+var (
+	consol console.Console
+)
+
+func init() {
+	consol = console.GetConsole()
+}
+
+func sendHeartbeat() {
+	config.Management.GpgUser, _ = db.GetMhGpgUsername()
+	consol.SendHeartBeat(true)
+}
+
 //todo refactor split into smaller methods
 func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
 	var msg string
 	if len(id) == 0 {
 		log.Error("Please specify container/template name or vlan id")
 	}
+
+	defer sendHeartbeat()
 
 	if strings.HasPrefix(id, "id:") {
 		contId := strings.ToUpper(strings.TrimPrefix(id, "id:"))
