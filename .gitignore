@@ -78,5 +78,3 @@ subutai
 .*
 !/debian/**
 
-vendor
-Gopkg.*

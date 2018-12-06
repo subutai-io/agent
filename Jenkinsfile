@@ -49,6 +49,8 @@ try {
 			git reset --hard origin/${release}
 			git clean -f -d
 			git checkout ${release}
+            git reset --hard origin/${release}
+            git clean -f -d
 			git pull
 		"""		
 		stage("Tweaks for version")
