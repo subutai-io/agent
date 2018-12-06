@@ -114,6 +114,9 @@ func Start(name string) error {
 		return errors.New("Unable to start container " + name)
 	}
 
+	SetContainerConf(name, [][]string{
+		{"lxc.start.auto", "1"}})
+
 	v, _ := db.FindContainerByName(name)
 	if v != nil {
 		v.State = Running
@@ -137,6 +140,9 @@ func Stop(name string) error {
 	if c.State().String() != Stopped {
 		return errors.New("Unable to stop container " + name)
 	}
+
+	SetContainerConf(name, [][]string{
+		{"lxc.start.auto", ""}})
 
 	v, _ := db.FindContainerByName(name)
 	if v != nil {
@@ -164,6 +170,9 @@ func Restart(name string) error {
 	if c.State().String() != Running {
 		return errors.New("Unable to start container " + name)
 	}
+
+	SetContainerConf(name, [][]string{
+		{"lxc.start.auto", "1"}})
 
 	v, _ := db.FindContainerByName(name)
 	if v != nil {
