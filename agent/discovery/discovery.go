@@ -101,7 +101,7 @@ func server() {
 		})
 
 		//stay as ssdp server while registration with Console is valid and MH IP has not changed
-		for consol.IsRegistered() && location == net.GetIp() {
+		for consol.CheckRegistration() && location == net.GetIp() {
 			time.Sleep(10 * time.Second)
 		}
 	} else {
@@ -111,7 +111,7 @@ func server() {
 
 func client() {
 	//don't search new peers while registration with Console is valid
-	for consol.IsRegistered() {
+	for consol.CheckRegistration() {
 		if config.Management.GpgUser == "" {
 			consol.ImportPubKey()
 		}

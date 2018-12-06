@@ -44,7 +44,7 @@ func Start() {
 	}
 
 	//wait till RH gets registered with Console
-	for !consol.IsRegistered() {
+	for !consol.CheckRegistration() {
 		time.Sleep(time.Second * 5)
 	}
 
