@@ -52,7 +52,7 @@ func GetConsole() Console {
 
 func (c Console) Heartbeats() {
 	for {
-		if c.IsRegistered() {
+		if c.CheckRegistration() {
 			if c.SendHeartBeat(false) == nil {
 				time.Sleep(30 * time.Second)
 			} else {
@@ -82,7 +82,6 @@ func (c Console) IsReady() bool {
 //returns false if not approved or any error during checking registration
 func (c Console) IsRegistered() bool {
 	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint
-	log.Debug("Checking registration with Console " + theUrl)
 	resp, err := c.secureClient.Get(theUrl)
 	if err == nil {
 		defer c.httpUtil.Close(resp)
@@ -90,6 +89,18 @@ func (c Console) IsRegistered() bool {
 			return true
 		}
 	}
+
+	return false
+}
+
+//returns true if Console has approved this RH registration
+//returns false if not approved or any error during checking registration
+//resets http client to ensure clean operation
+func (c Console) CheckRegistration() bool {
+	if c.IsRegistered() {
+		return true
+	}
+
 	log.Warn("RH is not registered")
 
 	checkRegistrationLock.Lock()
@@ -97,6 +108,7 @@ func (c Console) IsRegistered() bool {
 
 	c.secureClient.Transport.(*http.Transport).CloseIdleConnections()
 	//recreate secure client to exclude issue with SSL
+	var err error
 	c.secureClient, err = c.httpUtil.GetSecureClient(30)
 	log.Check(log.FatalLevel, "Recreating secure client", err)
 
