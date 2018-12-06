@@ -30,7 +30,9 @@ func init() {
 }
 
 func sendHeartbeat() {
-	consol.SendHeartBeat(true)
+	if container.State(container.Management) == container.Running && consol.IsRegistered() {
+		consol.SendHeartBeat(true)
+	}
 }
 
 //todo refactor split into smaller methods
