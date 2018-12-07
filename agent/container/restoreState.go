@@ -21,16 +21,11 @@ func doRestore() {
 	for _, v := range active {
 		if container.State(v.Name) != container.Running {
 			log.Debug("Starting container " + v.Name)
+
 			startErr := container.Start(v.Name)
-			for i := 0; i < 5 && startErr != nil; i++ {
-				log.Debug("Retrying container " + v.Name + " start")
-				time.Sleep(time.Second * time.Duration(5+i))
-				startErr = container.Start(v.Name)
-			}
+
 			if startErr != nil {
 				log.Warn("Failed to start container " + v.Name + ": " + startErr.Error())
-				v.State = container.Stopped
-				db.SaveContainer(&v)
 			}
 		}
 	}
