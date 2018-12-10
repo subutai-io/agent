@@ -9,7 +9,7 @@ function checkNRestore(){
     MISSING_IPS=()
 
     # iterate over IPs of running containers
-    for containerIp in `subutai list i | grep eth0 | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+    for containerIp in `subutai list i | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
 
         MISSING=1
 
@@ -25,11 +25,11 @@ function checkNRestore(){
 
         done
 
-         if [ "$MISSING" == 1 ]; then
+        if [ "$MISSING" == 1 ]; then
 
             MISSING_IPS+=($containerIp)
 
-         fi
+        fi
     done
 
     # restore forwarding rules
@@ -40,6 +40,45 @@ function checkNRestore(){
         vlan=$(subutai list i | grep $ipaddr | cut -f1 | awk -F'-' '{print $(NF-1)}')
 
         iptables -t nat -A PREROUTING -i p2p$vlan -p tcp -m tcp --dport $port -j DNAT --to-destination $ipaddr:22
+
+    done
+
+
+    #remove forwarding rules for missing (destroyed) containers
+    MISSING_RULES=()
+
+# set line separator
+IFS='
+'
+    # iterate over existing forwarding rules
+    for rule in `iptables -L -t nat --line-numbers | grep DNAT | tr -s [:blank:]` ; do
+
+        MISSING=1
+
+        # iterate over IPs of running containers to figure out which rules are obsolete
+        for containerIp in `subutai list i | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+
+            if [ -z "${rule##*$containerIp*}" ] ;then
+
+                MISSING=0
+
+                break
+            fi
+
+        done
+
+        if [ "$MISSING" == 1 ]; then
+
+            MISSING_RULES+=($rule)
+
+        fi
+
+    done
+
+    # remove forwarding rules
+    for rule in "${MISSING_RULES[@]}" ; do
+
+        iptables -t nat -D PREROUTING $( echo $rule | awk '{print $1}')
 
     done
 
