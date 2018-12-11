@@ -5,3 +5,5 @@ var (
 
 	Version string
 )
+
+const DAEMON_PORT = "7070"

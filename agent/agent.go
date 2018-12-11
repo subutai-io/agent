@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/agent/console"
+	"github.com/subutai-io/agent/agent/vars"
 )
 
 var (
@@ -77,7 +78,7 @@ func (*myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func setupHttpServer() {
 	srv := &http.Server{
-		Addr:              ":7070",
+		Addr:              ":" + vars.DAEMON_PORT,
 		ReadHeaderTimeout: 15 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -99,7 +100,9 @@ func pingHandler(rw http.ResponseWriter, request *http.Request) {
 }
 
 func heartbeatHandler(rw http.ResponseWriter, request *http.Request) {
-	if request.Method == http.MethodGet && strings.Split(request.RemoteAddr, ":")[0] == config.ManagementIP {
+	clientIp := strings.Split(request.RemoteAddr, ":")[0]
+
+	if request.Method == http.MethodGet && (clientIp == config.ManagementIP || strings.HasPrefix(request.RemoteAddr, "[::1]")) {
 		rw.WriteHeader(http.StatusOK)
 		go consol.SendHeartBeat(true)
 	} else {
