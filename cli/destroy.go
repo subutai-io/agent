@@ -12,6 +12,8 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/agent/console"
+	"net/http"
+	"github.com/subutai-io/agent/agent/vars"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -30,8 +32,12 @@ func init() {
 }
 
 func sendHeartbeat() {
-	if container.State(container.Management) == container.Running && consol.IsRegistered() {
-		consol.SendHeartBeat(true)
+	if consol.IsRegistered() {
+		//trigger heartbeat via REST to agent
+		resp, err := http.Get("http://localhost:" + vars.DAEMON_PORT + "/heartbeat")
+		if !log.Check(log.WarnLevel, "Triggering heartbeat", err) {
+			consol.Close(resp)
+		}
 	}
 }
 

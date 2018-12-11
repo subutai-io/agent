@@ -69,7 +69,7 @@ func (c Console) Heartbeats() {
 func (c Console) IsReady() bool {
 	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
 	if err == nil {
-		defer c.httpUtil.Close(resp)
+		defer c.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -84,7 +84,7 @@ func (c Console) IsRegistered() bool {
 	theUrl := "https://" + path.Join(config.ManagementIP) + ":8444/rest/v1/agent/check/" + c.fingerprint
 	resp, err := c.secureClient.Get(theUrl)
 	if err == nil {
-		defer c.httpUtil.Close(resp)
+		defer c.Close(resp)
 		if resp.StatusCode == http.StatusOK {
 			return true
 		}
@@ -146,7 +146,7 @@ func (c Console) Register() error {
 	resp, err := c.client.Post("https://"+path.Join(config.ManagementIP)+":8443/rest/v1/registration/public-key", "text/plain",
 		bytes.NewBuffer(msg))
 	if err == nil {
-		defer c.httpUtil.Close(resp)
+		defer c.Close(resp)
 	} else {
 		return err
 	}
@@ -157,7 +157,7 @@ func (c Console) Register() error {
 func (c Console) GetFingerprint() (string, error) {
 	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/security/keyman/getpublickeyfingerprint")
 	if err == nil {
-		defer c.httpUtil.Close(resp)
+		defer c.Close(resp)
 	} else {
 		return "", err
 	}
@@ -263,7 +263,7 @@ func (c Console) getPubKey() ([]byte, error) {
 	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/security/keyman/getpublickeyring")
 
 	if err == nil {
-		defer c.httpUtil.Close(resp)
+		defer c.Close(resp)
 	} else {
 		return nil, err
 	}
@@ -289,6 +289,10 @@ func (c Console) getContainerNameByID(id string) string {
 	}
 
 	return ""
+}
+
+func (c Console) Close(resp *http.Response) {
+	c.httpUtil.Close(resp)
 }
 
 //fetch commands to execute from Console
