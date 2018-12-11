@@ -39,6 +39,7 @@ func MngInit(templateRef string) {
 	mgmtCont := &db.Container{}
 	mgmtCont.Name = container.Management
 	mgmtCont.Ip = container.ManagementIp
+	mgmtCont.State = container.Running
 	log.Check(log.ErrorLevel, "Writing container data to database", db.SaveContainer(mgmtCont))
 
 	log.Info("********************")
