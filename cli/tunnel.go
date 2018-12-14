@@ -16,6 +16,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"os"
 	"path"
+	"regexp"
 )
 
 // The tunnel feature is based on SSH tunnels and works in combination with Subutai Helpers and serves as an easy solution for bypassing NATs.
@@ -24,6 +25,9 @@ import (
 // Tunnels may also be set to be permanent (default) or temporary (ttl in seconds). The default destination port is 22.
 // Subutai tunnels have a continuous state checking mechanism which keeps opened tunnels alive and closes outdated tunnels to keep the system network connections clean.
 // This mechanism may re-create a tunnel if it was dropped unintentionally (system reboot, network interruption, etc.), but newly created tunnels will have different "entrance" address.
+var (
+	socketRx = regexp.MustCompile(`^\S+:\S+$`)
+)
 
 func MigrateTunnels() {
 
@@ -135,6 +139,8 @@ func GetSshTunnels() (list []db.SshTunnel) {
 
 // TunDel removes tunnel entry from list and kills running tunnel process
 func DelSshTunnel(socket string, pid ...int) {
+	checkArgument(socketRx.MatchString(socket), "Socket must be in form ip:port")
+
 	list, err := db.GetAllTunnels()
 	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
 		for _, item := range list {
