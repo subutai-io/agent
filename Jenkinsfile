@@ -51,8 +51,8 @@ try {
 			git checkout ${release}
             git reset --hard origin/${release}
             git clean -f -d
-			git pull
-		"""		
+			git pull --tags
+		"""
 		stage("Tweaks for version")
 		notifyBuildDetails = "\nFailed on Stage - Version tweaks"
 		sh """
