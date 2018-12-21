@@ -9,18 +9,32 @@ import (
 
 // LxcStart starts a Subutai container and checks if container state changed to "running" or "starting".
 // If state is not changing for 60 seconds, then the "start" operation is considered to have failed.
-func LxcStart(name string) {
-	if container.LxcInstanceExists(name) && container.State(name) == container.Stopped {
-		defer sendHeartbeat()
-		startErr := container.Start(name)
-		for i := 0; i < 60 && startErr != nil; i++ {
-			log.Info("Waiting for container start (60 sec)")
-			startErr = container.Start(name)
-			time.Sleep(time.Second)
+func LxcStart(names ...string) {
+	needHeartBeat := false
+	defer func() {
+		if needHeartBeat {
+			sendHeartbeat()
 		}
-		if startErr != nil {
-			log.Error(name + " start failed")
+	}()
+
+	for _, name := range names {
+		if container.LxcInstanceExists(name) && container.State(name) == container.Stopped {
+			startErr := container.Start(name)
+			for i := 0; i < 60 && startErr != nil; i++ {
+				log.Info("Waiting for container start (60 sec)")
+				startErr = container.Start(name)
+				time.Sleep(time.Second)
+			}
+			if startErr != nil {
+				if len(names) > 0 {
+					log.Warn(name + " start failed")
+				} else {
+					log.Error(name + " start failed")
+				}
+			} else {
+				needHeartBeat = true
+				log.Info(name + " started")
+			}
 		}
-		log.Info(name + " started")
 	}
 }
