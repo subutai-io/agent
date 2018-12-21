@@ -237,15 +237,15 @@ var (
 
 	//start command
 	startCmd          = app.Command("start", "Start Subutai container")
-	startCmdContainer = startCmd.Arg("name", "container name").Required().String()
+	startCmdContainer = startCmd.Arg("name(s)", "container name(s)").Required().Strings()
 
 	//stop command
 	stopCmd          = app.Command("stop", "Stop Subutai container")
-	stopCmdContainer = stopCmd.Arg("name", "container name").Required().String()
+	stopCmdContainer = stopCmd.Arg("name(s)", "container name(s)").Required().Strings()
 
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
-	restartCmdContainer = restartCmd.Arg("name", "container name").Required().String()
+	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
 
 	//update command
 	//subutai update rh
@@ -414,11 +414,11 @@ func main() {
 	case quotaSetCmd.FullCommand():
 		cli.LxcQuota(*quotaSetContainer, *quotaSetResource, *quotaSetLimit, "")
 	case startCmd.FullCommand():
-		cli.LxcStart(*startCmdContainer)
+		cli.LxcStart(*startCmdContainer...)
 	case stopCmd.FullCommand():
-		cli.LxcStop(*stopCmdContainer)
+		cli.LxcStop(*stopCmdContainer...)
 	case restartCmd.FullCommand():
-		cli.LxcRestart(*restartCmdContainer)
+		cli.LxcRestart(*restartCmdContainer...)
 	case updateCmd.FullCommand():
 		cli.Update(*updateCmdComponent, *updateCheck)
 	case tunnelAddCmd.FullCommand():

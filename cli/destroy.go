@@ -11,9 +11,6 @@ import (
 	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
-	"github.com/subutai-io/agent/agent/console"
-	"net/http"
-	"github.com/subutai-io/agent/agent/vars"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -22,24 +19,6 @@ import (
 // The destroy command always runs each step in "force" mode to provide reliable deletion results;
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
-
-var (
-	consol console.Console
-)
-
-func init() {
-	consol = console.GetConsole()
-}
-
-func sendHeartbeat() {
-	if consol.IsRegistered() {
-		//trigger heartbeat via REST to agent
-		resp, err := http.Get("http://localhost:" + vars.DAEMON_PORT + "/heartbeat")
-		if !log.Check(log.WarnLevel, "Triggering heartbeat", err) {
-			consol.Close(resp)
-		}
-	}
-}
 
 //todo refactor split into smaller methods
 func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
