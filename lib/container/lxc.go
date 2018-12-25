@@ -274,6 +274,7 @@ func AttachExecOutput(name string, command []string, env ...[]string) (output st
 	}
 
 	pid, err := container.RunCommandNoWait(command, options)
+	//todo
 	log.Check(log.ErrorLevel, "Executing command inside container", err)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -287,11 +288,13 @@ func AttachExecOutput(name string, command []string, env ...[]string) (output st
 	}()
 
 	proc, err := os.FindProcess(pid)
+	//todo
 	log.Check(log.ErrorLevel, "Looking process by pid "+strconv.Itoa(pid), err)
 
 	procState, err := proc.Wait()
 	log.Check(log.ErrorLevel, "Waiting for process completion", err)
 
+	//todo
 	if !procState.Success() {
 		log.ErrorNoExit("Command failed")
 		if status, ok := procState.Sys().(syscall.WaitStatus); ok {
@@ -309,7 +312,7 @@ func DestroyContainer(name string) error {
 
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 
-	if log.Check(log.DebugLevel, "Creating container object", err) {
+	if log.Check(log.WarnLevel, "Creating container object", err) {
 		return err
 	}
 
@@ -317,11 +320,15 @@ func DestroyContainer(name string) error {
 
 	log.Check(log.DebugLevel, "Shutting down lxc", c.Shutdown(time.Second*120))
 
-	for i := 1; Destroy(name, false) != nil && i < 3; i++ {
+	err = Destroy(name, false)
+	for i := 1; err != nil && i < 3; i++ {
 		time.Sleep(time.Second * time.Duration(i*5))
+		err = Destroy(name, false)
 	}
 
-	log.Check(log.ErrorLevel, "Removing container", err)
+	if log.Check(log.WarnLevel, "Removing container", err) {
+		return err
+	}
 
 	cont, _ := db.FindContainerByName(name)
 	if cont != nil {
@@ -331,16 +338,18 @@ func DestroyContainer(name string) error {
 	return nil
 }
 
-func DestroyTemplate(name string) {
+func DestroyTemplate(name string) error {
 	if !IsTemplate(name) {
-		log.Error("Template " + name + " not found")
+		return errors.New("Template " + name + " not found")
 	}
 
 	err := Destroy(name, false)
 
-	log.Check(log.ErrorLevel, "Removing template", err)
+	if log.Check(log.WarnLevel, "Removing template", err) {
+		return err
+	}
 
-	log.Info("Template " + name + " is destroyed")
+	return nil
 }
 
 func Destroy(name string, silent bool) error {
@@ -701,12 +710,14 @@ func Mac() string {
 	buf := make([]byte, 6)
 
 	_, err := rand.Read(buf)
+	//todo
 	log.Check(log.ErrorLevel, "Generating random mac", err)
 
 	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 	for usedMacs[mac] {
 
 		_, err := rand.Read(buf)
+		//todo
 		log.Check(log.ErrorLevel, "Generating random mac", err)
 
 		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])

@@ -81,7 +81,7 @@ var (
 	subutai destroy foo
 	*/
 	destroyCmd  = app.Command("destroy", "Destroy Subutai container/template").Alias("rm").Alias("del")
-	destroyName = destroyCmd.Arg("name", "container/template name").Required().String()
+	destroyName = destroyCmd.Arg("name", "container/template name").Required().Strings()
 
 	//export command
 	/*
@@ -328,11 +328,11 @@ func main() {
 	case cloneCmd.FullCommand():
 		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
 	case cleanupCmd.FullCommand():
-		cli.LxcDestroy(*cleanupVlan, true, false)
+		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():
 		cli.Prune()
 	case destroyCmd.FullCommand():
-		cli.LxcDestroy(*destroyName, false, false)
+		cli.LxcDestroy(*destroyName...)
 	case exportCmd.FullCommand():
 		cli.LxcExport(*exportContainer, *exportName, *exportVersion, *exportSize, *exportToken, *exportLocal)
 	case importCmd.FullCommand():

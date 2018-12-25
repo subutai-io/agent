@@ -41,3 +41,14 @@ func ParsePem(cert string) (crt, key []byte) {
 	}
 	return crt, key
 }
+
+func ParsePem2(cert string) (crt, key []byte, err error) {
+	key, err = exec.ExecB("openssl", "pkey", "-in", cert)
+	if err == nil {
+		f, err := ioutil.ReadFile(cert)
+		if err == nil {
+			crt = bytes.Replace(f, key, []byte(""), -1)
+		}
+	}
+	return crt, key, err
+}
