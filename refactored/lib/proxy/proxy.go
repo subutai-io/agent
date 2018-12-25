@@ -31,6 +31,8 @@ const HTTPS = "https"
 const UDP = "udp"
 const TCP = "tcp"
 
+const TAGFORMAT = "%s-%d-%s"
+
 var (
 	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
 )
@@ -139,13 +141,13 @@ const selfSignedSslDirectives = `
     ssl_certificate_key /var/lib/subutai/web/ssl/{domain}/privkey.pem;
 `
 
-var selfSignedCertsDir = path.Join(config.Agent.DataPrefix, "/web/ssl")
+var SelfSignedCertsDir = path.Join(config.Agent.DataPrefix, "/web/ssl")
 var letsEncryptDir = path.Join(config.Agent.DataPrefix, "/letsencrypt")
 var letsEncryptWebRootDir = path.Join(letsEncryptDir, "/webroot")
 var letsEncryptCertsDir = path.Join(letsEncryptDir, "/live")
 
 func init() {
-	makeDir(selfSignedCertsDir)
+	makeDir(SelfSignedCertsDir)
 	makeDir(letsEncryptDir)
 	makeDir(letsEncryptWebRootDir)
 	makeDir(letsEncryptCertsDir)
@@ -585,7 +587,7 @@ func reloadNginx() error {
 }
 
 func removeCert(proxy *db.Proxy) error {
-	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	certDir := path.Join(SelfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
 	if proxy.IsLE() {
 		//LE certs
 		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
@@ -599,7 +601,7 @@ func removeCert(proxy *db.Proxy) error {
 }
 
 func installSelfSignedCert(proxy *db.Proxy) error {
-	certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
+	certDir := path.Join(SelfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
 	err := makeDir(certDir)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error creating directory: %s", err.Error()))

@@ -6,10 +6,13 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/log"
+	prxy "github.com/subutai-io/agent/refactored/lib/proxy"
 	"path"
 	"fmt"
 	"io/ioutil"
 )
+
+//todo dont use db directly, use only proxy lib
 
 var (
 	nginxInc = path.Join(config.Agent.DataPrefix, "nginx/nginx-includes")
@@ -19,7 +22,8 @@ func GetPortMappings(protocol string) []string {
 	protocol = strings.ToLower(protocol)
 
 	var output []string
-	proxies := GetProxies(protocol)
+	proxies, err := prxy.GetProxies(protocol)
+	log.Check(log.ErrorLevel, "Getting proxies", err)
 	for _, p := range proxies {
 		if protocol == p.Proxy.Protocol || protocol == "" {
 			for _, server := range p.Servers {
@@ -36,23 +40,26 @@ func RemovePortMapping(protocol, domain string, port int, server string) {
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 
-	tag := fmt.Sprintf(TAGFORMAT, protocol, port, domain)
-	if protocol == TCP || protocol == UDP {
-		tag = fmt.Sprintf(TAGFORMAT, protocol, port, "stream")
+	tag := fmt.Sprintf(prxy.TAGFORMAT, protocol, port, domain)
+	if protocol == prxy.TCP || protocol == prxy.UDP {
+		tag = fmt.Sprintf(prxy.TAGFORMAT, protocol, port, "stream")
 	}
 
 	if server != "" {
-		RemoveProxiedServer(tag, server)
+		err := prxy.RemoveProxiedServer(tag, server)
+		log.Check(log.ErrorLevel, "Removing server", err)
+
+		//if no servers left in proxy, remove it
+		servers, err := db.FindProxiedServers(tag, "")
+		log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
+
+		if len(servers) == 0 {
+			err = prxy.RemoveProxy(tag)
+			log.Check(log.ErrorLevel, "Removing proxy", err)
+		}
 	} else {
-		RemoveProxy(tag)
-		return
-	}
-
-	servers, err := db.FindProxiedServers(tag, "")
-	log.Check(log.ErrorLevel, "Getting proxied servers from db", err)
-
-	if len(servers) == 0 {
-		RemoveProxy(tag)
+		err := prxy.RemoveProxy(tag)
+		log.Check(log.ErrorLevel, "Removing proxy", err)
 	}
 }
 
@@ -60,21 +67,24 @@ func AddPortMapping(protocol, domain, loadBalancing string, port int, server, ce
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 
-	tag := fmt.Sprintf(TAGFORMAT, protocol, port, domain)
-	if protocol == TCP || protocol == UDP {
-		tag = fmt.Sprintf(TAGFORMAT, protocol, port, "stream")
+	tag := fmt.Sprintf(prxy.TAGFORMAT, protocol, port, domain)
+	if protocol == prxy.TCP || protocol == prxy.UDP {
+		tag = fmt.Sprintf(prxy.TAGFORMAT, protocol, port, "stream")
 	}
 
 	proxy, err := db.FindProxyByTag(tag)
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 
 	if proxy == nil {
-		CreateProxy(protocol, domain, loadBalancing, tag, port, redirect80Port, sslBackend, certPath)
+		err = prxy.CreateProxy(protocol, domain, loadBalancing, tag, port, redirect80Port, sslBackend, certPath)
+		log.Check(log.ErrorLevel, "Creating proxy", err)
 		proxy, err = db.FindProxyByTag(tag)
 		log.Check(log.ErrorLevel, "Getting proxy from db", err)
 	}
 
-	AddProxiedServer(tag, server)
+	err = prxy.AddProxiedServer(tag, server)
+	log.Check(log.ErrorLevel, "Adding server", err)
+
 }
 
 //todo remove after one version
@@ -97,8 +107,8 @@ func MapRemove(protocol, sockExt, domain, sockInt string) {
 				}
 				os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
 				if protocol == "https" {
-					os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
-					os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
+					os.Remove(path.Join(prxy.SelfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
+					os.Remove(path.Join(prxy.SelfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
 				}
 			}
 		}
@@ -108,8 +118,8 @@ func MapRemove(protocol, sockExt, domain, sockInt string) {
 		}
 		os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
 		if protocol == "https" {
-			os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
-			os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
+			os.Remove(path.Join(prxy.SelfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
+			os.Remove(path.Join(prxy.SelfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
 		}
 	}
 }
