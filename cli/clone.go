@@ -8,7 +8,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"regexp"
 )
 
@@ -29,7 +29,7 @@ var (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, consoleSecret string) {
-	utils.VerifyLxcName(child)
+	util.VerifyLxcName(child)
 
 	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")

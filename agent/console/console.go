@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"runtime"
 	"github.com/subutai-io/agent/lib/net"
-	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/log"
 	"net/url"
 	"sync"
@@ -29,7 +28,7 @@ import (
 var (
 	console Console
 	//todo move variables to Console instance
-	instanceType          = utils.InstanceType()
+	instanceType          = util.InstanceType()
 	instanceArch          = strings.ToUpper(runtime.GOARCH)
 	heartbeatLock         sync.Mutex
 	checkRegistrationLock sync.Mutex
@@ -41,7 +40,7 @@ func init() {
 	httpUtil := util.GetUtil()
 	sc, err := httpUtil.GetSecureClient(30)
 	log.Check(log.FatalLevel, "'Initializing Console connectivity", err)
-	cache = utils.GetCache(time.Minute * 30)
+	cache = util.GetCache(time.Minute * 30)
 	console = Console{httpUtil: httpUtil, client: httpUtil.GetClient(30), secureClient: sc, fingerprint: gpg.GetRhFingerprint()}
 	config.Management.GpgUser, _ = db.GetMhGpgUsername()
 }
@@ -129,9 +128,9 @@ func (c Console) Register() error {
 		Pk:           gpg.GetPk(config.Agent.GpgUser),
 		Id:           gpg.GetFingerprint(config.Agent.GpgUser),
 		Arch:         strings.ToUpper(runtime.GOARCH),
-		Cert:         utils.PublicCert(),
+		Cert:         util.PublicCert(),
 		Address:      net.GetIp(),
-		InstanceType: utils.InstanceType(),
+		InstanceType: util.InstanceType(),
 		Containers:   containers(true),
 	})
 	if err != nil {
@@ -216,7 +215,7 @@ func (c Console) SendHeartBeat(force bool) error {
 
 		resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/heartbeat", url.Values{"heartbeat": {string(message)}})
 		if !log.Check(log.WarnLevel, "Sending heartbeat: "+string(heartbeat), err) {
-			defer utils.Close(resp)
+			defer util.Close(resp)
 
 			if resp.StatusCode == http.StatusAccepted {
 				lastHeartbeatTime = time.Now()
@@ -303,7 +302,7 @@ func (c Console) getCommands() []executer.EncRequest {
 
 	resp, err := c.secureClient.Get(theUrl)
 	if err == nil {
-		defer utils.Close(resp)
+		defer util.Close(resp)
 	}
 
 	if log.Check(log.WarnLevel, "Fetching commands from Console", err) {
@@ -330,7 +329,7 @@ func (c Console) getCommands() []executer.EncRequest {
 func (c Console) sendResponse(msg []byte, deadline time.Time) {
 	resp, err := postForm(c.secureClient, "https://"+path.Join(config.ManagementIP)+":8444/rest/v1/agent/response", url.Values{"response": {string(msg)}})
 	if !log.Check(log.WarnLevel, "Sending response "+string(msg), err) {
-		defer utils.Close(resp)
+		defer util.Close(resp)
 		if resp.StatusCode == http.StatusAccepted {
 			return
 		}
@@ -373,15 +372,15 @@ func containers(details bool) []Container {
 
 			//cacheable properties>>>
 
-			aContainer.ID = utils.GetFromCacheOrCalculate(cache, c+"_fingerprint", func() string {
+			aContainer.ID = util.GetFromCacheOrCalculate(cache, c+"_fingerprint", func() string {
 				return gpg.GetFingerprint(c)
 			})
 
-			aContainer.Arch = utils.GetFromCacheOrCalculate(cache, c+"_arch", func() string {
+			aContainer.Arch = util.GetFromCacheOrCalculate(cache, c+"_arch", func() string {
 				return strings.ToUpper(cont.GetConfigItem(configPath, "lxc.arch"))
 			})
 
-			aContainer.Parent = utils.GetFromCacheOrCalculate(cache, c+"_parent", func() string {
+			aContainer.Parent = util.GetFromCacheOrCalculate(cache, c+"_parent", func() string {
 				return cont.GetConfigItem(configPath, "subutai.parent")
 			})
 
@@ -414,7 +413,7 @@ func interfaces(name string, staticIp string) []Iface {
 	if staticIp != "" {
 		iface.IP = staticIp
 	} else {
-		iface.IP = utils.GetFromCacheOrCalculate(cache, name+"_ip", func() string {
+		iface.IP = util.GetFromCacheOrCalculate(cache, name+"_ip", func() string {
 			return cont.GetIp(name)
 		})
 	}

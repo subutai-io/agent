@@ -10,7 +10,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"strings"
 	"path"
 	"regexp"
@@ -38,7 +38,7 @@ var (
 func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	//check new template name
 	if newname != "" {
-		utils.VerifyLxcName(newname)
+		util.VerifyLxcName(newname)
 	}
 
 	if !container.IsContainer(name) {
@@ -213,12 +213,12 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 func templateExists(name, owner, version string) bool {
 	theUrl := config.CdnUrl + "/template?name=" + name + "&owner=" + owner + "&version=" + version
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
+	clnt := util.GetClient(config.CDN.AllowInsecure, 30)
 	resp, err := clnt.Head(theUrl)
 
 	log.Check(log.ErrorLevel, "Checking template", err)
 
-	defer utils.Close(resp)
+	defer util.Close(resp)
 
 	if resp.StatusCode == http.StatusOK {
 		return true
@@ -231,12 +231,12 @@ func getOwner(token string) string {
 
 	theUrl := config.CdnUrl + "/users/username?token=" + token
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
+	clnt := util.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(theUrl, clnt, 3)
+	response, err := util.RetryGet(theUrl, clnt, 3)
 
 	log.Check(log.ErrorLevel, "Getting owner, get: "+theUrl, err)
-	defer utils.Close(response)
+	defer util.Close(response)
 
 	if response.StatusCode != 200 {
 		log.Error("Failed to get owner:  " + response.Status)
@@ -304,7 +304,7 @@ func upload(template, token string) error {
 	if log.Check(log.DebugLevel, "Uploading template", err) {
 		return err
 	}
-	defer utils.Close(resp)
+	defer util.Close(resp)
 
 	out, err := ioutil.ReadAll(resp.Body)
 

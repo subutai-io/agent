@@ -9,7 +9,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	prxy "github.com/subutai-io/agent/lib/proxy"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"github.com/pkg/errors"
 	"fmt"
 	"github.com/subutai-io/agent/lib/exec"
@@ -151,7 +151,7 @@ func cleanupNet(id string) {
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
 func cleanupNetStat(vlan string) {
-	c, err := utils.InfluxDbClient()
+	c, err := util.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
 	}

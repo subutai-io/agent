@@ -11,7 +11,6 @@ import (
 	"strings"
 	exec2 "github.com/subutai-io/agent/lib/exec"
 
-	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
@@ -254,7 +253,7 @@ func GetFingerprint(email string) string {
 func getMngKey(c string) {
 
 	//TODO possibly use console
-	consolePublicKey := utils.GetConsolePubKey()
+	consolePublicKey := util.GetConsolePubKey()
 
 	if consolePublicKey == nil {
 		log.Fatal("Failed to get Console public key")
@@ -301,7 +300,7 @@ func sendData(c string) {
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
 	log.Check(log.FatalLevel, "Sending container registration request to management", err)
-	defer utils.Close(resp)
+	defer util.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)
 	}

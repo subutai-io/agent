@@ -1,5 +1,5 @@
 // Package utils contains several function with different purposes which are needed by other packages
-package utils
+package util
 
 import (
 	"crypto/tls"
@@ -16,10 +16,6 @@ import (
 	"path"
 	"fmt"
 	"strconv"
-)
-
-var (
-	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
 )
 
 // ---> InfluxDB
@@ -44,13 +40,6 @@ func Close(resp *http.Response) {
 
 // PublicCert returns Public SSL certificate for Resource Host
 //todo move to ssl
-func PublicCert() string {
-	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
-	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
-		return ""
-	}
-	return string(pemCerts)
-}
 
 // InstanceType returns type of the Resource host: EC2 or LOCAL
 //todo add GCE

@@ -18,7 +18,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"github.com/subutai-io/agent/lib/fs"
 	"path"
 	"github.com/subutai-io/agent/lib/common"
@@ -47,7 +47,7 @@ func Collect() {
 
 func doCollect() {
 
-	influx, err := utils.InfluxDbClient()
+	influx, err := util.InfluxDbClient()
 	if err == nil {
 		defer influx.Close()
 	}

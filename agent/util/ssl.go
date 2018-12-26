@@ -7,6 +7,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"io/ioutil"
 	"bytes"
+	"path"
 )
 
 //Validates separate certificate and private key
@@ -31,18 +32,7 @@ func ValidatePem2(pathToCert, pathToKey string) bool {
 }
 
 // ParsePem return parsed OpenSSL x509 certificate.
-func ParsePem(cert string) (crt, key []byte) {
-	key, err := exec.ExecB("openssl", "pkey", "-in", cert)
-	if !log.Check(log.ErrorLevel, "Parsing private key", err) {
-		f, err := ioutil.ReadFile(cert)
-		if !log.Check(log.ErrorLevel, "Reading cert "+cert, err) {
-			crt = bytes.Replace(f, key, []byte(""), -1)
-		}
-	}
-	return crt, key
-}
-
-func ParsePem2(cert string) (crt, key []byte, err error) {
+func ParsePem(cert string) (crt, key []byte, err error) {
 	key, err = exec.ExecB("openssl", "pkey", "-in", cert)
 	if err == nil {
 		f, err := ioutil.ReadFile(cert)
@@ -51,4 +41,12 @@ func ParsePem2(cert string) (crt, key []byte, err error) {
 		}
 	}
 	return crt, key, err
+}
+
+func PublicCert() string {
+	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
+	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
+		return ""
+	}
+	return string(pemCerts)
 }

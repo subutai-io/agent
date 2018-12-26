@@ -614,7 +614,7 @@ func installSelfSignedCert(proxy *db.Proxy) error {
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error creating directory: %s", err.Error()))
 	}
-	crt, key, err := util.ParsePem2(proxy.CertPath)
+	crt, key, err := util.ParsePem(proxy.CertPath)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Error parsing certificate: %s", err.Error()))
 	}

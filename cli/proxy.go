@@ -211,7 +211,7 @@ func MigrateMappings() {
 			//copy certs
 			certDir := path.Join(selfSignedCertsDir, proxy.Domain+"-"+strconv.Itoa(proxy.Port))
 			log.Check(log.WarnLevel, "Creating cert dir", os.MkdirAll(certDir, 0755))
-			crt, key := util.ParsePem(proxy.CertPath)
+			crt, key, _ := util.ParsePem(proxy.CertPath)
 			log.Check(log.WarnLevel, "Writing certificate", ioutil.WriteFile(path.Join(certDir, "cert.pem"), crt, 0644))
 			log.Check(log.WarnLevel, "Writing key", ioutil.WriteFile(path.Join(certDir, "privkey.pem"), key, 0644))
 

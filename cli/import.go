@@ -13,7 +13,7 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"github.com/subutai-io/agent/lib/fs"
 	"path"
 	"github.com/subutai-io/agent/lib/exec"
@@ -57,12 +57,12 @@ func init() {
 func getTemplateInfoById(t *Template, id string) {
 	theUrl := config.CdnUrl + "/template?id=" + id
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
+	clnt := util.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(theUrl, clnt, 3)
+	response, err := util.RetryGet(theUrl, clnt, 3)
 
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
-	defer utils.Close(response)
+	defer util.Close(response)
 
 	if response.StatusCode == 404 {
 		log.Error("Template " + t.Name + " not found")
@@ -107,12 +107,12 @@ func getTemplateInfoByName(t *Template, name string, owner string, version strin
 		theUrl += "&version=" + version
 	}
 
-	clnt := utils.GetClient(config.CDN.AllowInsecure, 30)
+	clnt := util.GetClient(config.CDN.AllowInsecure, 30)
 
-	response, err := utils.RetryGet(theUrl, clnt, 3)
+	response, err := util.RetryGet(theUrl, clnt, 3)
 
 	log.Check(log.ErrorLevel, "Retrieving template info, get: "+theUrl, err)
-	defer utils.Close(response)
+	defer util.Close(response)
 
 	if response.StatusCode == 404 {
 		log.Error("Template " + t.Name + " not found")
@@ -157,15 +157,15 @@ func getTemplateInfo(template string) Template {
 		// if owner is missing then we use verified only, if version is missing we use latest version
 
 		if templateNameNOwnerNVersionRx.MatchString(template) {
-			groups := utils.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
+			groups := util.MatchRegexGroups(templateNameNOwnerNVersionRx, template)
 
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], groups["version"])
 		} else if templateNameNOwnerRx.MatchString(template) {
-			groups := utils.MatchRegexGroups(templateNameNOwnerRx, template)
+			groups := util.MatchRegexGroups(templateNameNOwnerRx, template)
 
 			getTemplateInfoByName(&t, groups["name"], groups["owner"], "")
 		} else if templateNameRx.MatchString(template) {
-			groups := utils.MatchRegexGroups(templateNameRx, template)
+			groups := util.MatchRegexGroups(templateNameRx, template)
 
 			getTemplateInfoByName(&t, groups["name"], "", "")
 		} else {
