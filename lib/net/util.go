@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"bufio"
 	"bytes"
+	"github.com/pkg/errors"
+	"fmt"
 )
 //todo return errors , dont use log.Error/Fatal
 
@@ -68,15 +70,20 @@ func iptablesCleanUp(name string) {
 	}
 }
 
-func GetP2pMtu() int {
+func GetP2pMtu() (int, error){
 	out, err := exec.Command("p2p", "show", "--mtu").CombinedOutput()
 	output := strings.TrimSpace(string(out))
-	log.Check(log.FatalLevel, "Getting p2p mtu: "+output, err)
+	if log.Check(log.DebugLevel, "Getting p2p mtu: "+output, err) {
+		return -1, errors.New(fmt.Sprintf("Error getting p2p mtu: %s", err.Error()))
+	}
+
 
 	mtu, err := strconv.Atoi(output)
-	log.Check(log.FatalLevel, "Parsing p2p mtu", err)
+	if log.Check(log.DebugLevel, "Parsing p2p mtu: "+output, err) {
+		return -1, errors.New(fmt.Sprintf("Error parsing p2p mtu: %s", err.Error()))
+	}
 
-	return mtu - 50
+	return mtu - 50, nil
 }
 
 // RateLimit sets throughput limits for container's network interfaces if "quota" is specified

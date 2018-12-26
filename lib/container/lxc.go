@@ -444,7 +444,10 @@ func Clone(parent, child string) error {
 		return err
 	}
 
-	mtu := net.GetP2pMtu()
+	mtu, err := net.GetP2pMtu()
+	if err != nil {
+		return err
+	}
 
 	err = SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
