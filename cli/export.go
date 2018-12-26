@@ -124,8 +124,8 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//copy config files
 	src := path.Join(config.Agent.LxcPrefix, name)
-	fs.Copy(src+"/fstab", dst+"/fstab")
-	fs.Copy(src+"/config", dst+"/config")
+	log.Check(log.ErrorLevel, "Copying fstab file", fs.Copy(src+"/fstab", dst+"/fstab"))
+	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(src+"/config", dst+"/config"))
 
 	//update template config
 	templateConf := [][]string{
@@ -153,11 +153,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	}
 
 	updateTemplateConfig(dst+"/config", templateConf)
-
-	//copy template icon if any
-	if _, err := os.Stat(src + "/icon.png"); !os.IsNotExist(err) {
-		fs.Copy(src+"/icon.png", dst+"/icon.png")
-	}
 
 	// check: write package list to packages
 	if container.State(name) != container.Running {

@@ -436,7 +436,10 @@ func Clone(parent, child string) error {
 	fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
 
 	for _, file := range []string{"config", "fstab", "packages"} {
-		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
+		err := fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
+		if err != nil {
+			return err
+		}
 	}
 
 	mac, err := Mac()

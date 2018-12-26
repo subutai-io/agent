@@ -552,7 +552,8 @@ func stringInList(s string, list []string) bool {
 	return false
 }
 
-func install(templateName string) {
+//todo check and return errors
+func install(templateName string) error {
 
 	pathToDecompressedTemplate := path.Join(config.Agent.CacheDir, templateName)
 
@@ -572,8 +573,13 @@ func install(templateName string) {
 	fs.SetDatasetReadOnly(templateName + "/opt")
 
 	for _, file := range []string{"config", "fstab", "packages"} {
-		fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
+		err := fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func initManagement(templateRef string) {

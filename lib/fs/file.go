@@ -10,20 +10,26 @@ import (
 	"path/filepath"
 )
 
-//todo return errors , dont use log.Error/Fatal
-
 // Copy creates a copy of passed "source" file to "dest" file
-func Copy(source string, dest string) {
+func Copy(source string, dest string) error {
 	sf, err := os.Open(source)
-	log.Check(log.FatalLevel, "Opening file "+source, err)
+	if log.Check(log.DebugLevel, "Opening file "+source, err) {
+		return err
+	}
 	defer sf.Close()
 
 	df, err := os.Create(dest)
-	log.Check(log.FatalLevel, "Creating file "+dest, err)
+	if log.Check(log.DebugLevel, "Creating file "+dest, err) {
+		return err
+	}
 	defer df.Close()
 
 	_, err = io.Copy(df, sf)
-	log.Check(log.FatalLevel, "Copying file "+source+" to "+dest, err)
+	if log.Check(log.FatalLevel, "Copying file "+source+" to "+dest, err) {
+		return err
+	}
+
+	return nil
 }
 
 func FileExists(name string) bool {
@@ -95,9 +101,18 @@ func DeleteDir(dirPath string) error {
 	return os.RemoveAll(dirPath)
 }
 
-func RemoveFilesWildcard(wildcard string) {
-	list, _ := filepath.Glob(wildcard)
-	for _, f := range list {
-		os.Remove(f)
+func RemoveFilesWildcard(wildcard string) error {
+	list, err := filepath.Glob(wildcard)
+	if err != nil {
+		return err
 	}
+
+	for _, f := range list {
+		err = os.Remove(f)
+		if log.Check(log.DebugLevel, "Removing file "+f, err) {
+			return err
+		}
+	}
+
+	return nil
 }
