@@ -36,8 +36,6 @@ const (
 	Unknown = "UNKNOWN"
 )
 
-//TODO add methods IsRunning, IsStopped
-
 const Management = "management"
 const ManagementIp = "10.10.10.1"
 const ContainerDefaultIface = "eth0"
@@ -232,10 +230,32 @@ func AttachExec(name string, command []string, env ...[]string) (output []string
 	return output, nil
 }
 
+type ErrResult interface {
+	Error() error
+	ExitCode() int
+}
+
+type ErrResultImpl struct {
+	Err     error
+	ExitCod int
+}
+
+func (e ErrResultImpl) Error() error {
+	return e.Err
+}
+
+func (e ErrResultImpl) ExitCode() int {
+	return e.ExitCod
+}
+
+func GetErrResult(err error, exitCode int) ErrResult {
+	return ErrResultImpl{Err: err, ExitCod: exitCode}
+}
+
 // AttachExec executes a command inside Subutai container.
-func AttachExecOutput(name string, command []string, env ...[]string) (output string, errOutput string, err error) {
+func AttachExecOutput(name string, command []string, env ...[]string) (output string, errOutput string, errResult ErrResult) {
 	if !LxcInstanceExists(name) {
-		return "", "", errors.New("Container does not exist")
+		return "", "", GetErrResult(errors.New("Container does not exist"), -1)
 	}
 
 	container, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
@@ -244,19 +264,19 @@ func AttachExecOutput(name string, command []string, env ...[]string) (output st
 	}
 
 	if container.State() != lxc.RUNNING || err != nil {
-		return "", "", errors.New("Container is " + container.State().String())
+		return "", "", GetErrResult(errors.New("Container is "+container.State().String()), -1)
 	}
 
 	bufR, bufW, err := os.Pipe()
 	if err != nil {
-		return "", "", errors.New("Failed to create OS pipe")
+		return "", "", GetErrResult(errors.New("Failed to create OS pipe"), -1)
 	}
 	defer bufR.Close()
 	defer bufW.Close()
 
 	bufRErr, bufWErr, err := os.Pipe()
 	if err != nil {
-		return "", "", errors.New("Failed to create OS pipe")
+		return "", "", GetErrResult(errors.New("Failed to create OS pipe"), -1)
 	}
 	defer bufRErr.Close()
 	defer bufWErr.Close()
@@ -273,8 +293,11 @@ func AttachExecOutput(name string, command []string, env ...[]string) (output st
 	}
 
 	pid, err := container.RunCommandNoWait(command, options)
-	//todo
-	log.Check(log.ErrorLevel, "Executing command inside container", err)
+	log.Check(log.DebugLevel, "Executing command inside container", err)
+	if err != nil {
+		return "", "",
+			GetErrResult(errors.New(fmt.Sprintf("Failed to execute command inside container: %s", err.Error())), -1)
+	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	stdout := io.MultiWriter(os.Stdout, &stdoutBuf)
@@ -287,23 +310,25 @@ func AttachExecOutput(name string, command []string, env ...[]string) (output st
 	}()
 
 	proc, err := os.FindProcess(pid)
-	//todo
-	log.Check(log.ErrorLevel, "Looking process by pid "+strconv.Itoa(pid), err)
+	log.Check(log.DebugLevel, "Looking process by pid "+strconv.Itoa(pid), err)
+	if err != nil {
+		return "", "",
+			GetErrResult(errors.New(fmt.Sprintf("Failed to find process by pid: %s", err.Error())), -1)
+	}
 
 	procState, err := proc.Wait()
 	log.Check(log.ErrorLevel, "Waiting for process completion", err)
 
-	//todo
 	if !procState.Success() {
 		log.ErrorNoExit("Command failed")
+		exitCode := 1
 		if status, ok := procState.Sys().(syscall.WaitStatus); ok {
-			os.Exit(status.ExitStatus())
-		} else {
-			os.Exit(1)
+			exitCode = status.ExitStatus()
 		}
+		return string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()), GetErrResult(nil, exitCode)
 	}
 
-	return string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()), nil
+	return string(stdoutBuf.Bytes()), string(stderrBuf.Bytes()), GetErrResult(nil, 0)
 }
 
 // Destroy deletes the Subutai container.
@@ -396,6 +421,7 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 }
 
 // Clone create the duplicate container from the Subutai template.
+//todo return error for fs.* calls
 func Clone(parent, child string) error {
 
 	parentParts := strings.Split(parent, ":")
@@ -413,9 +439,14 @@ func Clone(parent, child string) error {
 		fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
 	}
 
-	mac := Mac()
+	mac, err := Mac()
+	if err != nil {
+		return err
+	}
+
 	mtu := net.GetP2pMtu()
-	SetContainerConf(child, [][]string{
+
+	err = SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
 		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
@@ -430,13 +461,16 @@ func Clone(parent, child string) error {
 		{"lxc.rootfs.backend", "zfs"}, //must be in template
 		{"lxc.utsname", child},
 	})
+	if err != nil {
+		return err
+	}
 
 	//create default hostname
-	ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, child, "/rootfs/etc/hostname"), []byte(child), 0644)
+	return ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, child, "/rootfs/etc/hostname"), []byte(child), 0644)
 
-	return nil
 }
 
+//todo return error
 func QuotaDisk(name, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -459,6 +493,7 @@ func QuotaDisk(name, size string) int {
 
 // QuotaRAM sets the memory quota to the Subutai container.
 // If quota size argument is missing, just return current value.
+//todo return error
 func QuotaRAM(name string, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -486,6 +521,7 @@ func QuotaRAM(name string, size string) int {
 // QuotaCPU sets container CPU limitation and return current value in percents.
 // If passed value < 100, we assume that this value mean percents.
 // If passed value > 100, we assume that this value mean MHz.
+//todo return error
 func QuotaCPU(name string, size string) int {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -531,7 +567,8 @@ func QuotaCPU(name string, size string) int {
 	return result * 100 / cfsPeriod / runtime.NumCPU()
 }
 
-// QuotaCPUset sets particular cores that can be used by the Subutai container.
+// QuotaCPUset sets particular cores that can be used by the Subutai container
+// todo return error
 func QuotaCPUset(name string, size string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -546,6 +583,7 @@ func QuotaCPUset(name string, size string) string {
 }
 
 // QuotaNet sets network bandwidth for the Subutai container.
+//todo return error
 func QuotaNet(name string, size string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {
@@ -616,6 +654,7 @@ func GetContainerUID(container string) string {
 
 // SetContainerUID sets UID map shifting for the Subutai container.
 // It's required option for any unprivileged LXC container.
+//todo return error
 func SetContainerUID(c string) (string, error) {
 	uid := GetContainerUID(c)
 
@@ -643,6 +682,7 @@ func SetContainerUID(c string) (string, error) {
 }
 
 // SetDNS configures the Subutai containers to use internal DNS-server from the Resource Host.
+//todo return error
 func SetDNS(name string) {
 	dns := GetProperty(name, "lxc.network.ipv4.gateway")
 	if len(dns) == 0 {
@@ -658,6 +698,7 @@ func SetDNS(name string) {
 		ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/resolv.conf"), resolv, 0644))
 }
 
+//todo return error
 func CopyParentReference(name string, owner string, version string) {
 	SetContainerConf(name, [][]string{
 		{"subutai.template.owner", owner},
@@ -666,6 +707,7 @@ func CopyParentReference(name string, owner string, version string) {
 }
 
 // SetStaticNet sets static IP-address for the Subutai container.
+//todo return error
 func SetStaticNet(name string) {
 	data, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/network/interfaces"))
 	log.Check(log.WarnLevel, "Opening /etc/network/interfaces", err)
@@ -676,6 +718,7 @@ func SetStaticNet(name string) {
 }
 
 // DisableSSHPwd disabling SSH password access to the Subutai container.
+//todo return error
 func DisableSSHPwd(name string) {
 	input, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, name, "/rootfs/etc/ssh/sshd_config"))
 	if log.Check(log.DebugLevel, "Opening sshd config", err) {
@@ -695,7 +738,7 @@ func DisableSSHPwd(name string) {
 }
 
 // Mac function generates random mac address for LXC containers
-func Mac() string {
+func Mac() (string, error) {
 
 	usedMacs := make(map[string]bool)
 	for _, cont := range Containers() {
@@ -709,22 +752,25 @@ func Mac() string {
 	buf := make([]byte, 6)
 
 	_, err := rand.Read(buf)
-	//todo
-	log.Check(log.ErrorLevel, "Generating random mac", err)
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("Generating random mac: %s", err.Error()))
+	}
 
 	mac := fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 	for usedMacs[mac] {
 
 		_, err := rand.Read(buf)
-		//todo
-		log.Check(log.ErrorLevel, "Generating random mac", err)
+		if err != nil {
+			return "", errors.New(fmt.Sprintf("Generating random mac: %s", err.Error()))
+		}
 
 		mac = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[3], buf[4], buf[5])
 	}
 
-	return mac
+	return mac, nil
 }
 
+//todo return error
 func GetIp(name string) string {
 	c, err := lxc.NewContainer(name, config.Agent.LxcPrefix)
 	if err == nil {

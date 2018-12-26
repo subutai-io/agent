@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 )
 
+//todo return errors , dont use log.Error/Fatal
+
 // Copy creates a copy of passed "source" file to "dest" file
 func Copy(source string, dest string) {
 	sf, err := os.Open(source)

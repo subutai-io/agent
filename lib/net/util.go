@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"bytes"
 )
+//todo return errors , dont use log.Error/Fatal
 
 func DelIface(iface string) {
 	log.Debug("Removing interface " + iface)
