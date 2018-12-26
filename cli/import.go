@@ -12,7 +12,6 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/lib/template"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/lib/fs"
@@ -24,6 +23,8 @@ import (
 	"fmt"
 	"gopkg.in/cheggaaa/pb.v1"
 	"github.com/pkg/errors"
+	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/lib/net"
 )
 
 const maxDownloadAttempts = 3
@@ -243,7 +244,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	//for local import this check currently does not work
 	if container.LxcInstanceExists(templateRef) {
 		if t.Name == container.Management && !container.IsContainer(container.Management) {
-			template.MngInit(templateRef)
+			initManagement(templateRef)
 			return
 		}
 		//!important used by Console
@@ -321,7 +322,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 		container.Destroy(templateRef, true)
 	}
 
-	template.Install(templateRef)
+	install(templateRef)
 
 	log.Check(log.WarnLevel, "Removing temp dir "+extractDir, os.RemoveAll(extractDir))
 
@@ -331,7 +332,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	}
 
 	if t.Name == container.Management {
-		template.MngInit(templateRef)
+		initManagement(templateRef)
 		return
 	}
 
@@ -549,4 +550,66 @@ func stringInList(s string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func install(templateName string) {
+
+	pathToDecompressedTemplate := path.Join(config.Agent.CacheDir, templateName)
+
+	// create parent dataset
+	fs.CreateDataset(templateName)
+
+	// create partitions
+	fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"))
+	fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"))
+	fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"))
+	fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"))
+
+	// set partitions as read-only
+	fs.SetDatasetReadOnly(templateName + "/rootfs")
+	fs.SetDatasetReadOnly(templateName + "/home")
+	fs.SetDatasetReadOnly(templateName + "/var")
+	fs.SetDatasetReadOnly(templateName + "/opt")
+
+	for _, file := range []string{"config", "fstab", "packages"} {
+		fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
+	}
+}
+
+func initManagement(templateRef string) {
+	container.Clone(templateRef, container.Management)
+
+	container.SetContainerUID(container.Management)
+	container.SetContainerConf(container.Management, [][]string{
+		{"lxc.network.veth.pair", container.Management},
+	})
+	gpg.GenerateKey(container.Management)
+	container.SetDNS(container.Management)
+	container.Start(container.Management)
+
+	//TODO use proxy lib
+	log.Check(log.WarnLevel, "Setting up proxy for port 8443",
+		exec.Exec("subutai", "proxy", "create", "-t", "management-8443", "-p", "tcp", "-e", "8443"))
+	log.Check(log.WarnLevel, "Redirecting port 8443 to management container",
+		exec.Exec("subutai", "proxy", "srv", "add", "-t", "management-8443", "-s", "10.10.10.1:8443"))
+	log.Check(log.WarnLevel, "Setting up proxy for port 8444",
+		exec.Exec("subutai", "proxy", "create", "-t", "management-8444", "-p", "tcp", "-e", "8444"))
+	log.Check(log.WarnLevel, "Redirecting port 8444 to management container",
+		exec.Exec("subutai", "proxy", "srv", "add", "-t", "management-8444", "-s", "10.10.10.1:8444"))
+	log.Check(log.WarnLevel, "Setting up proxy for port 8086",
+		exec.Exec("subutai", "proxy", "create", "-t", "management-8086", "-p", "tcp", "-e", "8086"))
+	log.Check(log.WarnLevel, "Redirecting port 8086 to management container",
+		exec.Exec("subutai", "proxy", "srv", "add", "-t", "management-8086", "-s", "10.10.10.1:8086"))
+
+	mgmtCont := &db.Container{}
+	mgmtCont.Name = container.Management
+	mgmtCont.Ip = container.ManagementIp
+	mgmtCont.State = container.Running
+	log.Check(log.ErrorLevel, "Writing container data to database", db.SaveContainer(mgmtCont))
+
+	log.Info("********************")
+	log.Info("Subutai Management UI will be shortly available at https://" + net.GetIp() + ":8443")
+	log.Info("login: admin")
+	log.Info("password: secret")
+	log.Info("********************")
 }

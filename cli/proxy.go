@@ -502,3 +502,79 @@ func makeDir(path string) {
 		}
 	}
 }
+
+//todo remove after one version
+func MapRemove(protocol, sockExt, domain, sockInt string) {
+	log.Debug("Removing mapping: " + protocol + " " + sockExt + " " + domain + " " + sockInt)
+
+	if sockInt != "" {
+		if checkPort(protocol, sockExt, domain, sockInt) {
+			if deletePortMap(protocol, sockExt, domain, sockInt) > 0 {
+				if strings.Contains(sockInt, ":") {
+					sockInt = sockInt + ";"
+				} else {
+					sockInt = sockInt + ":"
+				}
+				addLine(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"),
+					"server "+sockInt, " ", true)
+			} else {
+				if deletePortMap(protocol, sockExt, domain, "") == 0 {
+					deletePortMap(protocol, sockExt, "", "")
+				}
+				os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
+				if protocol == "https" {
+					os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
+					os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
+				}
+			}
+		}
+	} else {
+		if deletePortMap(protocol, sockExt, domain, "") == 0 {
+			deletePortMap(protocol, sockExt, "", "")
+		}
+		os.Remove(path.Join(nginxInc, protocol, sockExt+"-"+domain+".conf"))
+		if protocol == "https" {
+			os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".key"))
+			os.Remove(path.Join(selfSignedCertsDir, "https-"+sockExt+"-"+domain+".crt"))
+		}
+	}
+}
+
+func checkPort(protocol, external, domain, internal string) bool {
+	res, err := db.INSTANCE.PortInMap(protocol, external, domain, internal)
+	log.Check(log.ErrorLevel, "Checking port mapping in db", err)
+	return res
+}
+
+func deletePortMap(protocol, sockExt, domain, sockInt string) int {
+	left, err := db.INSTANCE.PortMapDelete(protocol, sockExt, domain, sockInt)
+	log.Check(log.ErrorLevel, "Removing port mapping from db", err)
+	return left
+}
+
+// addLine adds, removes, replaces and checks if line exists in specified file
+func addLine(path, after, line string, replace bool) bool {
+	f, err := ioutil.ReadFile(path)
+	if !log.Check(log.DebugLevel, "Cannot read file "+path, err) {
+		lines := strings.Split(string(f), "\n")
+		for k, v := range lines {
+			if strings.Contains(v, after) {
+				if line != "" {
+					if replace {
+						log.Debug("Replacing " + lines[k] + " with " + line)
+						lines[k] = line
+					} else {
+						log.Debug("Adding " + line + " after " + lines[k])
+						lines[k] = after + "\n" + line
+					}
+				} else {
+					return true
+				}
+			}
+		}
+		str := strings.Join(lines, "\n")
+		log.Check(log.FatalLevel, "Writing new proxy config",
+			ioutil.WriteFile(path, []byte(str), 0744))
+	}
+	return false
+}

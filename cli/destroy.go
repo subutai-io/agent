@@ -7,13 +7,12 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
-	"github.com/subutai-io/agent/lib/net/p2p"
-	"github.com/subutai-io/agent/lib/template"
-	prxy "github.com/subutai-io/agent/refactored/lib/proxy"
+	prxy "github.com/subutai-io/agent/lib/proxy"
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/utils"
 	"github.com/pkg/errors"
 	"fmt"
+	"github.com/subutai-io/agent/lib/exec"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -130,7 +129,7 @@ func destroy(name string) error {
 
 		if name == container.Management {
 			//todo check error here
-			template.MngDel()
+			deleteManagement()
 		}
 
 		log.Info("Container " + name + " is destroyed")
@@ -139,9 +138,14 @@ func destroy(name string) error {
 	return nil
 }
 
+func deleteManagement() {
+	exec.Exec("ovs-vsctl", "del-port", "wan", container.Management)
+	exec.Exec("ovs-vsctl", "del-port", "wan", "mng-gw")
+}
+
 func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
-	p2p.RemoveByIface("p2p" + id)
+	net.RemoveP2pIface("p2p" + id)
 	cleanupNetStat(id)
 }
 

@@ -28,7 +28,6 @@ import (
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
 	"io"
-	"github.com/subutai-io/agent/lib/net/p2p"
 )
 
 const (
@@ -415,7 +414,7 @@ func Clone(parent, child string) error {
 	}
 
 	mac := Mac()
-	mtu := Mtu()
+	mtu := net.GetP2pMtu()
 	SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
@@ -724,10 +723,6 @@ func Mac() string {
 	}
 
 	return mac
-}
-
-func Mtu() int {
-	return p2p.Mtu()
 }
 
 func GetIp(name string) string {

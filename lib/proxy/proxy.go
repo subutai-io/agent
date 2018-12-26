@@ -12,10 +12,10 @@ import (
 	"sort"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/net"
 	"github.com/pkg/errors"
 	"github.com/subutai-io/agent/lib/fs"
 	"strconv"
-	"net"
 	"path"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/exec"
@@ -176,6 +176,14 @@ func GetProxies(protocol string) ([]ProxyNServers, error) {
 	}
 
 	return proxyNServers, nil
+}
+
+func FindProxyByTag(tag string) (*db.Proxy, error) {
+	return db.FindProxyByTag(tag)
+}
+
+func FindProxiedServers(tag, socket string) ([]db.ProxiedServer, error) {
+	return db.FindProxiedServers(tag, socket);
 }
 
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
@@ -431,7 +439,7 @@ func AddProxiedServer(tag, socket string) error {
 		return errors.New(fmt.Sprintf("Proxied server already exists"))
 	}
 
-	if !isValidSocket(socket) {
+	if !net.IsValidSocket(socket) {
 		return errors.New(fmt.Sprintf("Server socket is not valid"))
 	}
 
@@ -890,17 +898,6 @@ func deleteProxy(proxy *db.Proxy) error {
 }
 
 //utilities
-
-func isValidSocket(socket string) bool {
-	if addr := strings.Split(socket, ":"); len(addr) == 2 {
-		if _, err := net.ResolveIPAddr("ip4", addr[0]); err == nil {
-			if port, err := strconv.Atoi(addr[1]); err == nil && port < 65536 {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 func makeDir(path string) error {
 	if !fs.FileExists(path) {

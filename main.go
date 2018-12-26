@@ -10,7 +10,7 @@ import (
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
-	prxy "github.com/subutai-io/agent/refactored/lib/proxy"
+	prxy "github.com/subutai-io/agent/lib/proxy"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
