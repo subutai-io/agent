@@ -603,16 +603,15 @@ func QuotaNet(name string, size string) string {
 	return net.RateLimit(nic, size)
 }
 
-// SetContainerConf sets any parameter in the configuration file of the Subutai container.
-func SetContainerConf(container string, conf [][]string) error {
-	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
-	newconf := ""
+func CreateContainerConf(confPath string, conf [][]string) error {
 
-	file, err := os.Open(confPath)
+	file, err := os.OpenFile(confPath, os.O_CREATE|os.O_RDWR, 0644)
 	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
 		return err
 	}
 	defer file.Close()
+
+	newconf := ""
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		newline := scanner.Text() + "\n"
@@ -635,6 +634,14 @@ func SetContainerConf(container string, conf [][]string) error {
 		}
 	}
 	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
+}
+
+// SetContainerConf sets any parameter in the configuration file of the Subutai container.
+func SetContainerConf(container string, conf [][]string) error {
+
+	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
+
+	return CreateContainerConf(confPath, conf)
 }
 
 // GetConfigItem return any parameter from the configuration file of the Subutai container.
@@ -748,10 +755,9 @@ func Mac() (string, error) {
 
 	usedMacs := make(map[string]bool)
 	for _, cont := range Containers() {
-		cfg, err := GetConfig(path.Join(config.Agent.LxcPrefix, cont, "config"))
-		//skip error
-		if err == nil {
-			usedMacs[cfg.GetParam("lxc.network.hwaddr")] = true
+		cfgItem := GetConfigItem(path.Join(config.Agent.LxcPrefix, cont, "config"), "lxc.network.hwaddr")
+		if cfgItem != "" {
+			usedMacs[cfgItem] = true
 		}
 	}
 

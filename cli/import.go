@@ -526,20 +526,13 @@ func downloadViaLocalIPFSNode(template Template) {
 
 func updateContainerConfig(templateName string) error {
 
-	cfg := container.LxcConfig{}
-	err := cfg.Load(path.Join(config.Agent.LxcPrefix, templateName, "config"))
-	if err != nil {
-		return err
-	}
-
-	cfg.SetParams([][]string{
+	return container.SetContainerConf(templateName, [][]string{
 		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "home") + " home none bind,rw 0 0"},
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "opt") + " opt none bind,rw 0 0"},
 		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "var") + " var none bind,rw 0 0"},
 	})
 
-	return cfg.Save()
 }
 
 // Verify if package is already on dependency list

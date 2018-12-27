@@ -318,16 +318,7 @@ func upload(template, token string) error {
 }
 
 func updateTemplateConfig(path string, params [][]string) error {
-
-	cfg := container.LxcConfig{}
-	err := cfg.Load(path)
-	if err != nil {
-		return err
-	}
-
-	cfg.SetParams(params)
-
-	return cfg.Save()
+	return container.CreateContainerConf(path, params)
 }
 
 // clearFile writes an empty byte array to specified file
