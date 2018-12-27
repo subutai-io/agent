@@ -57,7 +57,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 
 	gpg.GenerateKey(child)
 	if len(consoleSecret) != 0 {
-		gpg.ExchageAndEncrypt(child, consoleSecret)
+		gpg.ExchangeAndEncrypt(child, consoleSecret)
 	}
 
 	if len(envID) != 0 {

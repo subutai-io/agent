@@ -250,16 +250,16 @@ func GetFingerprint(email string) string {
 	return ""
 }
 
-func getMngKey(c string) {
+func installMgmtKey(c string) {
 
-	//TODO possibly use console
-	consolePublicKey := util.GetConsolePubKey()
+	consolePublicKey, err := util.GetConsolePubKey()
+	log.Check(log.FatalLevel, "Getting Console public key", err)
 
 	if consolePublicKey == nil {
 		log.Fatal("Failed to get Console public key")
 	}
 
-	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
 	log.Check(log.FatalLevel, "Saving Console public key", err)
 }
 
@@ -307,13 +307,13 @@ func sendData(c string) {
 
 }
 
-// ExchageAndEncrypt installing the Management server GPG public key to the container keyring.
-// Sending container's GPG public key to the Management server. It require encrypting and singing message
+// ExchangeAndEncrypt installs the Management server GPG public key to the container keyring.
+// Sends container's GPG public key to the Management server. It requires encrypting and singing message
 // received from the Management server.
-func ExchageAndEncrypt(c, t string) {
+func ExchangeAndEncrypt(c, t string) {
 	var impout, expout, imperr, experr bytes.Buffer
 
-	getMngKey(c)
+	installMgmtKey(c)
 
 	//import mgmt key to container
 	impkey := exec.Command(GPG, "-v", "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix, c, "public.pub"), "--import", path.Join(config.Agent.LxcPrefix, c, "mgn.key"))

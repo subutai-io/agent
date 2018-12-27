@@ -208,7 +208,7 @@ func LxcImport(name, token string, auxDepList ...string) {
 	}
 
 	if container.LxcInstanceExists(name) && name == container.Management && len(token) > 1 {
-		gpg.ExchageAndEncrypt(container.Management, token)
+		gpg.ExchangeAndEncrypt(container.Management, token)
 		return
 	}
 

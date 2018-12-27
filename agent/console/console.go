@@ -259,23 +259,7 @@ func (c Console) ExecuteConsoleCommands() {
 
 //fetches Console public GPG key
 func (c Console) getPubKey() ([]byte, error) {
-	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/security/keyman/getpublickeyring")
-
-	if err == nil {
-		defer c.Close(resp)
-	} else {
-		return nil, err
-	}
-
-	if resp.StatusCode == 200 {
-		if key, err := ioutil.ReadAll(resp.Body); err == nil {
-			return key, nil
-		} else {
-			return nil, err
-		}
-	} else {
-		return nil, errors.New(fmt.Sprintf("Response status %d", resp.StatusCode))
-	}
+	return util.GetConsolePubKey()
 }
 
 //returns container name by container id
