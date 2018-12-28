@@ -601,7 +601,7 @@ func removeCert(proxy *db.Proxy) error {
 		certDir = path.Join(letsEncryptCertsDir, proxy.Domain)
 	}
 	err := fs.DeleteDir(certDir)
-	if !os.IsNotExist(err) {
+	if err != nil && !os.IsNotExist(err) {
 		return errors.New(fmt.Sprintf("Error removing certs: %s", err))
 	}
 
@@ -852,8 +852,8 @@ func figureOutDomainFolderName(domain string) (string, error) {
 func removeConfig(proxy db.Proxy) error {
 	//remove config
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
-	if !os.IsNotExist(err) {
-		return errors.New(fmt.Sprintf("Removing nginx config: %s", err))
+	if err != nil && !os.IsNotExist(err) {
+		return errors.New(fmt.Sprintf("Removing nginx config: %s", err.Error()))
 	}
 
 	return nil

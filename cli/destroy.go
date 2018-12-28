@@ -170,7 +170,7 @@ func removeContainerPortMappings(name string) error {
 			if sock[0] == containerIp {
 				err = prxy.RemoveProxiedServer(server.ProxyTag, server.Socket)
 				if err != nil {
-					log.Error("Error removing server", err)
+					log.Error("Error removing server ", err)
 				}
 				removedServers = append(removedServers, server)
 			}
@@ -181,7 +181,7 @@ func removeContainerPortMappings(name string) error {
 			for _, server := range removedServers {
 				err = prxy.RemoveProxy(server.ProxyTag)
 				if err != nil {
-					log.Error("Error removing proxy", err)
+					log.Error("Error removing proxy ", err)
 				}
 
 			}
