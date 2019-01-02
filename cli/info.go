@@ -22,7 +22,7 @@ import (
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 	"path"
 )
 
@@ -55,7 +55,7 @@ type quotaUsage struct {
 
 func queryDB(cmd string) (res []client.Result, err error) {
 
-	clnt, err := utils.InfluxDbClient()
+	clnt, err := util.InfluxDbClient()
 
 	if err == nil {
 		defer clnt.Close()
