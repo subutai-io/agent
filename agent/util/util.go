@@ -1,5 +1,5 @@
 // Package utils contains several function with different purposes which are needed by other packages
-package utils
+package util
 
 import (
 	"crypto/tls"
@@ -11,16 +11,14 @@ import (
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
 	"github.com/influxdata/influxdb/client/v2"
-	"io"
 	"regexp"
 	"path"
 	"fmt"
-	"strconv"
+	"github.com/subutai-io/agent/lib/exec"
+	"errors"
 )
 
-var (
-	sslPath = path.Join(config.Agent.DataPrefix, "ssl")
-)
+var httpUtil = GetUtil()
 
 // ---> InfluxDB
 func InfluxDbClient() (clnt client.Client, err error) {
@@ -36,24 +34,10 @@ func InfluxDbClient() (clnt client.Client, err error) {
 // <--- InfluxDb
 
 func Close(resp *http.Response) {
-	if resp.Body != nil {
-		io.Copy(ioutil.Discard, resp.Body)
-		resp.Body.Close()
-	}
-}
-
-// PublicCert returns Public SSL certificate for Resource Host
-//todo move to ssl
-func PublicCert() string {
-	pemCerts, err := ioutil.ReadFile(path.Join(sslPath, "cert.pem"))
-	if log.Check(log.WarnLevel, "Checking cert.pem file", err) {
-		return ""
-	}
-	return string(pemCerts)
+	httpUtil.Close(resp)
 }
 
 // InstanceType returns type of the Resource host: EC2 or LOCAL
-//todo add GCE
 func InstanceType() string {
 	uuid, err := ioutil.ReadFile("/sys/hypervisor/uuid")
 	if !log.Check(log.DebugLevel, "Checking if AWS ec2 by reading /sys/hypervisor/uuid", err) {
@@ -61,6 +45,11 @@ func InstanceType() string {
 			return "EC2"
 		}
 	}
+	_, err = exec.ExecuteWithBash("dmesg | grep -q 'BIOS Google'")
+	if err == nil {
+		return "GCE"
+	}
+
 	return "LOCAL"
 }
 
@@ -117,25 +106,26 @@ func MatchRegexGroups(regEx *regexp.Regexp, url string) (paramsMap map[string]st
 	return
 }
 
-//todo use HttpUtil instead
-func GetConsolePubKey() []byte {
-	clnt := GetClient(config.Management.AllowInsecure, 30)
-	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":" + config.Management.Port + config.Management.RestPublicKey)
+func GetConsolePubKey() ([]byte, error) {
+
+	clnt := httpUtil.GetClient(30)
+
+	resp, err := clnt.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/security/keyman/getpublickeyring")
 
 	if err == nil {
 		defer Close(resp)
-	}
-
-	if log.Check(log.WarnLevel, "Getting Console public Key", err) {
-		return nil
+	} else {
+		return nil, err
 	}
 
 	if resp.StatusCode == 200 {
 		if key, err := ioutil.ReadAll(resp.Body); err == nil {
-			return key
+			return key, nil
+		} else {
+			return nil, err
 		}
+	} else {
+		return nil, errors.New(fmt.Sprintf("Response status %d", resp.StatusCode))
 	}
 
-	log.Warn("Failed to fetch Console public key. Status Code " + strconv.Itoa(resp.StatusCode))
-	return nil
 }

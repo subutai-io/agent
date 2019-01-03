@@ -10,6 +10,8 @@ import (
 	"github.com/subutai-io/agent/config"
 )
 
+//todo return errors , dont use log.Error/Fatal
+
 var zfsRootDataset string
 var ChildDatasets = []string{"rootfs", "home", "var", "opt"}
 

@@ -11,7 +11,6 @@ import (
 	"strings"
 	exec2 "github.com/subutai-io/agent/lib/exec"
 
-	"github.com/subutai-io/agent/agent/utils"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/log"
@@ -251,16 +250,16 @@ func GetFingerprint(email string) string {
 	return ""
 }
 
-func getMngKey(c string) {
+func installMgmtKey(c string) {
 
-	//TODO possibly use console
-	consolePublicKey := utils.GetConsolePubKey()
+	consolePublicKey, err := util.GetConsolePubKey()
+	log.Check(log.FatalLevel, "Getting Console public key", err)
 
 	if consolePublicKey == nil {
 		log.Fatal("Failed to get Console public key")
 	}
 
-	err := ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, c, "mgn.key"), consolePublicKey, 0644)
 	log.Check(log.FatalLevel, "Saving Console public key", err)
 }
 
@@ -301,20 +300,20 @@ func sendData(c string) {
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt.asc")))
 	log.Check(log.DebugLevel, "Removing "+path.Join(config.Agent.LxcPrefix, c, "stdin.txt"), os.Remove(path.Join(config.Agent.LxcPrefix, c, "stdin.txt")))
 	log.Check(log.FatalLevel, "Sending container registration request to management", err)
-	defer utils.Close(resp)
+	defer util.Close(resp)
 	if resp.StatusCode != 200 && resp.StatusCode != 202 {
 		log.Error("Failed to exchange GPG Public Keys. StatusCode: " + resp.Status)
 	}
 
 }
 
-// ExchageAndEncrypt installing the Management server GPG public key to the container keyring.
-// Sending container's GPG public key to the Management server. It require encrypting and singing message
+// ExchangeAndEncrypt installs the Management server GPG public key to the container keyring.
+// Sends container's GPG public key to the Management server. It requires encrypting and singing message
 // received from the Management server.
-func ExchageAndEncrypt(c, t string) {
+func ExchangeAndEncrypt(c, t string) {
 	var impout, expout, imperr, experr bytes.Buffer
 
-	getMngKey(c)
+	installMgmtKey(c)
 
 	//import mgmt key to container
 	impkey := exec.Command(GPG, "-v", "--no-default-keyring", "--keyring", path.Join(config.Agent.LxcPrefix, c, "public.pub"), "--import", path.Join(config.Agent.LxcPrefix, c, "mgn.key"))

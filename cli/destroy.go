@@ -7,10 +7,12 @@ import (
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/gpg"
 	"github.com/subutai-io/agent/lib/net"
-	"github.com/subutai-io/agent/lib/net/p2p"
-	"github.com/subutai-io/agent/lib/template"
+	prxy "github.com/subutai-io/agent/lib/proxy"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
+	"github.com/pkg/errors"
+	"fmt"
+	"github.com/subutai-io/agent/lib/exec"
 )
 
 // LxcDestroy simply removes every resource associated with a Subutai container or template:
@@ -20,100 +22,136 @@ import (
 // even if some instance components were already removed, the destroy command will continue to perform all operations
 // once again while ignoring possible underlying errors: i.e. missing configuration files.
 
-//todo refactor split into smaller methods
-func LxcDestroy(id string, vlan bool, ignoreMissing bool) {
-	var msg string
-	if len(id) == 0 {
-		log.Error("Please specify container/template name or vlan id")
-	}
-
-	defer sendHeartbeat()
-
-	if strings.HasPrefix(id, "id:") {
-		contId := strings.ToUpper(strings.TrimPrefix(id, "id:"))
-		for _, c := range container.Containers() {
-			if contId == gpg.GetFingerprint(c) {
-				LxcDestroy(c, false, false)
-				return
+func Cleanup(vlan string) {
+	list, err := db.FindContainers("", "", vlan)
+	if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
+		for _, c := range list {
+			err = destroy(c.Name)
+			if err != nil {
+				log.Error(fmt.Sprintf("Error destroying container %s: %s", c.Name, err.Error()))
 			}
 		}
-		log.Error("Container " + contId + " not found")
-	} else if vlan {
-		list, err := db.FindContainers("", "", id)
-		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-			for _, c := range list {
-				LxcDestroy(c.Name, false, true)
-			}
-			msg = "Vlan " + id + " is destroyed"
-		}
-		cleanupNet(id)
-	} else if id != "everything" {
-		if container.IsTemplate(id) {
-			LxcDestroyTemplate(id)
-			return
-		}
-
-		c, err := db.FindContainerByName(id)
-		log.Check(log.WarnLevel, "Reading container metadata from db", err)
-
-		msg = "Container " + id + " is destroyed"
-
-		if c != nil {
-
-			removePortMap(id)
-
-			net.DelIface(c.Interface)
-
-			log.Check(log.ErrorLevel, "Destroying container", container.DestroyContainer(id))
-
-		} else if container.IsContainer(id) {
-
-			err = container.DestroyContainer(id)
-
-			log.Check(log.ErrorLevel, "Destroying container", err)
-		} else if !ignoreMissing {
-			log.Error(id + " not found")
-		}
-
+		log.Info("Vlan " + vlan + " is destroyed")
 	}
 
-	if id == "everything" {
-		list, err := db.FindContainers("", "", "")
-		if !log.Check(log.WarnLevel, "Reading container metadata from db", err) {
-			for _, cont := range list {
-				LxcDestroy(cont.Name, false, true)
-				if cont.Vlan != "" {
-					cleanupNet(cont.Vlan)
-				}
-			}
-		}
-		msg = id + " is destroyed"
-	}
-
-	if id == container.Management {
-		template.MngDel()
-	}
-
-	if len(msg) == 0 {
-		msg = id + " not found. Please check if the name is correct"
-	}
-
-	log.Info(msg)
+	//todo check error here
+	cleanupNet(vlan)
 }
 
-func LxcDestroyTemplate(name string) {
-	container.DestroyTemplate(name)
+func LxcDestroy(ids ...string) {
+	defer sendHeartbeat()
+
+	if len(ids) == 1 {
+		name := ids[0]
+		if name == "everything" {
+			//destroy all containers
+			list, err := db.FindContainers("", "", "")
+			if !log.Check(log.ErrorLevel, "Reading container metadata from db", err) {
+				for _, cont := range list {
+					err = destroy(cont.Name)
+					log.Check(log.ErrorLevel, "Destroying container", err)
+					if cont.Vlan != "" {
+						//todo check error here
+						cleanupNet(cont.Vlan)
+					}
+				}
+			}
+		} else if strings.HasPrefix(name, "id:") {
+			//destroy container by id
+			contId := strings.ToUpper(strings.TrimPrefix(name, "id:"))
+			for _, c := range container.Containers() {
+				if contId == gpg.GetFingerprint(c) {
+					err := destroy(c)
+					log.Check(log.ErrorLevel, "Destroying container", err)
+					break
+				}
+			}
+		} else {
+			//destroy container by name
+			err := destroy(name)
+			log.Check(log.ErrorLevel, "Destroying container", err)
+		}
+
+	} else if len(ids) > 1 {
+		//destroy a set of containers/templates
+		for _, name := range ids {
+			err := destroy(name)
+			log.Check(log.WarnLevel, "Destroying "+name, err)
+		}
+	}
+}
+
+//destroys template or container by name
+func destroy(name string) error {
+
+	if container.IsTemplate(name) {
+		err := container.DestroyTemplate(name)
+
+		if err != nil {
+			return errors.New(fmt.Sprintf("Error destroying template: %s", err.Error()))
+		}
+
+		log.Info("Template " + name + " is destroyed")
+
+	} else {
+
+		c, err := db.FindContainerByName(name)
+		log.Check(log.WarnLevel, "Reading container metadata from db", err)
+
+		if c != nil {
+			//destroy container that has metadata
+
+			err = removeContainerPortMappings(name)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error removing port mapping: %s", err.Error()))
+			}
+
+			//todo check error here
+			net.DelIface(c.Interface)
+
+			err = container.DestroyContainer(name)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error destroying container: %s", err.Error()))
+			}
+
+		} else if container.IsContainer(name) {
+			//destroy container with missing metadata
+
+			err = container.DestroyContainer(name)
+
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error destroying container: %s", err.Error()))
+			}
+
+		} else {
+			return errors.New(name + " not found")
+		}
+
+		if name == container.Management {
+			//todo check error here
+			deleteManagement()
+		}
+
+		log.Info("Container " + name + " is destroyed")
+	}
+
+	return nil
+}
+
+func deleteManagement() {
+	exec.Exec("ovs-vsctl", "del-port", "wan", container.Management)
+	exec.Exec("ovs-vsctl", "del-port", "wan", "mng-gw")
 }
 
 func cleanupNet(id string) {
 	net.DelIface("gw-" + id)
-	p2p.RemoveByIface("p2p" + id)
+	net.RemoveP2pIface("p2p" + id)
 	cleanupNetStat(id)
 }
 
 // cleanupNetStat drops data from database about network trafic for specified VLAN
 func cleanupNetStat(vlan string) {
-	c, err := utils.InfluxDbClient()
+	c, err := util.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
 	}
@@ -121,7 +159,7 @@ func cleanupNetStat(vlan string) {
 	queryInfluxDB(c, `drop series from host_net where iface = 'gw-`+vlan+`'`)
 }
 
-func removePortMap(name string) {
+func removeContainerPortMappings(name string) error {
 	containerIp := container.GetIp(name)
 	servers, err := db.FindProxiedServers("", "")
 	if !log.Check(log.WarnLevel, "Fetching port mappings", err) {
@@ -130,7 +168,10 @@ func removePortMap(name string) {
 		for _, server := range servers {
 			sock := strings.Split(server.Socket, ":")
 			if sock[0] == containerIp {
-				RemoveProxiedServer(server.ProxyTag, server.Socket)
+				err = prxy.RemoveProxiedServer(server.ProxyTag, server.Socket)
+				if err != nil {
+					log.Error("Error removing server ", err)
+				}
 				removedServers = append(removedServers, server)
 			}
 		}
@@ -138,10 +179,16 @@ func removePortMap(name string) {
 		//remove proxies for management container
 		if name == container.Management {
 			for _, server := range removedServers {
-				RemoveProxy(server.ProxyTag)
+				err = prxy.RemoveProxy(server.ProxyTag)
+				if err != nil {
+					log.Error("Error removing proxy ", err)
+				}
+
 			}
 		}
 	}
+
+	return err
 }
 
 type gradedTemplate struct {
@@ -223,7 +270,10 @@ func Prune() {
 		for _, name := range unusedTemplates {
 			if t, ok := gradedTemplates[name]; ok && t.grade == grade {
 				log.Info("Destroying " + t.reference)
-				container.DestroyTemplate(t.reference)
+				err := container.DestroyTemplate(t.reference)
+				if err != nil {
+					log.Error("Error destroying template "+t.reference, err)
+				}
 			}
 		}
 	}

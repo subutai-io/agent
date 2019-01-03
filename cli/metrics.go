@@ -9,7 +9,7 @@ import (
 
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/utils"
+	"github.com/subutai-io/agent/agent/util"
 )
 
 var (
@@ -50,7 +50,7 @@ func queryInfluxDB(clnt client.Client, cmd string) (res []client.Result, err err
 //	last week is in 5 minute intervals,
 // After 7 days all statistics is are overwritten by new incoming data.
 func GetHostMetrics(host, start, end string) string {
-	c, err := utils.InfluxDbClient()
+	c, err := util.InfluxDbClient()
 	if err == nil {
 		defer c.Close()
 	}

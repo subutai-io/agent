@@ -10,6 +10,7 @@ import (
 	"github.com/subutai-io/agent/cli"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/log"
+	prxy "github.com/subutai-io/agent/lib/proxy"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"fmt"
 	"github.com/subutai-io/agent/lib/net"
@@ -81,7 +82,7 @@ var (
 	subutai destroy foo
 	*/
 	destroyCmd  = app.Command("destroy", "Destroy Subutai container/template").Alias("rm").Alias("del")
-	destroyName = destroyCmd.Arg("name", "container/template name").Required().String()
+	destroyName = destroyCmd.Arg("name", "container/template name").Required().Strings()
 
 	//export command
 	/*
@@ -328,11 +329,11 @@ func main() {
 	case cloneCmd.FullCommand():
 		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
 	case cleanupCmd.FullCommand():
-		cli.LxcDestroy(*cleanupVlan, true, false)
+		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():
 		cli.Prune()
 	case destroyCmd.FullCommand():
-		cli.LxcDestroy(*destroyName, false, false)
+		cli.LxcDestroy(*destroyName...)
 	case exportCmd.FullCommand():
 		cli.LxcExport(*exportContainer, *exportName, *exportVersion, *exportSize, *exportToken, *exportLocal)
 	case importCmd.FullCommand():
@@ -372,11 +373,15 @@ func main() {
 		//prxy command
 
 	case prxyCreateCmd.FullCommand():
-		cli.CreateProxy(*prxyCreateProtocol, *prxyCreateDomain, *prxyCreateLoadBalancing, *prxyCreateTag, *prxyCreatePort, *prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate)
+		log.Check(log.ErrorLevel, "Creating proxy", prxy.CreateProxy(*prxyCreateProtocol,
+			*prxyCreateDomain, *prxyCreateLoadBalancing, *prxyCreateTag, *prxyCreatePort,
+			*prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate))
 
 	case prxyListCmd.FullCommand():
 		lines := []string{"Tag\tProtocol\tPort\tDomain\tBalancing\tRedirected\tSslBackend\tLE\tApplied"}
-		for _, v := range cli.GetProxies(*prxyListProtocol) {
+		proxies, err := prxy.GetProxies(*prxyListProtocol)
+		log.Check(log.ErrorLevel, "Getting proxies", err)
+		for _, v := range proxies {
 			proxy := v.Proxy
 			if *prxyListTag == "" || *prxyListTag == proxy.Tag {
 				servers := v.Servers
@@ -388,15 +393,19 @@ func main() {
 		output(lines)
 
 	case prxyRemoveCmd.FullCommand():
-		cli.RemoveProxy(*prxyRemoveTag)
+		log.Check(log.ErrorLevel, "Removing proxy", prxy.RemoveProxy(*prxyRemoveTag))
 
 	case prxyServerAddCmd.FullCommand():
-		cli.AddProxiedServer(*prxyServerAddTag, *prxyServerAddSocket)
+		log.Check(log.ErrorLevel, "Adding server",
+			prxy.AddProxiedServer(*prxyServerAddTag, *prxyServerAddSocket))
 	case prxyServerRemoveCmd.FullCommand():
-		cli.RemoveProxiedServer(*prxyServerRemoveTag, *prxyServerRemoveSocket)
+		log.Check(log.ErrorLevel, "Removing server",
+			prxy.RemoveProxiedServer(*prxyServerRemoveTag, *prxyServerRemoveSocket))
 	case prxyServerListCmd.FullCommand():
 		lines := []string{"Protocol\tPort\tDomain\tServer"}
-		for _, v := range cli.GetProxies("") {
+		proxies, err := prxy.GetProxies("")
+		log.Check(log.ErrorLevel, "Getting proxies", err)
+		for _, v := range proxies{
 			proxy := v.Proxy
 			if *prxyServerListTag == proxy.Tag {
 				for _, server := range v.Servers {

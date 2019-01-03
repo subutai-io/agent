@@ -68,9 +68,9 @@ func updateContainer(name string, check bool) {
 		log.Info("Update is available")
 		return
 	}
-	_, _, err = container.AttachExecOutput(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.WarnLevel, "Configuring dpkg", err)
-	_, _, err = container.AttachExecOutput(name, []string{"apt-get", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
+	_, _, errResult := container.AttachExecOutput(name, []string{"dpkg", "--configure", "-a"}, []string{"DEBIAN_FRONTEND=noninteractive"})
+	log.Check(log.WarnLevel, "Configuring dpkg", errResult.Error())
+	_, _, errResult = container.AttachExecOutput(name, []string{"apt-get", "upgrade", "-y", "--allow-unauthenticated", "-o", "Acquire::http::Timeout=5", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold"},
 		[]string{"DEBIAN_FRONTEND=noninteractive"})
-	log.Check(log.FatalLevel, "Updating container", err)
+	log.Check(log.FatalLevel, "Updating container", errResult.Error())
 }
