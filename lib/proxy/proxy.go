@@ -83,7 +83,7 @@ server {
 `
 
 //http & https
-//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}
+//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}, {http2}
 const webConfig = `
 upstream {protocol}-{port}-{domain}{
     {load-balancing}
@@ -92,7 +92,7 @@ upstream {protocol}-{port}-{domain}{
 }                                                                                                                                                                                       
 
 server {
-    listen {port};
+    listen {port} {http2};
     server_name {domain};
     client_max_body_size 1G;
 	
@@ -188,7 +188,7 @@ func FindProxiedServers(tag, socket string) ([]db.ProxiedServer, error) {
 
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
 //subutai prxy create -p http -n test.com -e 80 -t 123 [-b round_robin]
-func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80Port, sslBackend bool, certPath string) error {
+func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80Port, sslBackend bool, certPath string, http2 bool) error {
 	var err error = nil
 	var lock lockfile.Lockfile
 	for lock, err = common.LockFile("port", "proxy");
@@ -368,6 +368,9 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 	} else if protocol == HTTPS && port == 80 && redirect80Port {
 		redirect80Port = false
 	}
+	if !(protocol == HTTP || protocol == HTTPS) {
+		http2 = false
+	}
 
 	//save proxy
 	proxy = &db.Proxy{
@@ -379,6 +382,7 @@ func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect
 		Redirect80Port: redirect80Port,
 		LoadBalancing:  loadBalancing,
 		SslBackend:     sslBackend,
+		Http2:          http2,
 	}
 
 	err = db.SaveProxy(proxy)
@@ -732,7 +736,7 @@ func createTcpUdpConfig(proxy *db.Proxy, servers []db.ProxiedServer) string {
 }
 
 func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) (string, error) {
-	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl},{ssl-backend}
+	//place-holders: {protocol}, {port}, {domain}, {load-balancing}, {servers}, {ssl}, {ssl-backend}, {http2}
 	effectiveConfig := webConfig
 
 	//for http-80 proxy check if there is https proxy for the same domain with LE cert
@@ -811,6 +815,12 @@ func createHttpHttpsConfig(proxy *db.Proxy, servers []db.ProxiedServer) (string,
 		sslBackend = "s"
 	}
 	effectiveConfig = strings.Replace(effectiveConfig, "{ssl-backend}", sslBackend, -1)
+
+	http2 := ""
+	if proxy.Http2 {
+		http2 = "http2"
+	}
+	effectiveConfig = strings.Replace(effectiveConfig, "{http2}", http2, -1)
 
 	return effectiveConfig, nil
 }
