@@ -162,6 +162,7 @@ var (
 	mapAddBalancing      = mapAddCmd.Flag("balancing", "load balancing policy [rr(round_robin),sticky(ip_hash),lcon(least_conn)]").Short('b').String()
 	mapAddSslBackend     = mapAddCmd.Flag("sslbackend", "use ssl backend in https upstream").Short('s').Bool()
 	mapAddRedirect       = mapAddCmd.Flag("redirect", "redirect port 80 to external port").Short('r').Bool()
+	mapAddHttp2          = mapAddCmd.Flag("http2", "use http2 protocol").Bool()
 
 	/*
 	subutai map rm tcp ...
@@ -198,6 +199,7 @@ var (
 	prxyCreateCertificate   = prxyCreateCmd.Flag("certificate", "path to joint x509 cert and private key pem file; if not specified, LE certificates will be obtained").Short('c').String()
 	prxyCreateRedirect      = prxyCreateCmd.Flag("redirect", "redirect port 80 to external port").Short('r').Bool()
 	prxyCreateSslBackend    = prxyCreateCmd.Flag("sslbackend", "use ssl backend in https upstream").Short('s').Bool()
+	prxyCreateHttp2         = prxyCreateCmd.Flag("http2", "use http2 protocol").Bool()
 
 	prxyListCmd      = prxyCmd.Command("list", "List proxies").Alias("ls")
 	prxyListProtocol = prxyListCmd.Flag("protocol", "filer by protocol [http,https]").Short('p').String()
@@ -361,7 +363,7 @@ func main() {
 
 	case mapAddCmd.FullCommand():
 		cli.AddPortMapping(*mapAddProtocol, *mapAddDomain, *mapAddBalancing, *mapAddExternalPort,
-			*mapAddInternalServer, *mapAddCertificate, *mapAddRedirect, *mapAddSslBackend)
+			*mapAddInternalServer, *mapAddCertificate, *mapAddRedirect, *mapAddSslBackend, *mapAddHttp2)
 	case mapRemoveCmd.FullCommand():
 		cli.RemovePortMapping(*mapRemoveProtocol, *mapRemoveDomain, *mapRemoveExternalPort, *mapRemoveInternalServer)
 
@@ -375,19 +377,19 @@ func main() {
 	case prxyCreateCmd.FullCommand():
 		log.Check(log.ErrorLevel, "Creating proxy", prxy.CreateProxy(*prxyCreateProtocol,
 			*prxyCreateDomain, *prxyCreateLoadBalancing, *prxyCreateTag, *prxyCreatePort,
-			*prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate))
+			*prxyCreateRedirect, *prxyCreateSslBackend, *prxyCreateCertificate, *prxyCreateHttp2))
 
 	case prxyListCmd.FullCommand():
-		lines := []string{"Tag\tProtocol\tPort\tDomain\tBalancing\tRedirected\tSslBackend\tLE\tApplied"}
+		lines := []string{"Tag\tProtocol\tPort\tDomain\tBalancing\tRedirected\tSslBackend\tLE\tHttp2\tApplied"}
 		proxies, err := prxy.GetProxies(*prxyListProtocol)
 		log.Check(log.ErrorLevel, "Getting proxies", err)
 		for _, v := range proxies {
 			proxy := v.Proxy
 			if *prxyListTag == "" || *prxyListTag == proxy.Tag {
 				servers := v.Servers
-				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%s\t%t\t%t\t%t\t%t",
+				lines = append(lines, fmt.Sprintf("%s\t%s\t%d\t%s\t%s\t%t\t%t\t%t\t%t\t%t",
 					proxy.Tag, proxy.Protocol, proxy.Port, proxy.Domain, proxy.LoadBalancing, proxy.Redirect80Port,
-					proxy.SslBackend, proxy.IsLE(), len(servers) > 0))
+					proxy.SslBackend, proxy.IsLE(), proxy.Http2, len(servers) > 0))
 			}
 		}
 		output(lines)
@@ -405,7 +407,7 @@ func main() {
 		lines := []string{"Protocol\tPort\tDomain\tServer"}
 		proxies, err := prxy.GetProxies("")
 		log.Check(log.ErrorLevel, "Getting proxies", err)
-		for _, v := range proxies{
+		for _, v := range proxies {
 			proxy := v.Proxy
 			if *prxyServerListTag == proxy.Tag {
 				for _, server := range v.Servers {

@@ -64,7 +64,7 @@ func RemovePortMapping(protocol, domain string, port int, server string) {
 	}
 }
 
-func AddPortMapping(protocol, domain, loadBalancing string, port int, server, certPath string, redirect80Port, sslBackend bool) {
+func AddPortMapping(protocol, domain, loadBalancing string, port int, server, certPath string, redirect80Port, sslBackend, http2 bool) {
 	protocol = strings.ToLower(protocol)
 	domain = strings.ToLower(domain)
 
@@ -77,7 +77,7 @@ func AddPortMapping(protocol, domain, loadBalancing string, port int, server, ce
 	log.Check(log.ErrorLevel, "Getting proxy from db", err)
 
 	if prxy == nil {
-		err = proxy.CreateProxy(protocol, domain, loadBalancing, tag, port, redirect80Port, sslBackend, certPath)
+		err = proxy.CreateProxy(protocol, domain, loadBalancing, tag, port, redirect80Port, sslBackend, certPath, http2)
 		log.Check(log.ErrorLevel, "Creating proxy", err)
 		prxy, err = proxy.FindProxyByTag(tag)
 		log.Check(log.ErrorLevel, "Getting proxy from db", err)

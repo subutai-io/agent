@@ -10,6 +10,7 @@ type Proxy struct {
 	CertPath       string
 	Redirect80Port bool
 	SslBackend     bool
+	Http2          bool
 }
 
 func (p Proxy) IsLE() bool {
