@@ -612,14 +612,18 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 	defer file.Close()
 
 	newconf := ""
+
+	//replace changed settings and remove settings with empty value
 	scanner := bufio.NewScanner(bufio.NewReader(file))
 	for scanner.Scan() {
 		newline := scanner.Text() + "\n"
 		for i := 0; i < len(conf); i++ {
 			line := strings.Split(scanner.Text(), "=")
-			if len(line) > 1 && strings.Trim(line[0], " ") == conf[i][0] {
-				if newline = ""; len(conf[i][1]) > 0 {
-					newline = conf[i][0] + " = " + conf[i][1] + "\n"
+			if len(line) > 0 && len(conf[i]) > 0 && strings.TrimSpace(line[0]) == strings.TrimSpace(conf[i][0]) {
+				if len(conf[i]) > 1 && strings.TrimSpace(conf[i][1]) != "" {
+					newline = strings.TrimSpace(conf[i][0]) + " = " + strings.TrimSpace(conf[i][1]) + "\n"
+				} else {
+					newline = ""
 				}
 				conf = append(conf[:i], conf[i+1:]...)
 				break
@@ -628,9 +632,10 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 		newconf = newconf + newline
 	}
 
+	//append new settings
 	for i := range conf {
-		if conf[i][1] != "" {
-			newconf = newconf + conf[i][0] + " = " + conf[i][1] + "\n"
+		if len(conf[i]) > 1 && strings.TrimSpace(conf[i][1]) != "" {
+			newconf = newconf + strings.TrimSpace(conf[i][0]) + " = " + strings.TrimSpace(conf[i][1]) + "\n"
 		}
 	}
 	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
