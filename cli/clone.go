@@ -10,6 +10,8 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/util"
 	"regexp"
+	"fmt"
+	"reflect"
 )
 
 var (
@@ -29,6 +31,7 @@ var (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, consoleSecret string) {
+	//todo synchronize
 	util.VerifyLxcName(child)
 
 	if container.LxcInstanceExists(child) {
@@ -64,10 +67,37 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 		cont.EnvironmentId = envID
 	}
 
+	//todo refactor and extract common method for both types of IPs
 	if ip := strings.Fields(addr); len(ip) > 1 {
 		cont.Gateway = addNetConf(child, addr)
 		cont.Ip = strings.Split(ip[0], "/")[0]
 		cont.Vlan = ip[1]
+	} else {
+		freeIPs := make(map[string]bool)
+		for i := 100; i < 200; i++ {
+			freeIPs[fmt.Sprintf("10.10.10.%d", i)] = true
+		}
+
+		for _, cont := range container.Containers() {
+			ip := container.GetIp(cont)
+			delete(freeIPs, ip)
+		}
+
+		if len(freeIPs) == 0 {
+			log.Error("There is no free IP in range 10.10.10.1xx left")
+		}
+
+		keys := reflect.ValueOf(freeIPs).MapKeys()
+		cont.Gateway = "10.10.10.254"
+		cont.Ip = keys[0].String()
+
+		container.SetContainerConf(child, [][]string{
+			{"lxc.network.flags", "up"},
+			{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+			{"lxc.network.ipv4.gateway", cont.Gateway},
+		})
+		container.SetStaticNet(child)
+
 	}
 
 	cont.Uid, _ = container.SetContainerUID(child)
