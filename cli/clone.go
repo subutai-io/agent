@@ -12,6 +12,10 @@ import (
 	"regexp"
 	"fmt"
 	"reflect"
+	"sort"
+	"github.com/nightlyone/lockfile"
+	"time"
+	"github.com/subutai-io/agent/lib/common"
 )
 
 var (
@@ -31,12 +35,22 @@ var (
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
 func LxcClone(parent, child, envID, addr, consoleSecret string) {
-	//todo synchronize
+
 	util.VerifyLxcName(child)
 
 	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
+
+	//synchronize
+	var lock lockfile.Lockfile
+	var err error
+	for lock, err = common.LockFile("", "clone"); err != nil; lock, err = common.LockFile("", "clone") {
+		time.Sleep(time.Second * 1)
+	}
+	defer lock.Unlock()
+	//<<<synchronize
+
 	defer sendHeartbeat()
 
 	t := getTemplateInfo(parent)
@@ -67,12 +81,20 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 		cont.EnvironmentId = envID
 	}
 
-	//todo refactor and extract common method for both types of IPs
 	if ip := strings.Fields(addr); len(ip) > 1 {
-		cont.Gateway = addNetConf(child, addr)
+
 		cont.Ip = strings.Split(ip[0], "/")[0]
+		cont.Gateway = getOrGenerateGateway(addr)
 		cont.Vlan = ip[1]
+
+		container.SetContainerConf(child, [][]string{
+			{"lxc.network.flags", "up"},
+			{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+			{"lxc.network.ipv4.gateway", cont.Gateway},
+			{"#vlan_id", cont.Vlan},
+		})
 	} else {
+		//determine next free IP
 		freeIPs := make(map[string]bool)
 		for i := 100; i < 200; i++ {
 			freeIPs[fmt.Sprintf("10.10.10.%d", i)] = true
@@ -87,18 +109,24 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 			log.Error("There is no free IP in range 10.10.10.1xx left")
 		}
 
+		//sort IPs
 		keys := reflect.ValueOf(freeIPs).MapKeys()
-		cont.Gateway = "10.10.10.254"
+		sort.Slice(keys[:], func(i, j int) bool {
+			return keys[i].String() < keys[j].String()
+		})
+		//use first free ip
 		cont.Ip = keys[0].String()
+		cont.Gateway = "10.10.10.254"
 
 		container.SetContainerConf(child, [][]string{
 			{"lxc.network.flags", "up"},
 			{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
 			{"lxc.network.ipv4.gateway", cont.Gateway},
 		})
-		container.SetStaticNet(child)
 
 	}
+	//changing from dhcp to manual
+	container.SetStaticNet(child)
 
 	cont.Uid, _ = container.SetContainerUID(child)
 
@@ -119,8 +147,8 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 	log.Info(child + " with ID " + gpg.GetFingerprint(child) + " successfully cloned")
 }
 
-// addNetConf adds network related configuration values to container config file
-func addNetConf(name, addr string) string {
+// getOrGenerateGateway adds network related configuration values to container config file
+func getOrGenerateGateway(addr string) string {
 	ipvlan := strings.Fields(addr)
 	gateway := getEnvGw(ipvlan[1])
 	if len(gateway) == 0 {
@@ -130,14 +158,6 @@ func addNetConf(name, addr string) string {
 		gw[3] = gw[3] + 255 - ip[3]
 		gateway = net.IP(gw).String()
 	}
-
-	container.SetContainerConf(name, [][]string{
-		{"lxc.network.flags", "up"},
-		{"lxc.network.ipv4", ipvlan[0]},
-		{"lxc.network.ipv4.gateway", gateway},
-		{"#vlan_id", ipvlan[1]},
-	})
-	container.SetStaticNet(name)
 
 	return gateway
 }
