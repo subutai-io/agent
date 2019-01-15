@@ -130,7 +130,7 @@ server {
 //place-holders: {domain}
 const letsEncryptSslDirectives = `
     ssl on;
-    ssl_certificate /var/lib/subutai/letsencrypt/live/{domain}/cert.pem;
+    ssl_certificate /var/lib/subutai/letsencrypt/live/{domain}/fullchain.pem;
     ssl_certificate_key /var/lib/subutai/letsencrypt/live/{domain}/privkey.pem;
 `
 
