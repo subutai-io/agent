@@ -147,8 +147,11 @@ def notifyBuild(String buildStatus = 'STARTED', String details = '') {
   }
   // Get token
   def slackToken = getSlackToken('sysnet')
+  def mattermost_rest = "https://mm.subutai.io/hooks/k1ujhg8xwigupxjzqbwzpgdp3h"
+
   // Send notifications
-  slackSend (color: colorCode, message: summary, teamDomain: 'optdyn', token: "${slackToken}")
+ // slackSend (color: colorCode, message: summary, teamDomain: 'optdyn', token: "${slackToken}")
+ mattermostSend(color: colorCode, icon: "https://jenkins.io/images/logos/jenkins/jenkins.png", message: summary, channel: "#sysnet-bots", endpoint: "${mattermost_rest}" )
 }
 
 // get slack token from global jenkins credentials store
