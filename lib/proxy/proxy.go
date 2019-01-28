@@ -121,6 +121,7 @@ const lEConfig = `
 server {
     listen 80;
     server_name {domain};
+    return 444;
 
     {well-known}
 }
