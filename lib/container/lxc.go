@@ -735,6 +735,26 @@ func SetStaticNet(name string) {
 	log.Check(log.WarnLevel, "Setting internal eth0 interface to manual", err)
 }
 
+//todo return error
+func SetManagementNet() {
+	data, err := ioutil.ReadFile(path.Join(config.Agent.LxcPrefix, Management, "/rootfs/etc/network/interfaces"))
+	log.Check(log.WarnLevel, "Opening /etc/network/interfaces", err)
+
+	interfaces := string(data)
+	if strings.Contains(interfaces, "manual") {
+		interfaces = strings.Replace(interfaces, "manual", "static", 1)
+		interfaces += "address 10.10.10.1\n"
+		interfaces += "netmask 255.255.255.0\n"
+		interfaces += "gateway 10.10.10.254\n"
+		interfaces += "dns-search intra.lan\n"
+		interfaces += "dns-nameservers 10.10.10.254"
+	}
+
+	err = ioutil.WriteFile(path.Join(config.Agent.LxcPrefix, Management, "/rootfs/etc/network/interfaces"),
+		[]byte(interfaces), 0644)
+	log.Check(log.WarnLevel, "Configuring management network", err)
+}
+
 // DisableSSHPwd disabling SSH password access to the Subutai container.
 //todo return error
 func DisableSSHPwd(name string) {

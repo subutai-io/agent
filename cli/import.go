@@ -584,6 +584,7 @@ func initManagement(templateRef string) {
 	})
 	gpg.GenerateKey(container.Management)
 	container.SetDNS(container.Management)
+	container.SetManagementNet()
 	container.Start(container.Management)
 
 	//TODO use proxy lib
