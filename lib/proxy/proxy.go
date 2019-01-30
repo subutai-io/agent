@@ -563,9 +563,9 @@ func installLECert(proxy *db.Proxy) error {
 		//remove self created LE config
 		proxies, _ := db.FindProxies(HTTP, proxy.Domain, 80)
 		if len(proxies) == 0 {
-			err = fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
-			if err != nil && !os.IsNotExist(err) {
-				return errors.New(fmt.Sprintf("Error removing temporary LE nginx config: %s", err.Error()))
+			er := fs.DeleteFile(path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf"))
+			if er != nil && !os.IsNotExist(er) {
+				return errors.New(fmt.Sprintf("Error removing temporary LE nginx config: %s", er.Error()))
 			}
 		}
 		return errors.New(fmt.Sprintf("Failed to create proxy: %s", err.Error()))
