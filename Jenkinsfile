@@ -147,7 +147,7 @@ def notifyBuild(String buildStatus = 'STARTED', String details = '') {
   }
   // Get token
   //def slackToken = getSlackToken('sysnet')
-  def mattermost_rest = "https://mm.subutai.io/hooks/k1ujhg8xwigupxjzqbwzpgdp3h"
+  def mattermost_rest = "https://mm.optdyn.com/hooks/k1ujhg8xwigupxjzqbwzpgdp3h"
 
   // Send notifications
  // slackSend (color: colorCode, message: summary, teamDomain: 'optdyn', token: "${slackToken}")
