@@ -122,6 +122,10 @@ server {
     listen 80;
     server_name {domain};
 
+	location / {
+		return 444;
+	}  
+
     {well-known}
 }
 
