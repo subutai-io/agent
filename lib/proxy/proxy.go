@@ -118,8 +118,6 @@ server {
 
 const lEConfig = `
 
-#le-support
-
 server {
     listen 80;
     server_name {domain};
@@ -873,15 +871,31 @@ func removeConfig(proxy db.Proxy) error {
 	}
 
 	if proxy.IsLE() && !proxy.Redirect80Port {
-		//check and remove supportive LE config if exists
+
+		proxies, err := db.FindProxies(HTTP, proxy.Domain, 80)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Error looking up proxy in db: %s", err.Error()))
+		}
+
 		filePath := path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf")
-		read, err := ioutil.ReadFile(filePath)
-		if err == nil {
-			theConfig := string(read)
-			//supportive config must contain #le-support
-			if strings.Contains(theConfig, "#le-support") {
-				//remove the config
-				fs.DeleteFile(filePath)
+		if len(proxies) == 0 {
+			//check and remove supportive LE config if exists
+			err = fs.DeleteFile(filePath)
+			if err != nil && !os.IsNotExist(err) {
+				return errors.New(fmt.Sprintf("Error removing temporary LE nginx config: %s", err.Error()))
+			}
+		} else {
+			//replace well-known section in a separate http-80 mapping with placeholder #well-known
+			wellKnown := strings.Replace(letsEncryptWellKnownSection, "{domain}", proxy.Domain, -1)
+			read, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error reading nginx config: %s", err.Error()))
+			}
+			fileContent := string(read)
+			fileContent = strings.Replace(fileContent, wellKnown, "#well-known", 1)
+			ioutil.WriteFile(filePath, []byte(fileContent), 0744)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error saving nginx config: %s", err.Error()))
 			}
 		}
 	}
