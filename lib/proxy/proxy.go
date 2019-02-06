@@ -118,6 +118,8 @@ server {
 
 const lEConfig = `
 
+#le-support
+
 server {
     listen 80;
     server_name {domain};
@@ -187,7 +189,7 @@ func FindProxyByTag(tag string) (*db.Proxy, error) {
 }
 
 func FindProxiedServers(tag, socket string) ([]db.ProxiedServer, error) {
-	return db.FindProxiedServers(tag, socket);
+	return db.FindProxiedServers(tag, socket)
 }
 
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
@@ -868,6 +870,20 @@ func removeConfig(proxy db.Proxy) error {
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
 	if err != nil && !os.IsNotExist(err) {
 		return errors.New(fmt.Sprintf("Removing nginx config: %s", err.Error()))
+	}
+
+	if proxy.IsLE() && !proxy.Redirect80Port {
+		//check and remove supportive LE config if exists
+		filePath := path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf")
+		read, err := ioutil.ReadFile(filePath)
+		if err == nil {
+			theConfig := string(read)
+			//supportive config must contain #le-support
+			if strings.Contains(theConfig, "#le-support") {
+				//remove the config
+				fs.DeleteFile(filePath)
+			}
+		}
 	}
 
 	return nil
