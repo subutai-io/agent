@@ -896,7 +896,11 @@ func removeConfig(proxy db.Proxy) error {
 				return errors.New(fmt.Sprintf("Error reading nginx config: %s", err.Error()))
 			}
 			fileContent := string(read)
-			fileContent = strings.Replace(fileContent, wellKnown, "#well-known", 1)
+			if strings.Contains(fileContent, "#well-known") {
+				fileContent = strings.Replace(fileContent, wellKnown, "", 1)
+			} else {
+				fileContent = strings.Replace(fileContent, wellKnown, "#well-known", 1)
+			}
 			ioutil.WriteFile(filePath, []byte(fileContent), 0744)
 			if err != nil {
 				return errors.New(fmt.Sprintf("Error saving nginx config: %s", err.Error()))
