@@ -187,7 +187,7 @@ func FindProxyByTag(tag string) (*db.Proxy, error) {
 }
 
 func FindProxiedServers(tag, socket string) ([]db.ProxiedServer, error) {
-	return db.FindProxiedServers(tag, socket);
+	return db.FindProxiedServers(tag, socket)
 }
 
 //subutai prxy create -p https -n test.com -e 80 -t 123 [-b round_robin] [--redirect] [-c path/to/cert] [--sslbackend]
@@ -868,6 +868,36 @@ func removeConfig(proxy db.Proxy) error {
 	err := fs.DeleteFile(path.Join(nginxInc, proxy.Protocol, proxy.Domain+"-"+strconv.Itoa(proxy.Port)+".conf"))
 	if err != nil && !os.IsNotExist(err) {
 		return errors.New(fmt.Sprintf("Removing nginx config: %s", err.Error()))
+	}
+
+	if proxy.IsLE() && !proxy.Redirect80Port {
+
+		proxies, err := db.FindProxies(HTTP, proxy.Domain, 80)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Error looking up proxy in db: %s", err.Error()))
+		}
+
+		filePath := path.Join(nginxInc, HTTP, proxy.Domain+"-80.conf")
+		if len(proxies) == 0 {
+			//check and remove supportive LE config if exists
+			err = fs.DeleteFile(filePath)
+			if err != nil && !os.IsNotExist(err) {
+				return errors.New(fmt.Sprintf("Error removing temporary LE nginx config: %s", err.Error()))
+			}
+		} else {
+			//replace well-known section in a separate http-80 mapping with placeholder #well-known
+			wellKnown := strings.Replace(letsEncryptWellKnownSection, "{domain}", proxy.Domain, -1)
+			read, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error reading nginx config: %s", err.Error()))
+			}
+			fileContent := string(read)
+			fileContent = strings.Replace(fileContent, wellKnown, "#well-known", 1)
+			ioutil.WriteFile(filePath, []byte(fileContent), 0744)
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error saving nginx config: %s", err.Error()))
+			}
+		}
 	}
 
 	return nil
