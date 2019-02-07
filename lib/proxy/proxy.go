@@ -45,10 +45,14 @@ type ProxyNServers struct {
 //for http and LE certs only
 //place-holders: {domain}
 const letsEncryptWellKnownSection = `
-location /.well-known {                                                                                                                                                                    
-	default_type "text/plain";                                                                                                                                                             
-	rewrite /.well-known/(.*) /$1 break;                                                                                                                                                   
-	root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;                                                                                                         
+location /.well-known {
+
+    default_type "text/plain";
+
+    rewrite /.well-known/(.*) /$1 break;
+
+    root /var/lib/subutai/letsencrypt/webroot/{domain}/.well-known/;
+
 }
 `
 
@@ -89,17 +93,17 @@ upstream {protocol}-{port}-{domain}{
     {load-balancing}
 
 {servers}
-}                                                                                                                                                                                       
+}
 
 server {
     listen {port} {http2};
     server_name {domain};
     client_max_body_size 1G;
-	
+
 {ssl}
-	
+
     error_page 497	https://$host$request_uri;
-	
+
     location / {
         proxy_pass         http{ssl-backend}://{protocol}-{port}-{domain}; 
         proxy_set_header   X-Real-IP $remote_addr;
@@ -124,7 +128,7 @@ server {
 
 	location / {
 		return 444;
-	}  
+	}
 
     {well-known}
 }
