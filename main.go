@@ -253,6 +253,17 @@ var (
 		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
 	snapshotCreateCmdLabel = snapshotCreateCmd.Flag("label", "snapshot label").Short('l').Required().String()
 
+	snapshotRemoveCmd          = snapshotCmd.Command("remove", "Remove snapshot").Alias("rm").Alias("del")
+	snapshotRemoveCmdContainer = snapshotRemoveCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotRemoveCmdPartition = snapshotRemoveCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+	snapshotRemoveCmdLabel = snapshotRemoveCmd.Flag("label", "snapshot label").Short('l').Required().String()
+
+	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
+	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotListCmdPartition = snapshotListCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -426,6 +437,12 @@ func main() {
 
 	case snapshotCreateCmd.FullCommand():
 		cli.CreateSnapshot(*snapshotCreateCmdContainer, *snapshotCreateCmdPartition, * snapshotCreateCmdLabel)
+
+	case snapshotRemoveCmd.FullCommand():
+		cli.RemoveSnapshot(*snapshotRemoveCmdContainer, * snapshotRemoveCmdPartition, * snapshotRemoveCmdLabel)
+
+	case snapshotListCmd.FullCommand():
+		fmt.Println(cli.ListSnapshots(*snapshotListCmdContainer, *snapshotListCmdPartition))
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
