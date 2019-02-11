@@ -67,7 +67,8 @@ func CreateDataset(dataset string) {
 	log.Check(log.FatalLevel, "Creating zfs dataset "+dataset+" "+out, err)
 }
 
-// Return output of `zfs list -t snapshot` command
+// Lists snapshots for dataset
+// Returns output of `zfs list -t snapshot` command
 func ListSnapshots(dataset string) (string, error) {
 	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
@@ -76,21 +77,13 @@ func ListSnapshots(dataset string) (string, error) {
 	return out, nil
 }
 
-// Receives delta file to dataset
-// e.g. ReceiveStream("foo/rootfs", "/tmp/rootfs.delta")
-//todo return error
-func ReceiveStream(dataset string, delta string) {
-	out, err := exec.ExecuteWithBash("zfs receive " + path.Join(zfsRootDataset, dataset) + " < " + delta)
-	log.Check(log.FatalLevel, "Receving zfs stream from "+delta+" to "+dataset+" "+out, err)
-}
-
-// Saves incremental stream to delta file
-// e.g. SendStream("debian-stretch/rootfs@now", "foo/rootfs@now", "/tmp/rootfs.delta")
-//todo return error
-func SendStream(snapshotFrom, snapshotTo, delta string) {
-	out, err := exec.ExecuteWithBash("zfs send -i " + path.Join(zfsRootDataset, snapshotFrom) +
-		" " + path.Join(zfsRootDataset, snapshotTo) + " > " + delta)
-	log.Check(log.FatalLevel, "Sending zfs stream from "+snapshotFrom+" to "+snapshotTo+" > "+delta+" "+out, err)
+//Rollbacks parent dataset to the specified snapshot
+func RollbackToSnapshot(snapshot string) error {
+	out, err := exec.Execute("zfs", "rollback", path.Join(zfsRootDataset, snapshot))
+	if err != nil {
+		return errors.Errorf("Error rolling back to snapshot %s: %s %s", snapshot, out, err.Error())
+	}
+	return nil
 }
 
 // Creates snapshot
@@ -110,6 +103,23 @@ func CloneSnapshot(snapshot, dataset string) {
 	out, err := exec.Execute("zfs", "clone", path.Join(zfsRootDataset, snapshot),
 		path.Join(zfsRootDataset, dataset))
 	log.Check(log.FatalLevel, "Cloning zfs snapshot "+snapshot+" to "+dataset+" "+out, err)
+}
+
+// Receives delta file to dataset
+// e.g. ReceiveStream("foo/rootfs", "/tmp/rootfs.delta")
+//todo return error
+func ReceiveStream(dataset string, delta string) {
+	out, err := exec.ExecuteWithBash("zfs receive " + path.Join(zfsRootDataset, dataset) + " < " + delta)
+	log.Check(log.FatalLevel, "Receving zfs stream from "+delta+" to "+dataset+" "+out, err)
+}
+
+// Saves incremental stream to delta file
+// e.g. SendStream("debian-stretch/rootfs@now", "foo/rootfs@now", "/tmp/rootfs.delta")
+//todo return error
+func SendStream(snapshotFrom, snapshotTo, delta string) {
+	out, err := exec.ExecuteWithBash("zfs send -i " + path.Join(zfsRootDataset, snapshotFrom) +
+		" " + path.Join(zfsRootDataset, snapshotTo) + " > " + delta)
+	log.Check(log.FatalLevel, "Sending zfs stream from "+snapshotFrom+" to "+snapshotTo+" > "+delta+" "+out, err)
 }
 
 // Sets dataset quota in GB

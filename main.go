@@ -264,6 +264,12 @@ var (
 	snapshotListCmdPartition = snapshotListCmd.Flag(
 		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
 
+	snapshotRollbackCmd          = snapshotCmd.Command("rollback", "Rollback to snapshot").Alias("rb")
+	snapshotRollBackCmdContainer = snapshotRollbackCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotRollbackCmdPartition = snapshotRollbackCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -443,6 +449,9 @@ func main() {
 
 	case snapshotListCmd.FullCommand():
 		fmt.Println(cli.ListSnapshots(*snapshotListCmdContainer, *snapshotListCmdPartition))
+
+	case snapshotRollbackCmd.FullCommand():
+		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))

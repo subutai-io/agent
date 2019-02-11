@@ -101,10 +101,41 @@ func ListSnapshots(container, partition string) string {
 	} else {
 		out, err = fs.ListSnapshots(container)
 	}
-
 	checkCondition(err == nil, func() {
 		log.Error("Failed to list snapshots ", err.Error())
 	})
 
 	return out
+}
+
+func RollbackToSnapshot(container, partition, label string) {
+	container = strings.ToLower(strings.TrimSpace(container))
+	partition = strings.ToLower(strings.TrimSpace(partition))
+	label = strings.ToLower(strings.TrimSpace(label))
+
+	checkArgument(container != "", "Invalid container name")
+
+	checkArgument(partition != "", "Invalid container partition")
+	partitionFound := false
+	for _, vol := range fs.ChildDatasets {
+		if vol == partition {
+			partitionFound = true
+			break
+		}
+	}
+	checkArgument(partitionFound, "Invalid partition %s", partition)
+
+	checkArgument(label != "", "Invalid snapshot label")
+
+	// check that container exists
+	checkState(container2.IsContainer(container), "Container %s not found", container)
+	// check that snapshot with such label exists
+	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
+	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
+
+	err := fs.RollbackToSnapshot(snapshot)
+	checkCondition(err == nil, func() {
+		log.Error("Failed to rollback to snapshot", err.Error())
+	})
+
 }
