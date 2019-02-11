@@ -84,9 +84,12 @@ func SendStream(snapshotFrom, snapshotTo, delta string) {
 
 // Creates snapshot
 // e.g. CreateSnapshot("foo/rootfs@now")
-func CreateSnapshot(snapshot string) {
+func CreateSnapshot(snapshot string) error {
 	out, err := exec.Execute("zfs", "snapshot", path.Join(zfsRootDataset, snapshot))
-	log.Check(log.FatalLevel, "Creating zfs snapshot "+snapshot+" "+out, err)
+	if err != nil {
+		return errors.Errorf("Error creating zfs snapshot %s: %s %s", out, err.Error())
+	}
+	return nil
 }
 
 // Clones snapshot to dataset
