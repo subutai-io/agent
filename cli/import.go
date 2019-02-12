@@ -545,25 +545,50 @@ func stringInList(s string, list []string) bool {
 	return false
 }
 
-//todo check and return errors
 func install(templateName string) error {
 
 	pathToDecompressedTemplate := path.Join(config.Agent.CacheDir, templateName)
 
 	// create parent dataset
-	fs.CreateDataset(templateName)
-
+	err := fs.CreateDataset(templateName)
+	if err != nil {
+		return err
+	}
 	// create partitions
-	fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"))
-	fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"))
-	fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"))
-	fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"))
+	err = fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"))
+	if err != nil {
+		return err
+	}
+	err = fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"))
+	if err != nil {
+		return err
+	}
+	err = fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"))
+	if err != nil {
+		return err
+	}
+	err = fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"))
+	if err != nil {
+		return err
+	}
 
 	// set partitions as read-only
-	fs.SetDatasetReadOnly(templateName + "/rootfs")
-	fs.SetDatasetReadOnly(templateName + "/home")
-	fs.SetDatasetReadOnly(templateName + "/var")
-	fs.SetDatasetReadOnly(templateName + "/opt")
+	err = fs.SetDatasetReadOnly(templateName + "/rootfs")
+	if err != nil {
+		return err
+	}
+	err = fs.SetDatasetReadOnly(templateName + "/home")
+	if err != nil {
+		return err
+	}
+	err = fs.SetDatasetReadOnly(templateName + "/var")
+	if err != nil {
+		return err
+	}
+	err = fs.SetDatasetReadOnly(templateName + "/opt")
+	if err != nil {
+		return err
+	}
 
 	for _, file := range []string{"config", "fstab", "packages"} {
 		err := fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
