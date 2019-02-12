@@ -21,15 +21,7 @@ func CreateSnapshot(container, partition, label string) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	checkArgument(partition != "", "Invalid container partition")
-	partitionFound := false
-	for _, vol := range fs.ChildDatasets {
-		if vol == partition {
-			partitionFound = true
-			break
-		}
-	}
-	checkArgument(partitionFound, "Invalid partition %s", partition)
+	checkPartitionName(partition)
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -53,15 +45,7 @@ func RemoveSnapshot(container, partition, label string) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	checkArgument(partition != "", "Invalid container partition")
-	partitionFound := false
-	for _, vol := range fs.ChildDatasets {
-		if vol == partition {
-			partitionFound = true
-			break
-		}
-	}
-	checkArgument(partitionFound, "Invalid partition %s", partition)
+	checkPartitionName(partition)
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -150,15 +134,7 @@ func RollbackToSnapshot(container, partition, label string) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	checkArgument(partition != "", "Invalid container partition")
-	partitionFound := false
-	for _, vol := range fs.ChildDatasets {
-		if vol == partition {
-			partitionFound = true
-			break
-		}
-	}
-	checkArgument(partitionFound, "Invalid partition %s", partition)
+	checkPartitionName(partition)
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -173,4 +149,16 @@ func RollbackToSnapshot(container, partition, label string) {
 		log.Error("Failed to rollback to snapshot", err.Error())
 	})
 
+}
+
+func checkPartitionName(partition string) {
+	checkArgument(partition != "", "Invalid container partition")
+	partitionFound := false
+	for _, vol := range fs.ChildDatasets {
+		if vol == partition {
+			partitionFound = true
+			break
+		}
+	}
+	checkArgument(partitionFound, "Invalid partition %s", partition)
 }
