@@ -10,10 +10,7 @@ import (
 	"path"
 )
 
-//todo remove code duplicates
-//todo stop and start container when doing snapshot and rollback
-
-func CreateSnapshot(container, partition, label string) {
+func CreateSnapshot(container, partition, label string, stopContainer bool) {
 
 	container = strings.TrimSpace(container)
 	partition = strings.ToLower(strings.TrimSpace(partition))
@@ -30,6 +27,13 @@ func CreateSnapshot(container, partition, label string) {
 	// check that snapshot with such label does not exist
 	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
 	checkState(!fs.DatasetExists(snapshot), "Snapshot %s already exists", snapshot)
+
+	if stopContainer {
+		if container2.State(container) == container2.Running {
+			LxcStop(container)
+			defer LxcStart(container)
+		}
+	}
 
 	// create snapshot
 	err := fs.CreateSnapshot(snapshot)
@@ -127,7 +131,7 @@ func ListSnapshots(container, partition string) string {
 	return out
 }
 
-func RollbackToSnapshot(container, partition, label string) {
+func RollbackToSnapshot(container, partition, label string, stopContainer bool) {
 	container = strings.TrimSpace(container)
 	partition = strings.ToLower(strings.TrimSpace(partition))
 	label = strings.ToLower(strings.TrimSpace(label))
@@ -144,11 +148,17 @@ func RollbackToSnapshot(container, partition, label string) {
 	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
 	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
 
+	if stopContainer {
+		if container2.State(container) == container2.Running {
+			LxcStop(container)
+			defer LxcStart(container)
+		}
+	}
+
 	err := fs.RollbackToSnapshot(snapshot)
 	checkCondition(err == nil, func() {
 		log.Error("Failed to rollback to snapshot", err.Error())
 	})
-
 }
 
 func checkPartitionName(partition string) {

@@ -252,6 +252,7 @@ var (
 	snapshotCreateCmdPartition = snapshotCreateCmd.Flag(
 		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
 	snapshotCreateCmdLabel = snapshotCreateCmd.Flag("label", "snapshot label").Short('l').Required().String()
+	snapshotCreateCmdStop  = snapshotCreateCmd.Flag("stop", "stop container when doing snapshot").Short('s').Bool()
 
 	snapshotRemoveCmd          = snapshotCmd.Command("remove", "Remove snapshot").Alias("rm").Alias("del")
 	snapshotRemoveCmdContainer = snapshotRemoveCmd.Flag("container", "container name").Short('c').Required().String()
@@ -269,6 +270,7 @@ var (
 	snapshotRollbackCmdPartition = snapshotRollbackCmd.Flag(
 		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
 	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
+	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
 
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
@@ -442,16 +444,16 @@ func main() {
 		output(lines)
 
 	case snapshotCreateCmd.FullCommand():
-		cli.CreateSnapshot(*snapshotCreateCmdContainer, *snapshotCreateCmdPartition, * snapshotCreateCmdLabel)
+		cli.CreateSnapshot(*snapshotCreateCmdContainer, *snapshotCreateCmdPartition, *snapshotCreateCmdLabel, *snapshotCreateCmdStop)
 
 	case snapshotRemoveCmd.FullCommand():
-		cli.RemoveSnapshot(*snapshotRemoveCmdContainer, * snapshotRemoveCmdPartition, * snapshotRemoveCmdLabel)
+		cli.RemoveSnapshot(*snapshotRemoveCmdContainer, *snapshotRemoveCmdPartition, *snapshotRemoveCmdLabel)
 
 	case snapshotListCmd.FullCommand():
 		fmt.Println(cli.ListSnapshots(*snapshotListCmdContainer, *snapshotListCmdPartition))
 
 	case snapshotRollbackCmd.FullCommand():
-		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel)
+		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
