@@ -10,8 +10,6 @@ import (
 	"github.com/subutai-io/agent/config"
 )
 
-//todo return errors , dont use log.Error/Fatal
-
 var zfsRootDataset string
 var ChildDatasets = []string{"rootfs", "home", "var", "opt"}
 
@@ -24,22 +22,25 @@ func init() {
 func IsDatasetReadOnly(dataset string) bool {
 	out, _ := exec.ExecuteWithBash(
 		"zfs get readonly -H " + path.Join(zfsRootDataset, dataset) + " | awk '{print $3}' ")
-	log.Debug("Getting zfs dataset " + dataset + " readonly property " + out)
 	return strings.TrimSpace(out) == "on"
 }
 
 // Sets dataset readonly
 // e.g. SetDatasetReadOnly("debian-stretch")
-func SetDatasetReadOnly(dataset string) {
+func SetDatasetReadOnly(dataset string) error {
 	out, err := exec.Execute("zfs", "set", "readonly=on", path.Join(zfsRootDataset, dataset))
-	log.Check(log.FatalLevel, "Setting zfs dataset "+dataset+" readonly "+out, err)
+	if err != nil {
+		return errors.Errorf("Error setting dataset %s readonly: %s %s", dataset, out, err.Error())
+	}
+
+	return nil
 }
 
 // Checks if dataset exists
 // e.g. DatasetExists("foo")
 func DatasetExists(dataset string) bool {
 	out, err := exec.Execute("zfs", "list", "-H", path.Join(zfsRootDataset, dataset))
-	log.Debug("Checking zfs dataset " + dataset + " existence " + out)
+	log.Debug("Checking dataset " + dataset + " existence " + out)
 	return err == nil
 }
 
@@ -55,16 +56,20 @@ func RemoveDataset(dataset string, recursive bool) error {
 	out, err := exec.Execute("zfs", args...)
 	log.Check(log.WarnLevel, "Removing zfs dataset/snapshot "+dataset+" "+out, err)
 	if err != nil {
-		return errors.Errorf("Error removing zfs dataset/snapshot %s: %s %s", dataset, out, err.Error())
+		return errors.Errorf("Error removing dataset/snapshot %s: %s %s", dataset, out, err.Error())
 	}
 	return nil
 }
 
 // Creates dataset
 // e.g. CreateDataset("debian-stretch")
-func CreateDataset(dataset string) {
+func CreateDataset(dataset string) error {
 	out, err := exec.Execute("zfs", "create", path.Join(zfsRootDataset, dataset))
-	log.Check(log.FatalLevel, "Creating zfs dataset "+dataset+" "+out, err)
+	if err != nil {
+		return errors.Errorf("Error creating dataset %s: %s %s", dataset, out, err)
+	}
+
+	return nil
 }
 
 // Lists snapshots for dataset
@@ -72,7 +77,7 @@ func CreateDataset(dataset string) {
 func ListSnapshots(dataset string) (string, error) {
 	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
-		return "", errors.Errorf("Error listing zfs snapshots for %s: %s %s", dataset, out, err.Error())
+		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
 	return out, nil
 }
@@ -91,42 +96,54 @@ func RollbackToSnapshot(snapshot string) error {
 func CreateSnapshot(snapshot string) error {
 	out, err := exec.Execute("zfs", "snapshot", path.Join(zfsRootDataset, snapshot))
 	if err != nil {
-		return errors.Errorf("Error creating zfs snapshot %s: %s %s", snapshot, out, err.Error())
+		return errors.Errorf("Error creating snapshot %s: %s %s", snapshot, out, err.Error())
 	}
 	return nil
 }
 
 // Clones snapshot to dataset
 // e.g. CloneSnapshot("debian-stretch/rootfs@now", "foo/rootfs")
-//todo return error
-func CloneSnapshot(snapshot, dataset string) {
+func CloneSnapshot(snapshot, dataset string) error {
 	out, err := exec.Execute("zfs", "clone", path.Join(zfsRootDataset, snapshot),
 		path.Join(zfsRootDataset, dataset))
-	log.Check(log.FatalLevel, "Cloning zfs snapshot "+snapshot+" to "+dataset+" "+out, err)
+	if err != nil {
+		return errors.Errorf("Error cloning snapshot %s to dataset %s: %s %s", snapshot, dataset, out, err.Error())
+	}
+	return nil
 }
 
 // Receives delta file to dataset
 // e.g. ReceiveStream("foo/rootfs", "/tmp/rootfs.delta")
-//todo return error
-func ReceiveStream(dataset string, delta string) {
+func ReceiveStream(dataset string, delta string) error {
 	out, err := exec.ExecuteWithBash("zfs receive " + path.Join(zfsRootDataset, dataset) + " < " + delta)
-	log.Check(log.FatalLevel, "Receving zfs stream from "+delta+" to "+dataset+" "+out, err)
+	if err != nil {
+		errors.Errorf("Error receiving stream from %s to %s: %s %s", delta, dataset, out, err.Error())
+	}
+
+	return nil
 }
 
 // Saves incremental stream to delta file
 // e.g. SendStream("debian-stretch/rootfs@now", "foo/rootfs@now", "/tmp/rootfs.delta")
-//todo return error
-func SendStream(snapshotFrom, snapshotTo, delta string) {
+func SendStream(snapshotFrom, snapshotTo, delta string) error {
 	out, err := exec.ExecuteWithBash("zfs send -i " + path.Join(zfsRootDataset, snapshotFrom) +
 		" " + path.Join(zfsRootDataset, snapshotTo) + " > " + delta)
-	log.Check(log.FatalLevel, "Sending zfs stream from "+snapshotFrom+" to "+snapshotTo+" > "+delta+" "+out, err)
+	if err != nil {
+		errors.Errorf("Error sending stream between %s and %s to %s: %s %s", snapshotFrom, snapshotTo, delta, out, err.Error())
+	}
+
+	return nil
 }
 
 // Sets dataset quota in GB
 // e.g. SetQuota("foo", 10)
-func SetQuota(dataset string, quotaInGb int) {
+func SetQuota(dataset string, quotaInGb int) error {
 	out, err := exec.Execute("zfs", "set", "quota="+strconv.Itoa(quotaInGb)+"G", path.Join(zfsRootDataset, dataset))
-	log.Check(log.ErrorLevel, "Setting quota "+strconv.Itoa(quotaInGb)+"G to "+dataset+" "+out, err)
+	if err != nil {
+		return errors.Errorf("Error setting quota %dG to %s: %s %s", quotaInGb, dataset, out, err.Error())
+	}
+
+	return nil
 }
 
 // Returns dataset quota in bytes, 0 if no quota set

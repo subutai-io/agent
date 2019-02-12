@@ -121,7 +121,8 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 		log.Check(log.ErrorLevel, "Creating snapshot "+snapshot, err)
 
 		// send incremental delta between parent and child to delta file
-		fs.SendStream(parentRef+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
+		err = fs.SendStream(parentRef+"/"+vol+"@now", name+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
+		log.Check(log.ErrorLevel, "Sending stream for partition "+vol, err)
 	}
 
 	//copy config files

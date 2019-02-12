@@ -421,19 +421,33 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 }
 
 // Clone create the duplicate container from the Subutai template.
-//todo return error for fs.* calls
 func Clone(parent, child string) error {
 
 	parentParts := strings.Split(parent, ":")
 
 	//create parent dataset
-	fs.CreateDataset(child)
+	err := fs.CreateDataset(child)
+	if err != nil {
+		return err
+	}
 
 	//create partitions
-	fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
-	fs.CloneSnapshot(parent+"/home@now", child+"/home")
-	fs.CloneSnapshot(parent+"/var@now", child+"/var")
-	fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
+	err = fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
+	if err != nil {
+		return err
+	}
+	err = fs.CloneSnapshot(parent+"/home@now", child+"/home")
+	if err != nil {
+		return err
+	}
+	err = fs.CloneSnapshot(parent+"/var@now", child+"/var")
+	if err != nil {
+		return err
+	}
+	err = fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
+	if err != nil {
+		return err
+	}
 
 	for _, file := range []string{"config", "fstab", "packages"} {
 		err := fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
@@ -486,7 +500,8 @@ func QuotaDisk(name, size string) int {
 
 	if len(size) > 0 {
 		vs, err := strconv.Atoi(size)
-		fs.SetQuota(name, vs)
+		log.Check(log.DebugLevel, "Parsing disk limit "+size, err)
+		err = fs.SetQuota(name, vs)
 		log.Check(log.DebugLevel, "Setting disk limit of container "+name, err)
 	}
 	vr, err := fs.GetQuota(name)
