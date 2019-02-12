@@ -246,6 +246,32 @@ var (
 	stopCmd          = app.Command("stop", "Stop Subutai container")
 	stopCmdContainer = stopCmd.Arg("name(s)", "container name(s)").Required().Strings()
 
+	snapshotCmd                = app.Command("snapshot", "Manage container snapshots").Alias("snap")
+	snapshotCreateCmd          = snapshotCmd.Command("create", "Create snapshot").Alias("add")
+	snapshotCreateCmdContainer = snapshotCreateCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotCreateCmdPartition = snapshotCreateCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+	snapshotCreateCmdLabel = snapshotCreateCmd.Flag("label", "snapshot label").Short('l').Required().String()
+	snapshotCreateCmdStop  = snapshotCreateCmd.Flag("stop", "stop container when doing snapshot").Short('s').Bool()
+
+	snapshotRemoveCmd          = snapshotCmd.Command("remove", "Remove snapshot").Alias("rm").Alias("del")
+	snapshotRemoveCmdContainer = snapshotRemoveCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotRemoveCmdPartition = snapshotRemoveCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+	snapshotRemoveCmdLabel = snapshotRemoveCmd.Flag("label", "snapshot label").Short('l').Required().String()
+
+	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
+	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').String()
+	snapshotListCmdPartition = snapshotListCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
+
+	snapshotRollbackCmd          = snapshotCmd.Command("rollback", "Rollback to snapshot").Alias("rb")
+	snapshotRollBackCmdContainer = snapshotRollbackCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotRollbackCmdPartition = snapshotRollbackCmd.Flag(
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
+	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -416,6 +442,18 @@ func main() {
 			}
 		}
 		output(lines)
+
+	case snapshotCreateCmd.FullCommand():
+		cli.CreateSnapshot(*snapshotCreateCmdContainer, *snapshotCreateCmdPartition, *snapshotCreateCmdLabel, *snapshotCreateCmdStop)
+
+	case snapshotRemoveCmd.FullCommand():
+		cli.RemoveSnapshot(*snapshotRemoveCmdContainer, *snapshotRemoveCmdPartition, *snapshotRemoveCmdLabel)
+
+	case snapshotListCmd.FullCommand():
+		fmt.Println(cli.ListSnapshots(*snapshotListCmdContainer, *snapshotListCmdPartition))
+
+	case snapshotRollbackCmd.FullCommand():
+		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
