@@ -260,7 +260,7 @@ var (
 	snapshotRemoveCmdLabel = snapshotRemoveCmd.Flag("label", "snapshot label").Short('l').Required().String()
 
 	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
-	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').String()
 	snapshotListCmdPartition = snapshotListCmd.Flag(
 		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
 
