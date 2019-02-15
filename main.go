@@ -16,6 +16,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/agent/vars"
 	"text/tabwriter"
+	"path"
 )
 
 var version = "unknown"
@@ -272,6 +273,11 @@ var (
 	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
 
+	//backup command
+	backupCmd           = app.Command("backup", "Manage container backups")
+	backupCmdContainer  = backupCmd.Arg("container", "container to backup").Required().String()
+	backupCmdBackupName = backupCmd.Arg("backup name", fmt.Sprintf("Name of backup. Will be dumped to %s", path.Join(config.Agent.CacheDir, "{name-of-backup}.tar.gz"))).Required().String()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -454,6 +460,9 @@ func main() {
 
 	case snapshotRollbackCmd.FullCommand():
 		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
+
+	case backupCmd.FullCommand():
+		cli.BackupContainer(*backupCmdContainer, *backupCmdBackupName)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
