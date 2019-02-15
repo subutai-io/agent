@@ -590,18 +590,16 @@ func install(templateName string) error {
 		return err
 	}
 
-	for _, file := range []string{"config", "fstab", "packages"} {
-		err := fs.Copy(path.Join(pathToDecompressedTemplate, file), path.Join(config.Agent.LxcPrefix, templateName, file))
-		if err != nil {
-			return err
-		}
+	err = fs.Copy(path.Join(pathToDecompressedTemplate, "config"), path.Join(config.Agent.LxcPrefix, templateName, "config"))
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func initManagement(templateRef string) {
-	container.Clone(templateRef, container.Management)
+	container.Clone(templateRef, container.Management, "")
 
 	container.SetContainerUID(container.Management)
 	container.SetContainerConf(container.Management, [][]string{

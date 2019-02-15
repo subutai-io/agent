@@ -58,12 +58,13 @@ var (
 	/*
 	subutai clone master foo [-e {env-id} -n {net-settings} -s {secret}]
 	*/
-	cloneCmd       = app.Command("clone", "Create Subutai container")
-	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
-	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
-	cloneEnvId     = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
-	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
-	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
+	cloneCmd        = app.Command("clone", "Create Subutai container")
+	cloneTemplate   = cloneCmd.Arg("template", "source template").Required().String()
+	cloneContainer  = cloneCmd.Arg("container", "container name").Required().String()
+	cloneEnvId      = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
+	cloneNetwork    = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret     = cloneCmd.Flag("secret", "console secret").Short('s').String()
+	cloneBackupFile = cloneCmd.Flag("backup", "Backup file to restore container from").Short('b').String()
 
 	//cleanup command
 	/*
@@ -361,7 +362,7 @@ func main() {
 	case attachCmd.FullCommand():
 		cli.LxcAttach(*attachName, *attachCommand)
 	case cloneCmd.FullCommand():
-		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
+		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret, *cloneBackupFile)
 	case cleanupCmd.FullCommand():
 		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():

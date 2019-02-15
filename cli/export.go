@@ -127,7 +127,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//copy config files
 	src := path.Join(config.Agent.LxcPrefix, name)
-	log.Check(log.ErrorLevel, "Copying fstab file", fs.Copy(src+"/fstab", dst+"/fstab"))
 	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(src+"/config", dst+"/config"))
 
 	//update template config
@@ -161,11 +160,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	if container.State(name) != container.Running {
 		LxcStart(name)
 	}
-	pkgCmdResult, _ := container.AttachExec(name, []string{"timeout", "60", "dpkg", "-l"})
-	strCmdRes := strings.Join(pkgCmdResult, "\n")
-	log.Check(log.FatalLevel, "Write packages",
-		ioutil.WriteFile(dst+"/packages",
-			[]byte(strCmdRes), 0755))
 
 	//archive template contents
 	templateArchive := dst + ".tar.gz"

@@ -28,6 +28,7 @@ import (
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
 	"io"
+	"path/filepath"
 )
 
 const (
@@ -420,10 +421,16 @@ func GetProperty(templateOrContainerName string, propertyName string) string {
 	return GetConfigItem(path.Join(config.Agent.LxcPrefix, templateOrContainerName, "config"), propertyName)
 }
 
-// Clone create the duplicate container from the Subutai template.
-func Clone(parent, child string) error {
+func getFileName(filePath string) string {
+	file := filepath.Base(filePath)
+	for i := 0; i < 3; i++ {
+		file = strings.TrimSuffix(file, filepath.Ext(file))
+	}
+	return file
+}
 
-	parentParts := strings.Split(parent, ":")
+// Clone create the duplicate container from the Subutai template.
+func Clone(parent, child, backupFile string) error {
 
 	//create parent dataset
 	err := fs.CreateDataset(child)
@@ -431,29 +438,49 @@ func Clone(parent, child string) error {
 		return err
 	}
 
-	//create partitions
-	err = fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
-	if err != nil {
-		return err
-	}
-	err = fs.CloneSnapshot(parent+"/home@now", child+"/home")
-	if err != nil {
-		return err
-	}
-	err = fs.CloneSnapshot(parent+"/var@now", child+"/var")
-	if err != nil {
-		return err
-	}
-	err = fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
-	if err != nil {
-		return err
-	}
-
-	for _, file := range []string{"config", "fstab", "packages"} {
-		err := fs.Copy(path.Join(config.Agent.LxcPrefix, parent, file), path.Join(config.Agent.LxcPrefix, child, file))
+	//restore container from backup file
+	if backupFile != "" {
+		dest := path.Join(config.Agent.CacheDir, getFileName(backupFile))
+		//extract backup file
+		err = fs.Decompress(backupFile, dest)
 		if err != nil {
 			return err
 		}
+
+		//receive deltas
+		for _, dataset := range fs.ChildDatasets {
+
+			err = fs.ReceiveStream(path.Join(child, dataset), path.Join(dest, "deltas", dataset+".delta"))
+			if err != nil {
+				return err
+			}
+		}
+
+	} else {
+
+		//create partitions
+		err = fs.CloneSnapshot(parent+"/rootfs@now", child+"/rootfs")
+		if err != nil {
+			return err
+		}
+		err = fs.CloneSnapshot(parent+"/home@now", child+"/home")
+		if err != nil {
+			return err
+		}
+		err = fs.CloneSnapshot(parent+"/var@now", child+"/var")
+		if err != nil {
+			return err
+		}
+		err = fs.CloneSnapshot(parent+"/opt@now", child+"/opt")
+		if err != nil {
+			return err
+		}
+
+	}
+
+	err = fs.Copy(path.Join(config.Agent.LxcPrefix, parent, "config"), path.Join(config.Agent.LxcPrefix, child, "config"))
+	if err != nil {
+		return err
 	}
 
 	mac, err := Mac()
@@ -465,6 +492,8 @@ func Clone(parent, child string) error {
 	if err != nil {
 		return err
 	}
+
+	parentParts := strings.Split(parent, ":")
 
 	err = SetContainerConf(child, [][]string{
 		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
