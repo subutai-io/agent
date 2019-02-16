@@ -387,30 +387,36 @@ func Destroy(name string, silent bool) error {
 	}
 	defer lock.Unlock()
 
-	//destroy child datasets
-	for _, dataset := range fs.ChildDatasets {
+	out, err := fs.ListSnapshotNamesOnly(name)
+	if !silent && err != nil {
+		return err
+	}
 
-		//destroy snapshot
-		childSnapshot := path.Join(name, dataset) + "@now"
-		if fs.DatasetExists(childSnapshot) {
-			err = fs.RemoveDataset(childSnapshot, false)
+	//destroy child snapshots
+	snapshots := strings.Split(out, "\n")
+	for _, snapshot := range snapshots {
+		snapshot = strings.TrimSpace(strings.TrimPrefix(snapshot, config.Agent.Dataset))
+		if snapshot != "" {
+			err = fs.RemoveDataset(snapshot, false)
 			if !silent && err != nil {
-				break
+				return err
 			}
 		}
+	}
 
-		//destroy dataset
+	//destroy child datasets
+	for _, dataset := range fs.ChildDatasets {
 		childDataset := path.Join(name, dataset)
 		if fs.DatasetExists(childDataset) {
 			err = fs.RemoveDataset(childDataset, false)
 			if !silent && err != nil {
-				break
+				return err
 			}
 		}
 	}
 
 	//destroy parent dataset
-	if (silent || err == nil) && fs.DatasetExists(name) {
+	if fs.DatasetExists(name) {
 		err = fs.RemoveDataset(name, false)
 	}
 
