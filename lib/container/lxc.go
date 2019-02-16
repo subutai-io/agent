@@ -454,6 +454,17 @@ func Clone(parent, child, backupFile string) error {
 			if err != nil {
 				return err
 			}
+
+		}
+
+		time.Sleep(1000)
+
+		//remove snapshots @now
+		for _, dataset := range fs.ChildDatasets {
+			err = fs.RemoveDataset(path.Join(child, dataset)+"@now", false)
+			if err != nil {
+				return err
+			}
 		}
 
 	} else {

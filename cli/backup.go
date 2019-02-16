@@ -8,6 +8,7 @@ import (
 	"os"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
+	"time"
 )
 
 //todo move functionality to lib and here delegate there
@@ -28,7 +29,7 @@ func BackupContainer(containerName, backupName string) {
 
 	//cleanup files
 	src := path.Join(config.Agent.LxcPrefix, containerName)
-	cleanupFS(path.Join(src, "/var/log"), 0775)
+	cleanupFS(path.Join(src, "/var/log"), 0775) // should we clean log??
 	cleanupFS(path.Join(src, "/var/cache"), 0775)
 	cleanupFS(path.Join(src, "/var/tmp"), 0775)
 
@@ -43,18 +44,29 @@ func BackupContainer(containerName, backupName string) {
 	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
 
 	for _, vol := range fs.ChildDatasets {
+		snapshot := containerName + "/" + vol + "@now"
+
 		//remove old snapshot if any
-		if fs.DatasetExists(containerName + "/" + vol + "@now") {
-			fs.RemoveDataset(containerName+"/"+vol+"@now", false)
+		if fs.DatasetExists(snapshot) {
+			fs.RemoveDataset(snapshot, false)
 		}
 		// snapshot each partition
-		snapshot := containerName + "/" + vol + "@now"
 		err := fs.CreateSnapshot(snapshot)
 		log.Check(log.ErrorLevel, "Creating snapshot "+snapshot, err)
 
 		// send incremental delta between parent and child to delta file
 		err = fs.SendStream(parentRef+"/"+vol+"@now", containerName+"/"+vol+"@now", dst+"/deltas/"+vol+".delta")
 		log.Check(log.ErrorLevel, "Sending stream for partition "+vol, err)
+	}
+
+	time.Sleep(1000)
+
+	for _, vol := range fs.ChildDatasets {
+		snapshot := containerName + "/" + vol + "@now"
+
+		//remove snapshot to save space
+		err := fs.RemoveDataset(snapshot, false)
+		log.Check(log.ErrorLevel, "Removing snapshot "+snapshot, err)
 	}
 
 	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(src+"/config", dst+"/config"))

@@ -1,3 +1,11 @@
+/**
+
+Provides methods to work with zfs.
+Parameter "dataset" passed to most of functions must start with a container/template name and optionally a child dataset
+Root dataset taken from configuration parameter Agent.Dataset is automatically prepended to the "dataset" paramater.
+
+ */
+
 package fs
 
 import (
@@ -73,9 +81,19 @@ func CreateDataset(dataset string) error {
 }
 
 // Lists snapshots for dataset
-// Returns output of `zfs list -t snapshot` command
+// Returns output of `zfs list -t snapshot -r {root}/{dataset}` command
 func ListSnapshots(dataset string) (string, error) {
 	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-r", path.Join(zfsRootDataset, dataset))
+	if err != nil {
+		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
+	}
+	return out, nil
+}
+
+// Lists snapshots names only for dataset
+// Returns output of `zfs list -t snapshot -H -t snapshot -r {dataset} | awk '{print $1}'` command
+func ListSnapshotNamesOnly(dataset string) (string, error) {
+	out, err := exec.ExecuteWithBash("zfs list -H -t snapshot -r " + path.Join(zfsRootDataset, dataset) + " | awk '{print $1}'")
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
