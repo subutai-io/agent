@@ -279,6 +279,15 @@ var (
 	backupCmdContainer  = backupCmd.Arg("container", "container to backup").Required().String()
 	backupCmdBackupName = backupCmd.Arg("backup name", fmt.Sprintf("Name of backup. Will be dumped to %s", path.Join(config.Agent.CacheDir, "{name-of-backup}.tar.gz"))).Required().String()
 
+	cdnCmd               = app.Command("cdn", "Download/upload files from/to CDN")
+	cdnDownloadCmd       = cdnCmd.Command("get", "Download file")
+	cdnDownloadCmdId     = cdnDownloadCmd.Arg("id", "Id of file on CDN").Required().String()
+	cdnDowloadCmdDestDir = cdnDownloadCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+
+	cdnUploadCmd      = cdnCmd.Command("put", "Upload file")
+	cdnUploadCmdFile  = cdnUploadCmd.Flag("file", "path to file to upload").Short('f').Required().String()
+	cndUploadCmdToken = cdnUploadCmd.Flag("token", "CDN token").Short('t').Required().String()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -464,6 +473,9 @@ func main() {
 
 	case backupCmd.FullCommand():
 		cli.BackupContainer(*backupCmdContainer, *backupCmdBackupName)
+
+	case cdnDownloadCmd.FullCommand():
+		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
