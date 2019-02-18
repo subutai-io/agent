@@ -16,7 +16,6 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/agent/vars"
 	"text/tabwriter"
-	"path"
 )
 
 var version = "unknown"
@@ -275,9 +274,9 @@ var (
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
 
 	//backup command
-	backupCmd           = app.Command("backup", "Manage container backups")
-	backupCmdContainer  = backupCmd.Arg("container", "container to backup").Required().String()
-	backupCmdBackupName = backupCmd.Arg("backup name", fmt.Sprintf("Name of backup. Will be dumped to %s", path.Join(config.Agent.CacheDir, "{name-of-backup}.tar.gz"))).Required().String()
+	backupCmd          = app.Command("backup", "Manage container backups")
+	backupCmdContainer = backupCmd.Arg("container", "container to backup").Required().String()
+	backupCmdDestDir   = backupCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
 
 	cdnCmd               = app.Command("cdn", "Download/upload files from/to CDN")
 	cdnDownloadCmd       = cdnCmd.Command("get", "Download file")
@@ -472,7 +471,7 @@ func main() {
 		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
 
 	case backupCmd.FullCommand():
-		cli.BackupContainer(*backupCmdContainer, *backupCmdBackupName)
+		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
 
 	case cdnDownloadCmd.FullCommand():
 		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)

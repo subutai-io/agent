@@ -13,14 +13,16 @@ import (
 
 //todo move functionality to lib and here delegate there
 
-func BackupContainer(containerName, backupName string) {
+func BackupContainer(containerName, destDir string) {
 
-	backupName = strings.TrimSpace(backupName)
 	containerName = strings.TrimSpace(containerName)
+	destDir = strings.TrimSpace(destDir)
 
-	checkArgument(backupName != "", "Invalid backup name")
+	checkArgument(containerName != "", "Invalid container name")
+	checkArgument(destDir != "", "Invalid backup name")
 
 	checkState(container.IsContainer(containerName), "Container %s not found", containerName)
+	checkState(fs.FileExists(destDir), "Destination directory %s not found", destDir)
 
 	if container.State(containerName) == container.Running {
 		LxcStop(containerName)
@@ -34,7 +36,7 @@ func BackupContainer(containerName, backupName string) {
 	cleanupFS(path.Join(src, "/var/tmp"), 0775)
 
 	//create deltas
-	dst := path.Join(config.Agent.CacheDir, backupName)
+	dst := path.Join(destDir, containerName)
 	os.MkdirAll(dst, 0755)
 	os.MkdirAll(dst+"/deltas", 0755)
 
