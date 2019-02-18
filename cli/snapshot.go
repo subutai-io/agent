@@ -25,7 +25,7 @@ func CreateSnapshot(container, partition, label string, stopContainer bool) {
 	// check that container exists
 	checkState(container2.IsContainer(container), "Container %s not found", container)
 	// check that snapshot with such label does not exist
-	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
+	snapshot := getSnapshotName(container, partition, label)
 	checkState(!fs.DatasetExists(snapshot), "Snapshot %s already exists", snapshot)
 
 	if stopContainer {
@@ -56,7 +56,7 @@ func RemoveSnapshot(container, partition, label string) {
 	// check that container exists
 	checkState(container2.IsContainer(container), "Container %s not found", container)
 	// check that snapshot with such label exists
-	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
+	snapshot := getSnapshotName(container, partition, label)
 	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
 
 	err := fs.RemoveDataset(snapshot, false)
@@ -87,6 +87,9 @@ func ListSnapshots(container, partition string) string {
 				break
 			}
 		}
+		if partition == "parent" {
+			partitionFound = true
+		}
 		checkArgument(partitionFound, "Invalid partition %s", partition)
 	}
 
@@ -116,7 +119,7 @@ func ListSnapshots(container, partition string) string {
 
 	} else {
 		if partition != "" {
-			out, err = fs.ListSnapshots(fmt.Sprintf("%s/%s", container, partition))
+			out, err = fs.ListSnapshots(getSnapshotName(container, partition, ""))
 		} else {
 			out, err = fs.ListSnapshots(container)
 		}
@@ -145,7 +148,7 @@ func RollbackToSnapshot(container, partition, label string, stopContainer bool) 
 	// check that container exists
 	checkState(container2.IsContainer(container), "Container %s not found", container)
 	// check that snapshot with such label exists
-	snapshot := fmt.Sprintf("%s/%s@%s", container, partition, label)
+	snapshot := getSnapshotName(container, partition, label)
 	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
 
 	if stopContainer {
@@ -161,6 +164,22 @@ func RollbackToSnapshot(container, partition, label string, stopContainer bool) 
 	})
 }
 
+func getSnapshotName(container, partition, label string) string {
+	if label == "" {
+		if partition == "parent" {
+			return fmt.Sprintf("%s", container)
+		} else {
+			return fmt.Sprintf("%s/%s", container, partition)
+		}
+	} else {
+		if partition == "parent" {
+			return fmt.Sprintf("%s@%s", container, label)
+		} else {
+			return fmt.Sprintf("%s/%s@%s", container, partition, label)
+		}
+	}
+}
+
 func checkPartitionName(partition string) {
 	checkArgument(partition != "", "Invalid container partition")
 	partitionFound := false
@@ -169,6 +188,10 @@ func checkPartitionName(partition string) {
 			partitionFound = true
 			break
 		}
+	}
+
+	if partition == "parent" {
+		partitionFound = true
 	}
 	checkArgument(partitionFound, "Invalid partition %s", partition)
 }
