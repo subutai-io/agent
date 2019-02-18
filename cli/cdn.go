@@ -13,11 +13,15 @@ import (
 	"time"
 	"path"
 	"gopkg.in/cheggaaa/pb.v1"
+	"mime/multipart"
+	"os"
+	"io"
+	"sync"
+	"net/http"
+	"path/filepath"
 )
 
 func DownloadRawFile(id, destDir string) error {
-
-	//todo
 
 	id = strings.TrimSpace(id)
 	destDir = strings.TrimSpace(destDir)
@@ -124,7 +128,81 @@ Loop:
 
 func UploadRawFile(filePath, cdnToken string) error {
 
-	//todo
+	filePath = strings.TrimSpace(filePath)
+	cdnToken = strings.TrimSpace(cdnToken)
+
+	checkArgument(filePath != "", "Invalid file path")
+	checkArgument(cdnToken != "", "Invalid token")
+	checkState(fs.FileExists(filePath), "File %s not found", filePath)
+
+	out, err := uploadFile(filePath, cdnToken)
+	log.Check(log.ErrorLevel, "Uploading file "+filePath, err)
+
+	log.Info("File " + filepath.Base(filePath) + " uploaded to CDN:\n" + out)
 
 	return nil
+}
+
+func uploadFile(filePath, token string) (string, error) {
+
+	file, err := os.Open(filePath)
+	if log.Check(log.DebugLevel, "Opening file for upload", err) {
+		return "", err
+	}
+	defer file.Close()
+
+	fStat, err := file.Stat()
+	if log.Check(log.DebugLevel, "Getting file size", err) {
+		return "", err
+	}
+
+	bar := pb.New64(fStat.Size()).SetUnits(pb.U_BYTES).SetRefreshRate(time.Millisecond * 10)
+	bar.Start()
+	defer bar.Finish()
+
+	r, w := io.Pipe()
+	mpw := multipart.NewWriter(w)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	//feed file in a routine
+	go func() {
+		var part io.Writer
+		defer wg.Done()
+		defer bar.Finish()
+		defer file.Close()
+		defer w.Close()
+
+		if err = mpw.WriteField("token", token); err != nil {
+			w.CloseWithError(err)
+		}
+
+		if part, err = mpw.CreateFormFile("file", fStat.Name()); err != nil {
+			w.CloseWithError(err)
+		}
+		part = io.MultiWriter(part, bar)
+		if _, err = io.Copy(part, file); err != nil {
+			w.CloseWithError(err)
+		}
+		if err = mpw.Close(); err != nil {
+			w.CloseWithError(err)
+		}
+	}()
+
+	resp, err := http.Post(config.CdnUrl+"/raw/upload", mpw.FormDataContentType(), r)
+
+	wg.Wait()
+
+	if log.Check(log.DebugLevel, "Checking upload status", err) {
+		return "", err
+	}
+	defer util.Close(resp)
+
+	out, err := ioutil.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP status: %s; %s; %v", resp.Status, out, err)
+	}
+
+	return string(out), nil
 }

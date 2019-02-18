@@ -477,6 +477,9 @@ func main() {
 	case cdnDownloadCmd.FullCommand():
 		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)
 
+	case cdnUploadCmd.FullCommand():
+		cli.UploadRawFile(*cdnUploadCmdFile, *cndUploadCmdToken)
+
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
 
