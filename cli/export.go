@@ -164,7 +164,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	//archive template contents
 	templateArchive := dst + ".tar.gz"
 	fs.Compress(dst, templateArchive)
-	log.Check(log.FatalLevel, "Removing temporary file", os.RemoveAll(dst))
+	log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
 	//generate template metadata

@@ -473,6 +473,9 @@ func Clone(parent, child, backupFile string) error {
 			}
 		}
 
+		//remove decompressed backup folder
+		log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(dest))
+
 	} else {
 
 		//create partitions
