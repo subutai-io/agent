@@ -18,7 +18,9 @@ func CreateSnapshot(container, partition, label string, stopContainer bool) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	checkPartitionName(partition)
+	if partition != "all" {
+		checkPartitionName(partition)
+	}
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -36,7 +38,7 @@ func CreateSnapshot(container, partition, label string, stopContainer bool) {
 	}
 
 	// create snapshot
-	err := fs.CreateSnapshot(snapshot)
+	err := fs.CreateSnapshot(snapshot, partition == "all")
 	checkCondition(err == nil, func() {
 		log.Error("Failed to create snapshot ", err.Error())
 	})
@@ -172,7 +174,7 @@ func getSnapshotName(container, partition, label string) string {
 			return fmt.Sprintf("%s/%s", container, partition)
 		}
 	} else {
-		if partition == "parent" {
+		if partition == "parent" || partition == "all" {
 			return fmt.Sprintf("%s@%s", container, label)
 		} else {
 			return fmt.Sprintf("%s/%s@%s", container, partition, label)

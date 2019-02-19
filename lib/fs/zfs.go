@@ -111,8 +111,13 @@ func RollbackToSnapshot(snapshot string) error {
 
 // Creates snapshot
 // e.g. CreateSnapshot("foo/rootfs@now")
-func CreateSnapshot(snapshot string) error {
-	out, err := exec.Execute("zfs", "snapshot", path.Join(zfsRootDataset, snapshot))
+func CreateSnapshot(snapshot string, recursive bool) error {
+	args := []string{"snapshot"}
+	if recursive {
+		args = append(args, "-r")
+	}
+	args = append(args, path.Join(zfsRootDataset, snapshot))
+	out, err := exec.Execute("zfs", args...)
 	if err != nil {
 		return errors.Errorf("Error creating snapshot %s: %s %s", snapshot, out, err.Error())
 	}

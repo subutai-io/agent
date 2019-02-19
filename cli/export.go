@@ -117,7 +117,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 		}
 		// snapshot each partition
 		snapshot := name + "/" + vol + "@now"
-		err := fs.CreateSnapshot(snapshot)
+		err := fs.CreateSnapshot(snapshot, false)
 		log.Check(log.ErrorLevel, "Creating snapshot "+snapshot, err)
 
 		// send incremental delta between parent and child to delta file

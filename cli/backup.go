@@ -53,7 +53,7 @@ func BackupContainer(containerName, destDir string) {
 			fs.RemoveDataset(snapshot, false)
 		}
 		// snapshot each partition
-		err := fs.CreateSnapshot(snapshot)
+		err := fs.CreateSnapshot(snapshot, false)
 		log.Check(log.ErrorLevel, "Creating snapshot "+snapshot, err)
 
 		// send incremental delta between parent and child to delta file
