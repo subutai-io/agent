@@ -13,11 +13,9 @@ import (
 // Update operation can be divided into two different types: container updates and Resource Host updates.
 //
 // Container updates simply perform apt-get update and upgrade operations inside target containers without any extra commands.
-// Since SS Management is just another container, the Subutai update command works fine with the management container too.
+// Since Management Console is just another container, the Subutai update command works fine with the management container too.
 //
-// The second type of update, a Resource Host update, checks the Ubuntu Store and compares available snap packages with those currently installed in the system and,
-// if a newer version is found, installs it. Please note, system security policies requires that such commands should be performed by the superuser manually,
-// otherwise an application's attempt to update itself will be blocked.
+// The second type of update, a Resource Host update, is done in the same way using apt-get update and upgrade operations.
 func Update(name string, check bool) {
 	lock, err := common.LockFile(name, "update")
 	if err != nil {
