@@ -57,12 +57,13 @@ var (
 	/*
 	subutai clone master foo [-e {env-id} -n {net-settings} -s {secret}]
 	*/
-	cloneCmd       = app.Command("clone", "Create Subutai container")
-	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
-	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
-	cloneEnvId     = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
-	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
-	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
+	cloneCmd        = app.Command("clone", "Create Subutai container")
+	cloneTemplate   = cloneCmd.Arg("template", "source template").Required().String()
+	cloneContainer  = cloneCmd.Arg("container", "container name").Required().String()
+	cloneEnvId      = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
+	cloneNetwork    = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret     = cloneCmd.Flag("secret", "console secret").Short('s').String()
+	cloneBackupFile = cloneCmd.Flag("backup", "Backup file to restore container from").Short('b').String()
 
 	//cleanup command
 	/*
@@ -246,31 +247,46 @@ var (
 	stopCmd          = app.Command("stop", "Stop Subutai container")
 	stopCmdContainer = stopCmd.Arg("name(s)", "container name(s)").Required().Strings()
 
+	//snapshot command
 	snapshotCmd                = app.Command("snapshot", "Manage container snapshots").Alias("snap")
 	snapshotCreateCmd          = snapshotCmd.Command("create", "Create snapshot").Alias("add")
 	snapshotCreateCmdContainer = snapshotCreateCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotCreateCmdPartition = snapshotCreateCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
 	snapshotCreateCmdLabel = snapshotCreateCmd.Flag("label", "snapshot label").Short('l').Required().String()
 	snapshotCreateCmdStop  = snapshotCreateCmd.Flag("stop", "stop container when doing snapshot").Short('s').Bool()
 
 	snapshotRemoveCmd          = snapshotCmd.Command("remove", "Remove snapshot").Alias("rm").Alias("del")
 	snapshotRemoveCmdContainer = snapshotRemoveCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotRemoveCmdPartition = snapshotRemoveCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
 	snapshotRemoveCmdLabel = snapshotRemoveCmd.Flag("label", "snapshot label").Short('l').Required().String()
 
 	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
 	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').String()
 	snapshotListCmdPartition = snapshotListCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
+		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').String()
 
 	snapshotRollbackCmd          = snapshotCmd.Command("rollback", "Rollback to snapshot").Alias("rb")
 	snapshotRollBackCmdContainer = snapshotRollbackCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotRollbackCmdPartition = snapshotRollbackCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home]").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
 	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
+
+	//backup command
+	backupCmd          = app.Command("backup", "Manage container backups")
+	backupCmdContainer = backupCmd.Arg("container", "container to backup").Required().String()
+	backupCmdDestDir   = backupCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+
+	cdnCmd               = app.Command("cdn", "Download/upload files from/to CDN")
+	cdnDownloadCmd       = cdnCmd.Command("get", "Download file")
+	cdnDownloadCmdId     = cdnDownloadCmd.Arg("id", "Id of file on CDN").Required().String()
+	cdnDowloadCmdDestDir = cdnDownloadCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+
+	cdnUploadCmd      = cdnCmd.Command("put", "Upload file")
+	cdnUploadCmdFile  = cdnUploadCmd.Flag("file", "path to file to upload").Short('f').Required().String()
+	cndUploadCmdToken = cdnUploadCmd.Flag("token", "CDN token").Short('t').Required().String()
 
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
@@ -355,7 +371,7 @@ func main() {
 	case attachCmd.FullCommand():
 		cli.LxcAttach(*attachName, *attachCommand)
 	case cloneCmd.FullCommand():
-		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
+		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret, *cloneBackupFile)
 	case cleanupCmd.FullCommand():
 		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():
@@ -454,6 +470,15 @@ func main() {
 
 	case snapshotRollbackCmd.FullCommand():
 		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
+
+	case backupCmd.FullCommand():
+		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
+
+	case cdnDownloadCmd.FullCommand():
+		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)
+
+	case cdnUploadCmd.FullCommand():
+		cli.UploadRawFile(*cdnUploadCmdFile, *cndUploadCmdToken)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))

@@ -117,7 +117,7 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 		}
 		// snapshot each partition
 		snapshot := name + "/" + vol + "@now"
-		err := fs.CreateSnapshot(snapshot)
+		err := fs.CreateSnapshot(snapshot, false)
 		log.Check(log.ErrorLevel, "Creating snapshot "+snapshot, err)
 
 		// send incremental delta between parent and child to delta file
@@ -127,7 +127,6 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 
 	//copy config files
 	src := path.Join(config.Agent.LxcPrefix, name)
-	log.Check(log.ErrorLevel, "Copying fstab file", fs.Copy(src+"/fstab", dst+"/fstab"))
 	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(src+"/config", dst+"/config"))
 
 	//update template config
@@ -161,16 +160,11 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	if container.State(name) != container.Running {
 		LxcStart(name)
 	}
-	pkgCmdResult, _ := container.AttachExec(name, []string{"timeout", "60", "dpkg", "-l"})
-	strCmdRes := strings.Join(pkgCmdResult, "\n")
-	log.Check(log.FatalLevel, "Write packages",
-		ioutil.WriteFile(dst+"/packages",
-			[]byte(strCmdRes), 0755))
 
 	//archive template contents
 	templateArchive := dst + ".tar.gz"
 	fs.Compress(dst, templateArchive)
-	log.Check(log.FatalLevel, "Removing temporary file", os.RemoveAll(dst))
+	log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(dst))
 	log.Info(name + " exported to " + templateArchive)
 
 	//generate template metadata
