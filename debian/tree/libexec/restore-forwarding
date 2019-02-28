@@ -9,7 +9,7 @@ function checkNRestore(){
     MISSING_IPS=()
 
     # iterate over IPs of running containers
-    for containerIp in `subutai list i | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+    for containerIp in `subutai list i | grep -e 'RUNNING.*172.' | tr -s [:blank:] | cut -f3` ; do
 
         MISSING=1
 
@@ -56,7 +56,7 @@ IFS='
         MISSING=1
 
         # iterate over IPs of running containers to figure out which rules are obsolete
-        for containerIp in `subutai list i | grep RUNNING | tr -s [:blank:] | grep -v "management" | cut -f3` ; do
+        for containerIp in `subutai list i | grep -e 'RUNNING.*172.' | tr -s [:blank:] | cut -f3` ; do
 
             if [ -z "${rule##*$containerIp*}" ] ;then
 
