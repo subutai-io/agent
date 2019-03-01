@@ -18,9 +18,7 @@ func CreateSnapshot(container, partition, label string, stopContainer bool) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	if partition != "all" {
-		checkPartitionName(partition)
-	}
+	checkPartitionName(partition)
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -51,9 +49,7 @@ func RemoveSnapshot(container, partition, label string) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	if partition != "all" {
-		checkPartitionName(partition)
-	}
+	checkPartitionName(partition)
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -84,17 +80,7 @@ func ListSnapshots(container, partition string) string {
 	}
 
 	if partition != "" {
-		partitionFound := false
-		for _, vol := range fs.ChildDatasets {
-			if vol == partition {
-				partitionFound = true
-				break
-			}
-		}
-		if partition == "config" {
-			partitionFound = true
-		}
-		checkArgument(partitionFound, "Invalid partition %s", partition)
+		checkPartitionName(partition)
 	}
 
 	var out string
@@ -138,7 +124,6 @@ func ListSnapshots(container, partition string) string {
 	return out
 }
 
-//todo add recursive
 func RollbackToSnapshot(container, partition, label string, forceRollback, stopContainer bool) {
 	container = strings.TrimSpace(container)
 	partition = strings.ToLower(strings.TrimSpace(partition))
@@ -163,10 +148,34 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 		}
 	}
 
-	err := fs.RollbackToSnapshot(snapshot, forceRollback)
-	checkCondition(err == nil, func() {
-		log.Error("Failed to rollback to snapshot", err.Error())
-	})
+	if partition == "all" {
+		//perform recursive rollback
+		out, err := fs.ListSnapshotNamesOnly(container)
+		checkCondition(err == nil, func() {
+			log.Error("Failed to list snapshots", err.Error())
+
+		})
+
+		//destroy child snapshots
+		snapshots := strings.Split(out, "\n")
+		for _, snapshot := range snapshots {
+			snapshot = strings.TrimSpace(strings.TrimPrefix(snapshot, config.Agent.Dataset))
+			if snapshot != "" && strings.HasSuffix(snapshot, "@"+label) {
+				err = fs.RollbackToSnapshot(snapshot, forceRollback)
+				checkCondition(err == nil, func() {
+					log.Error("Failed to rollback to snapshot", err.Error())
+				})
+			}
+		}
+
+	} else {
+
+		err := fs.RollbackToSnapshot(snapshot, forceRollback)
+		checkCondition(err == nil, func() {
+			log.Error("Failed to rollback to snapshot", err.Error())
+		})
+	}
+
 }
 
 func getSnapshotName(container, partition, label string) string {
@@ -195,7 +204,7 @@ func checkPartitionName(partition string) {
 		}
 	}
 
-	if partition == "config" {
+	if partition == "config" || partition == "all" {
 		partitionFound = true
 	}
 	checkArgument(partitionFound, "Invalid partition %s", partition)
