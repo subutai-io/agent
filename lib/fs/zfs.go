@@ -83,7 +83,7 @@ func CreateDataset(dataset string) error {
 // Lists snapshots for dataset
 // Returns output of `zfs list -t snapshot -r {root}/{dataset}` command
 func ListSnapshots(dataset string) (string, error) {
-	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-r", path.Join(zfsRootDataset, dataset))
+	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-o", "name,creation", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
