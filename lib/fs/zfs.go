@@ -93,7 +93,7 @@ func ListSnapshots(dataset string) (string, error) {
 // Lists snapshots names only for dataset
 // Returns output of `zfs list -t snapshot -H -t snapshot -r {dataset} | awk '{print $1}'` command
 func ListSnapshotNamesOnly(dataset string) (string, error) {
-	out, err := exec.ExecuteWithBash("zfs list -H -t snapshot -r " + path.Join(zfsRootDataset, dataset) + " | awk '{print $1}'")
+	out, err := exec.Execute("zfs", "list", "-H", "-t", "snapshot", "-o", "name", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
