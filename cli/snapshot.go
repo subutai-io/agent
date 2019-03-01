@@ -51,7 +51,9 @@ func RemoveSnapshot(container, partition, label string) {
 
 	checkArgument(container != "", "Invalid container name")
 
-	checkPartitionName(partition)
+	if partition != "all" {
+		checkPartitionName(partition)
+	}
 
 	checkArgument(label != "", "Invalid snapshot label")
 
@@ -61,7 +63,7 @@ func RemoveSnapshot(container, partition, label string) {
 	snapshot := getSnapshotName(container, partition, label)
 	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
 
-	err := fs.RemoveDataset(snapshot, false)
+	err := fs.RemoveDataset(snapshot, partition == "all")
 	checkCondition(err == nil, func() {
 		log.Error("Failed to remove snapshot ", err.Error())
 	})
@@ -136,6 +138,7 @@ func ListSnapshots(container, partition string) string {
 	return out
 }
 
+//todo add recursive
 func RollbackToSnapshot(container, partition, label string, forceRollback, stopContainer bool) {
 	container = strings.TrimSpace(container)
 	partition = strings.ToLower(strings.TrimSpace(partition))
