@@ -100,9 +100,14 @@ func ListSnapshotNamesOnly(dataset string) (string, error) {
 	return out, nil
 }
 
-//Rollbacks parent dataset to the specified snapshot
-func RollbackToSnapshot(snapshot string) error {
-	out, err := exec.Execute("zfs", "rollback", path.Join(zfsRootDataset, snapshot))
+// Rollbacks parent dataset to the specified snapshot
+func RollbackToSnapshot(snapshot string, forceRollback bool) error {
+	args := []string{"rollback"}
+	if forceRollback {
+		args = append(args, "-r")
+	}
+	args = append(args, path.Join(zfsRootDataset, snapshot))
+	out, err := exec.Execute("zfs", args...)
 	if err != nil {
 		return errors.Errorf("Error rolling back to snapshot %s: %s %s", snapshot, out, err.Error())
 	}

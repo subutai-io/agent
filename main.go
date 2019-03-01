@@ -252,27 +252,28 @@ var (
 	snapshotCreateCmd          = snapshotCmd.Command("create", "Create snapshot").Alias("add")
 	snapshotCreateCmdContainer = snapshotCreateCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotCreateCmdPartition = snapshotCreateCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|config]").Short('p').Required().String()
 	snapshotCreateCmdLabel = snapshotCreateCmd.Flag("label", "snapshot label").Short('l').Required().String()
 	snapshotCreateCmdStop  = snapshotCreateCmd.Flag("stop", "stop container when doing snapshot").Short('s').Bool()
 
 	snapshotRemoveCmd          = snapshotCmd.Command("remove", "Remove snapshot").Alias("rm").Alias("del")
 	snapshotRemoveCmdContainer = snapshotRemoveCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotRemoveCmdPartition = snapshotRemoveCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|config]").Short('p').Required().String()
 	snapshotRemoveCmdLabel = snapshotRemoveCmd.Flag("label", "snapshot label").Short('l').Required().String()
 
 	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
 	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').String()
 	snapshotListCmdPartition = snapshotListCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').String()
+		"partition", "container partition [rootfs|var|opt|home|config]").Short('p').String()
 
 	snapshotRollbackCmd          = snapshotCmd.Command("rollback", "Rollback to snapshot").Alias("rb")
 	snapshotRollBackCmdContainer = snapshotRollbackCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotRollbackCmdPartition = snapshotRollbackCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home|parent], parent is for parent dataset").Short('p').Required().String()
+		"partition", "container partition [rootfs|var|opt|home|config]").Short('p').Required().String()
 	snapshotRollbackCmdLabel = snapshotRollbackCmd.Flag("label", "snapshot label").Short('l').Required().String()
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
+	snapshotRollbackCmdForce = snapshotRollbackCmd.Flag("force", "force rollback which will remove more recent snapshots if any").Short('f').Bool()
 
 	//backup command
 	backupCmd          = app.Command("backup", "Manage container backups")
@@ -469,7 +470,7 @@ func main() {
 		fmt.Println(cli.ListSnapshots(*snapshotListCmdContainer, *snapshotListCmdPartition))
 
 	case snapshotRollbackCmd.FullCommand():
-		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdStop)
+		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdForce, *snapshotRollbackCmdStop)
 
 	case backupCmd.FullCommand():
 		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
