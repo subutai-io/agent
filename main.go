@@ -265,7 +265,7 @@ var (
 	snapshotListCmd          = snapshotCmd.Command("list", "List snapshots").Alias("ls")
 	snapshotListCmdContainer = snapshotListCmd.Flag("container", "container name").Short('c').String()
 	snapshotListCmdPartition = snapshotListCmd.Flag(
-		"partition", "container partition [rootfs|var|opt|home|config]").Short('p').String()
+		"partition", "container partition [rootfs|var|opt|home]").Short('p').String()
 
 	snapshotRollbackCmd          = snapshotCmd.Command("rollback", "Rollback to snapshot").Alias("rb")
 	snapshotRollBackCmdContainer = snapshotRollbackCmd.Flag("container", "container name").Short('c').Required().String()
