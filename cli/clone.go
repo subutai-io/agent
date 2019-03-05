@@ -27,11 +27,10 @@ var (
 // LxcClone function creates new `child` container from a Subutai `parent` template.
 //
 // If the specified template argument is not deployed in system, Subutai first tries to import it, and if import succeeds, it then continues to clone from the imported template image.
-// By default, clone will use the NAT-ed network interface with IP address received from the Subutai DHCP server, but this behavior can be changed with command options described below.
 //
-// If `-i` option is defined, separate bridge interface will be created in specified VLAN and new container will receive static IP address.
+// If `-n` option is defined, separate bridge interface will be created in specified VLAN and new container will receive the specified static IP address.
 // Option `-e` writes the environment ID string inside new container.
-// Option `-t` is intended to check the origin of new container creation request during environment build.
+// Option `-s` is intended to check the origin of new container creation request during environment build.
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
