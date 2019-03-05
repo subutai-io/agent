@@ -83,7 +83,7 @@ func CreateDataset(dataset string) error {
 // Lists snapshots for dataset
 // Returns output of `zfs list -t snapshot -r {root}/{dataset}` command
 func ListSnapshots(dataset string) (string, error) {
-	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-r", path.Join(zfsRootDataset, dataset))
+	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-o", "name,creation", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
@@ -93,16 +93,21 @@ func ListSnapshots(dataset string) (string, error) {
 // Lists snapshots names only for dataset
 // Returns output of `zfs list -t snapshot -H -t snapshot -r {dataset} | awk '{print $1}'` command
 func ListSnapshotNamesOnly(dataset string) (string, error) {
-	out, err := exec.ExecuteWithBash("zfs list -H -t snapshot -r " + path.Join(zfsRootDataset, dataset) + " | awk '{print $1}'")
+	out, err := exec.Execute("zfs", "list", "-H", "-t", "snapshot", "-o", "name", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
 	return out, nil
 }
 
-//Rollbacks parent dataset to the specified snapshot
-func RollbackToSnapshot(snapshot string) error {
-	out, err := exec.Execute("zfs", "rollback", path.Join(zfsRootDataset, snapshot))
+// Rollbacks parent dataset to the specified snapshot
+func RollbackToSnapshot(snapshot string, forceRollback bool) error {
+	args := []string{"rollback"}
+	if forceRollback {
+		args = append(args, "-r")
+	}
+	args = append(args, path.Join(zfsRootDataset, snapshot))
+	out, err := exec.Execute("zfs", args...)
 	if err != nil {
 		return errors.Errorf("Error rolling back to snapshot %s: %s %s", snapshot, out, err.Error())
 	}
