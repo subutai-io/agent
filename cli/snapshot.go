@@ -8,6 +8,7 @@ import (
 	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/config"
 	"path"
+	"os"
 )
 
 func CreateSnapshot(container, partition, label string, stopContainer bool) {
@@ -176,6 +177,64 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 		})
 	}
 
+}
+
+func SendSnapshot(container, destDir string, labels ... string) {
+	container = strings.TrimSpace(container)
+	checkArgument(container != "", "Invalid container name")
+	checkState(container2.IsContainer(container), "Container %s not found", container)
+
+	destDir = strings.TrimSpace(destDir)
+	checkArgument(destDir != "", "Invalid destination directory")
+	checkState(fs.FileExists(destDir), "Destination directory %s not found", destDir)
+
+	checkArgument(len(labels) == 1 || len(labels) == 2, "Invalid number of snapshot labels")
+	for _, label := range labels {
+		checkArgument(label != "", "Invalid snapshot label")
+	}
+	partitions := append(fs.ChildDatasets, "config")
+	for _, label := range labels {
+		for _, partition := range partitions {
+
+			// check that snapshot with such label exists
+			snapshot := getSnapshotName(container, partition, label)
+			checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
+		}
+	}
+
+	// create dump file
+	parts := []string{container}
+	parts = append(parts, labels...)
+	targetDir := path.Join(destDir, strings.Join(parts, "_"))
+	os.MkdirAll(targetDir, 0755)
+
+	parent := container2.GetProperty(container, "subutai.parent")
+	parentOwner := container2.GetProperty(container, "subutai.parent.owner")
+	parentVersion := container2.GetProperty(container, "subutai.parent.version")
+	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
+
+	for _, partition := range partitions {
+		var err error
+		if len(labels) == 1 {
+
+			// send incremental delta between parent and child to delta file
+			err = fs.SendStream(getSnapshotName(parentRef, partition, "now"),
+				getSnapshotName(container, partition, labels[0]), path.Join(targetDir, partition+".delta"))
+		} else {
+			// send incremental delta between parent and child to delta file
+			err = fs.SendStream(getSnapshotName(container, partition, labels[0]),
+				getSnapshotName(container, partition, labels[1]), path.Join(targetDir, partition+".delta"))
+		}
+
+		log.Check(log.ErrorLevel, "Sending stream for partition "+partition, err)
+
+	}
+
+	//archive template contents
+	targetFile := targetDir + ".tar.gz"
+	fs.Compress(targetDir, targetFile)
+	log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(targetDir))
+	log.Info(container + " snapshots got dumped to " + targetFile)
 }
 
 func getSnapshotName(container, partition, label string) string {
