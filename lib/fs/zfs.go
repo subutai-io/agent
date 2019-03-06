@@ -142,8 +142,12 @@ func CloneSnapshot(snapshot, dataset string) error {
 
 // Receives delta file to dataset
 // e.g. ReceiveStream("foo/rootfs", "/tmp/rootfs.delta")
-func ReceiveStream(dataset string, delta string) error {
-	out, err := exec.ExecuteWithBash("zfs receive " + path.Join(zfsRootDataset, dataset) + " < " + delta)
+func ReceiveStream(dataset, delta string, force bool) error {
+	cmd := "zfs receive " + path.Join(zfsRootDataset, dataset) + " < " + delta
+	if force {
+		cmd += " -F"
+	}
+	out, err := exec.ExecuteWithBash(cmd)
 	if err != nil {
 		errors.Errorf("Error receiving stream from %s to %s: %s %s", delta, dataset, out, err.Error())
 	}

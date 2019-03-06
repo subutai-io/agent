@@ -456,7 +456,7 @@ func Clone(parent, child, backupFile string) error {
 		//receive deltas
 		for _, dataset := range fs.ChildDatasets {
 
-			err = fs.ReceiveStream(path.Join(child, dataset), path.Join(dest, "deltas", dataset+".delta"))
+			err = fs.ReceiveStream(path.Join(child, dataset), path.Join(dest, "deltas", dataset+".delta"), false)
 			if err != nil {
 				return err
 			}

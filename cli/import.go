@@ -555,19 +555,19 @@ func install(templateName string) error {
 		return err
 	}
 	// create partitions
-	err = fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"))
+	err = fs.ReceiveStream(templateName+"/rootfs", path.Join(pathToDecompressedTemplate, "deltas", "rootfs.delta"), false)
 	if err != nil {
 		return err
 	}
-	err = fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"))
+	err = fs.ReceiveStream(templateName+"/home", path.Join(pathToDecompressedTemplate, "deltas", "home.delta"), false)
 	if err != nil {
 		return err
 	}
-	err = fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"))
+	err = fs.ReceiveStream(templateName+"/var", path.Join(pathToDecompressedTemplate, "deltas", "var.delta"), false)
 	if err != nil {
 		return err
 	}
-	err = fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"))
+	err = fs.ReceiveStream(templateName+"/opt", path.Join(pathToDecompressedTemplate, "deltas", "opt.delta"), false)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/subutai-io/agent/config"
 	"path"
 	"os"
+	"path/filepath"
 )
 
 func CreateSnapshot(container, partition, label string, stopContainer bool) {
@@ -179,7 +180,7 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 
 }
 
-func SendSnapshot(container, destDir string, labels ... string) {
+func SendContainerSnapshots(container, destDir string, labels ... string) {
 	container = strings.TrimSpace(container)
 	checkArgument(container != "", "Invalid container name")
 	checkState(container2.IsContainer(container), "Container %s not found", container)
@@ -192,9 +193,8 @@ func SendSnapshot(container, destDir string, labels ... string) {
 	for _, label := range labels {
 		checkArgument(label != "", "Invalid snapshot label")
 	}
-	partitions := append(fs.ChildDatasets, "config")
 	for _, label := range labels {
-		for _, partition := range partitions {
+		for _, partition := range fs.ChildDatasets {
 
 			// check that snapshot with such label exists
 			snapshot := getSnapshotName(container, partition, label)
@@ -213,7 +213,7 @@ func SendSnapshot(container, destDir string, labels ... string) {
 	parentVersion := container2.GetProperty(container, "subutai.parent.version")
 	parentRef := strings.Join([]string{parent, parentOwner, parentVersion}, ":")
 
-	for _, partition := range partitions {
+	for _, partition := range fs.ChildDatasets {
 		var err error
 		if len(labels) == 1 {
 
@@ -221,7 +221,7 @@ func SendSnapshot(container, destDir string, labels ... string) {
 			err = fs.SendStream(getSnapshotName(parentRef, partition, "now"),
 				getSnapshotName(container, partition, labels[0]), path.Join(targetDir, partition+".delta"))
 		} else {
-			// send incremental delta between parent and child to delta file
+			// send incremental delta between two child snapshots to delta file
 			err = fs.SendStream(getSnapshotName(container, partition, labels[0]),
 				getSnapshotName(container, partition, labels[1]), path.Join(targetDir, partition+".delta"))
 		}
@@ -230,11 +230,61 @@ func SendSnapshot(container, destDir string, labels ... string) {
 
 	}
 
+	//copy config file
+	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(path.Join(config.Agent.LxcPrefix, container, "config"), path.Join(targetDir, "config")))
+
 	//archive template contents
 	targetFile := targetDir + ".tar.gz"
 	fs.Compress(targetDir, targetFile)
 	log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(targetDir))
 	log.Info(container + " snapshots got dumped to " + targetFile)
+}
+
+func ReceiveContainerSnapshots(container, sourceFile string) {
+	container = strings.TrimSpace(container)
+	checkArgument(container != "", "Invalid container name")
+
+	sourceFile = strings.TrimSpace(sourceFile)
+	checkArgument(sourceFile != "", "Invalid path to snapshots file")
+	checkState(fs.FileExists(sourceFile), "File %s not found", sourceFile)
+
+	//extract archive file
+	dest := path.Join(config.Agent.CacheDir, getFileName(sourceFile))
+	log.Check(log.ErrorLevel, "Decompressing snapshots file", fs.Decompress(sourceFile, dest))
+
+	//check presence of all deltas
+	for _, partition := range fs.ChildDatasets {
+		checkState(fs.FileExists(path.Join(dest, partition+".delta")), "Snapshot file for partition %s not found", partition)
+	}
+	//check presence of config file
+	checkState(fs.FileExists(path.Join(dest, "config")), "Config file not found")
+
+	//precreate parent dataset if not exists
+	if !fs.DatasetExists(container) {
+		fs.CreateDataset(container)
+	}
+
+	//receive snapshots
+	for _, partition := range fs.ChildDatasets {
+
+		err := fs.ReceiveStream(path.Join(container, partition), path.Join(dest, partition+".delta"), true)
+		log.Check(log.ErrorLevel, "Receiving snapshots for partition "+partition, err)
+
+	}
+
+	//copy config file
+	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(path.Join(dest, "config"), path.Join(config.Agent.LxcPrefix, container, "config")))
+
+	//remove decompressed archive folder
+	log.Check(log.WarnLevel, "Removing temporary directory", os.RemoveAll(dest))
+}
+
+func getFileName(filePath string) string {
+	file := filepath.Base(filePath)
+	for i := 0; i < 3; i++ {
+		file = strings.TrimSuffix(file, filepath.Ext(file))
+	}
+	return file
 }
 
 func getSnapshotName(container, partition, label string) string {

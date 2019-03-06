@@ -273,10 +273,14 @@ var (
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
 	snapshotRollbackCmdForce = snapshotRollbackCmd.Flag("force", "force rollback which will remove more recent snapshots if any").Short('f').Bool()
 
-	snapshotSendCmd            = snapshotCmd.Command("send", "Dump snapshot to file")
+	snapshotSendCmd            = snapshotCmd.Command("send", "Send snapshots to archive file")
 	snapshotSendCmdContainer   = snapshotSendCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotSendCmdSnapshots   = snapshotSendCmd.Flag("label(s)", "snapshot label(s). You can specify up to 2 labels separated by space").Short('l').Required().String()
 	snapshotSendCmdDestination = snapshotSendCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+
+	snapshotReceiveCmd          = snapshotCmd.Command("receive", "Receive snapshots from a file").Alias("recv")
+	snapshotReceiveCmdContainer = snapshotReceiveCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotReceiveCmdFile      = snapshotReceiveCmd.Flag("file", "path to archive file containing snapshots").Short('f').Required().String()
 
 	//todo remove
 	//backup command
@@ -477,7 +481,10 @@ func main() {
 		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdForce, *snapshotRollbackCmdStop)
 
 	case snapshotSendCmd.FullCommand():
-		cli.SendSnapshot(*snapshotSendCmdContainer, *snapshotSendCmdDestination, strings.Split(*snapshotSendCmdSnapshots, ",")...)
+		cli.SendContainerSnapshots(*snapshotSendCmdContainer, *snapshotSendCmdDestination, strings.Split(*snapshotSendCmdSnapshots, ",")...)
+
+	case snapshotReceiveCmd.FullCommand():
+		cli.ReceiveContainerSnapshots(*snapshotReceiveCmdContainer, *snapshotReceiveCmdFile)
 
 	case backupCmd.FullCommand():
 		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
