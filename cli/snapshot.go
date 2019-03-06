@@ -59,7 +59,7 @@ func RemoveSnapshot(container, partition, label string) {
 	checkState(container2.IsContainer(container), "Container %s not found", container)
 	// check that snapshot with such label exists
 	snapshot := getSnapshotName(container, partition, label)
-	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
+	//checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
 
 	err := fs.RemoveDataset(snapshot, partition == "all")
 	checkCondition(err == nil, func() {
@@ -141,7 +141,16 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 	checkState(container2.IsContainer(container), "Container %s not found", container)
 	// check that snapshot with such label exists
 	snapshot := getSnapshotName(container, partition, label)
-	checkState(fs.DatasetExists(snapshot), "Snapshot %s does not exist", snapshot)
+	checkCondition(fs.DatasetExists(snapshot), func() {
+		if partition != "all" {
+			log.Error(fmt.Sprintf("Snapshot %s does not exist", snapshot))
+		} else {
+			for _, part := range fs.ChildDatasets {
+				snap := getSnapshotName(container, part, label)
+				checkState(fs.DatasetExists(snap), "Snapshot %s does not exist", snap)
+			}
+		}
+	})
 
 	if stopContainer {
 		if container2.State(container) == container2.Running {
@@ -158,7 +167,7 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 
 		})
 
-		//destroy child snapshots
+		//rollback to snapshots
 		snapshots := strings.Split(out, "\n")
 		for _, snapshot := range snapshots {
 			snapshot = strings.TrimSpace(strings.TrimPrefix(snapshot, config.Agent.Dataset))
