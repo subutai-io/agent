@@ -255,7 +255,10 @@ func ReceiveContainerSnapshots(container, sourceFile string) {
 
 	sourceFile = strings.TrimSpace(sourceFile)
 	checkArgument(sourceFile != "", "Invalid path to snapshots file")
-	checkState(fs.FileExists(sourceFile), "File %s not found", sourceFile)
+	checkCondition(fs.FileExists(sourceFile), func() {
+		checkState(fs.FileExists(path.Join(config.Agent.CacheDir, sourceFile)), "File %s not found", sourceFile)
+		sourceFile = path.Join(config.Agent.CacheDir, sourceFile)
+	})
 
 	//extract archive file
 	dest := path.Join(config.Agent.CacheDir, getFileName(sourceFile))
