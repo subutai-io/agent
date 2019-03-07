@@ -62,6 +62,12 @@ var (
 	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
 	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
 
+	restoreCmd       = app.Command("restore", "Restore container")
+	restoreContainer = restoreCmd.Arg("container", "container name").Required().String()
+	restoreEnvId     = restoreCmd.Flag("environment", "id of container environment").Short('e').String()
+	restoreNetwork   = restoreCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	restoreSecret    = restoreCmd.Flag("secret", "console secret").Short('s').String()
+
 	//cleanup command
 	/*
 	subutai cleanup 123
@@ -370,6 +376,8 @@ func main() {
 		cli.LxcAttach(*attachName, *attachCommand)
 	case cloneCmd.FullCommand():
 		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
+	case restoreCmd.FullCommand():
+		cli.RestoreContainer(*restoreContainer, *restoreEnvId, *restoreNetwork, *restoreSecret)
 	case cleanupCmd.FullCommand():
 		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():

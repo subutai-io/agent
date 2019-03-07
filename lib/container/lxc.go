@@ -471,7 +471,6 @@ func Clone(parent, child string) error {
 	parentParts := strings.Split(parent, ":")
 
 	err = SetContainerConf(child, [][]string{
-		//{"lxc.network.script.up", "/usr/sbin/subutai-create-interface"}, //must be in template
 		{"lxc.network.hwaddr", mac},
 		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
 		{"lxc.network.mtu", strconv.Itoa(mtu)},
