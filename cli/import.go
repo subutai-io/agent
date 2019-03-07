@@ -599,7 +599,7 @@ func install(templateName string) error {
 }
 
 func initManagement(templateRef string) {
-	container.Clone(templateRef, container.Management, "")
+	container.Clone(templateRef, container.Management)
 
 	container.SetContainerUID(container.Management)
 	container.SetContainerConf(container.Management, [][]string{

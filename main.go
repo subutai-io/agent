@@ -55,13 +55,12 @@ var (
 	/*
 	subutai clone master foo [-e {env-id} -n {net-settings} -s {secret}]
 	*/
-	cloneCmd        = app.Command("clone", "Create Subutai container")
-	cloneTemplate   = cloneCmd.Arg("template", "source template").Required().String()
-	cloneContainer  = cloneCmd.Arg("container", "container name").Required().String()
-	cloneEnvId      = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
-	cloneNetwork    = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
-	cloneSecret     = cloneCmd.Flag("secret", "console secret").Short('s').String()
-	cloneBackupFile = cloneCmd.Flag("backup", "Backup file to restore container from").Short('b').String()
+	cloneCmd       = app.Command("clone", "Create Subutai container")
+	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
+	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
+	cloneEnvId     = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
+	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
 
 	//cleanup command
 	/*
@@ -282,12 +281,6 @@ var (
 	snapshotReceiveCmdContainer = snapshotReceiveCmd.Flag("container", "container name").Short('c').Required().String()
 	snapshotReceiveCmdFile      = snapshotReceiveCmd.Flag("file", "path to archive file containing snapshots").Short('f').Required().String()
 
-	//todo remove
-	//backup command
-	backupCmd          = app.Command("backup", "Manage container backups")
-	backupCmdContainer = backupCmd.Arg("container", "container to backup").Required().String()
-	backupCmdDestDir   = backupCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
-
 	cdnCmd               = app.Command("cdn", "Download/upload files from/to CDN")
 	cdnDownloadCmd       = cdnCmd.Command("get", "Download file")
 	cdnDownloadCmdId     = cdnDownloadCmd.Arg("id", "Id of file on CDN").Required().String()
@@ -360,10 +353,6 @@ func main() {
 
 	vars.IsDaemon = input == daemonCmd.FullCommand()
 
-	//todo temp, remove in one version
-	cli.MigrateMappings()
-	cli.MigrateTunnels()
-
 	switch input {
 
 	case listContainers.FullCommand():
@@ -380,7 +369,7 @@ func main() {
 	case attachCmd.FullCommand():
 		cli.LxcAttach(*attachName, *attachCommand)
 	case cloneCmd.FullCommand():
-		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret, *cloneBackupFile)
+		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
 	case cleanupCmd.FullCommand():
 		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():
@@ -485,9 +474,6 @@ func main() {
 
 	case snapshotReceiveCmd.FullCommand():
 		cli.ReceiveContainerSnapshots(*snapshotReceiveCmdContainer, *snapshotReceiveCmdFile)
-
-	case backupCmd.FullCommand():
-		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
 
 	case cdnDownloadCmd.FullCommand():
 		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)
