@@ -16,7 +16,6 @@ import (
 	"github.com/nightlyone/lockfile"
 	"time"
 	"github.com/subutai-io/agent/lib/common"
-	"github.com/subutai-io/agent/lib/fs"
 )
 
 var (
@@ -34,16 +33,13 @@ var (
 // This is one of the security checks which makes sure that each container creation request is authorized by registered user.
 //
 // The clone options are not intended for manual use: unless you're confident about what you're doing. Use default clone format without additional options to create Subutai containers.
-func LxcClone(parent, child, envID, addr, consoleSecret, backupFile string) {
+func LxcClone(parent, child, envID, addr, consoleSecret string) {
 
 	util.VerifyLxcName(child)
 
 	if container.LxcInstanceExists(child) {
 		log.Error("Container " + child + " already exists")
 	}
-
-	backupFile = strings.TrimSpace(backupFile)
-	checkState(backupFile == "" || fs.FileExists(backupFile), "Backup file %s not found", backupFile)
 
 	//synchronize
 	var lock lockfile.Lockfile
@@ -73,7 +69,7 @@ func LxcClone(parent, child, envID, addr, consoleSecret, backupFile string) {
 		LxcImport("id:"+t.Id, "")
 	}
 
-	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child, backupFile))
+	log.Check(log.ErrorLevel, "Cloning the container", container.Clone(fullRef, child))
 
 	gpg.GenerateKey(child)
 	if len(consoleSecret) != 0 {

@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -14,6 +13,7 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/agent/vars"
 	"text/tabwriter"
+	"strings"
 )
 
 var version = "unknown"
@@ -55,13 +55,18 @@ var (
 	/*
 	subutai clone master foo [-e {env-id} -n {net-settings} -s {secret}]
 	*/
-	cloneCmd        = app.Command("clone", "Create Subutai container")
-	cloneTemplate   = cloneCmd.Arg("template", "source template").Required().String()
-	cloneContainer  = cloneCmd.Arg("container", "container name").Required().String()
-	cloneEnvId      = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
-	cloneNetwork    = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
-	cloneSecret     = cloneCmd.Flag("secret", "console secret").Short('s').String()
-	cloneBackupFile = cloneCmd.Flag("backup", "Backup file to restore container from").Short('b').String()
+	cloneCmd       = app.Command("clone", "Create Subutai container")
+	cloneTemplate  = cloneCmd.Arg("template", "source template").Required().String()
+	cloneContainer = cloneCmd.Arg("container", "container name").Required().String()
+	cloneEnvId     = cloneCmd.Flag("environment", "id of container environment").Short('e').String()
+	cloneNetwork   = cloneCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	cloneSecret    = cloneCmd.Flag("secret", "console secret").Short('s').String()
+
+	restoreCmd       = app.Command("restore", "Restore container")
+	restoreContainer = restoreCmd.Arg("container", "container name").Required().String()
+	restoreEnvId     = restoreCmd.Flag("environment", "id of container environment").Short('e').String()
+	restoreNetwork   = restoreCmd.Flag("network", "container network settings in form 'ip/mask vlan'").Short('n').String()
+	restoreSecret    = restoreCmd.Flag("secret", "console secret").Short('s').String()
 
 	//cleanup command
 	/*
@@ -273,10 +278,14 @@ var (
 	snapshotRollbackCmdStop  = snapshotRollbackCmd.Flag("stop", "stop container when doing rollback").Short('s').Bool()
 	snapshotRollbackCmdForce = snapshotRollbackCmd.Flag("force", "force rollback which will remove more recent snapshots if any").Short('f').Bool()
 
-	//backup command
-	backupCmd          = app.Command("backup", "Manage container backups")
-	backupCmdContainer = backupCmd.Arg("container", "container to backup").Required().String()
-	backupCmdDestDir   = backupCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+	snapshotSendCmd            = snapshotCmd.Command("send", "Send snapshots to archive file")
+	snapshotSendCmdContainer   = snapshotSendCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotSendCmdSnapshots   = snapshotSendCmd.Flag("label(s)", "snapshot label(s). You can specify up to 2 labels separated by space").Short('l').Required().String()
+	snapshotSendCmdDestination = snapshotSendCmd.Flag("destination", "Destination directory").Default(config.Agent.CacheDir).String()
+
+	snapshotReceiveCmd          = snapshotCmd.Command("receive", "Receive snapshots from a file").Alias("recv")
+	snapshotReceiveCmdContainer = snapshotReceiveCmd.Flag("container", "container name").Short('c').Required().String()
+	snapshotReceiveCmdFile      = snapshotReceiveCmd.Flag("file", "path to archive file containing snapshots").Short('f').Required().String()
 
 	cdnCmd               = app.Command("cdn", "Download/upload files from/to CDN")
 	cdnDownloadCmd       = cdnCmd.Command("get", "Download file")
@@ -350,10 +359,6 @@ func main() {
 
 	vars.IsDaemon = input == daemonCmd.FullCommand()
 
-	//todo temp, remove in one version
-	cli.MigrateMappings()
-	cli.MigrateTunnels()
-
 	switch input {
 
 	case listContainers.FullCommand():
@@ -370,7 +375,9 @@ func main() {
 	case attachCmd.FullCommand():
 		cli.LxcAttach(*attachName, *attachCommand)
 	case cloneCmd.FullCommand():
-		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret, *cloneBackupFile)
+		cli.LxcClone(*cloneTemplate, *cloneContainer, *cloneEnvId, *cloneNetwork, *cloneSecret)
+	case restoreCmd.FullCommand():
+		cli.RestoreContainer(*restoreContainer, *restoreEnvId, *restoreNetwork, *restoreSecret)
 	case cleanupCmd.FullCommand():
 		cli.Cleanup(*cleanupVlan)
 	case pruneCmd.FullCommand():
@@ -470,8 +477,11 @@ func main() {
 	case snapshotRollbackCmd.FullCommand():
 		cli.RollbackToSnapshot(*snapshotRollBackCmdContainer, *snapshotRollbackCmdPartition, *snapshotRollbackCmdLabel, *snapshotRollbackCmdForce, *snapshotRollbackCmdStop)
 
-	case backupCmd.FullCommand():
-		cli.BackupContainer(*backupCmdContainer, *backupCmdDestDir)
+	case snapshotSendCmd.FullCommand():
+		cli.SendContainerSnapshots(*snapshotSendCmdContainer, *snapshotSendCmdDestination, strings.Split(*snapshotSendCmdSnapshots, ",")...)
+
+	case snapshotReceiveCmd.FullCommand():
+		cli.ReceiveContainerSnapshots(*snapshotReceiveCmdContainer, *snapshotReceiveCmdFile)
 
 	case cdnDownloadCmd.FullCommand():
 		cli.DownloadRawFile(*cdnDownloadCmdId, *cdnDowloadCmdDestDir)

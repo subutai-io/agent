@@ -29,35 +29,6 @@ var (
 	socketRx = regexp.MustCompile(`^\S+:\S+$`)
 )
 
-func MigrateTunnels() {
-
-	var oldTunnelRecords []db.SshTunnel
-	list, err := db.INSTANCE.GetTunList()
-	if !log.Check(log.WarnLevel, "Reading tunnel list from db", err) {
-		for _, item := range list {
-			ttl, err := strconv.Atoi(item["ttl"])
-			pid, err2 := strconv.Atoi(item["pid"])
-			if err == nil && err2 == nil {
-				oldTunnelRecords = append(oldTunnelRecords,
-					db.SshTunnel{RemoteSocket: item["remote"], LocalSocket: item["local"], Ttl: ttl, Pid: pid})
-			}
-		}
-	}
-
-	for _, tun := range oldTunnelRecords {
-		//save into new table
-		tunnels, err := db.FindTunnelsByPid(tun.Pid)
-		if !log.Check(log.WarnLevel, "Fetching tunnels by pid", err) {
-			if len(tunnels) == 0 {
-				log.Check(log.WarnLevel, "Adding new tunnel entry", db.SaveTunnel(&tun))
-			}
-		}
-		//remove from old table
-		db.INSTANCE.DelTunEntry(strconv.Itoa(tun.Pid))
-	}
-
-}
-
 // TunAdd adds tunnel to specified network socket
 func AddSshTunnel(socket, timeout string, ssh bool) {
 	if len(socket) == 0 {

@@ -17,7 +17,7 @@ var (
 )
 
 func init() {
-	if !fs.FileExists(dbPath) {
+	if !fs.FileExists(dbFilePath) {
 		db, err := storm.Open(dbFilePath, storm.BoltOptions(0600, &bolt.Options{ReadOnly: false}))
 		log.Check(log.ErrorLevel, "Creating database", err)
 		defer db.Close()
@@ -26,38 +26,6 @@ func init() {
 		log.Check(log.ErrorLevel, "Initializing ssh tunnels storage", db.Init(&SshTunnel{}))
 		log.Check(log.ErrorLevel, "Initializing proxy storage", db.Init(&Proxy{}))
 		log.Check(log.ErrorLevel, "Initializing proxied servers storage", db.Init(&ProxiedServer{}))
-	}
-
-	migrateContainers()
-}
-
-func migrateContainers() {
-
-	list, _ := INSTANCE.GetContainers()
-
-	for _, name := range list {
-		meta, err := INSTANCE.GetContainerByName(name)
-
-		if meta != nil && err == nil {
-
-			cont := Container{}
-			cont.Name = name
-			cont.State = meta["state"]
-			cont.Vlan = meta["vlan"]
-			cont.EnvironmentId = meta["environment"]
-			cont.Gateway = meta["gw"]
-			cont.Ip = meta["ip"]
-			cont.Interface = meta["interface"]
-			cont.Uid = meta["uid"]
-			cont.Template = meta["parent"]
-			cont.TemplateOwner = meta["parent.owner"]
-			cont.TemplateId = meta["parent.id"]
-			cont.TemplateVersion = meta["parent.version"]
-
-			SaveContainer(&cont)
-
-			INSTANCE.RemoveContainer(name)
-		}
 	}
 
 }
