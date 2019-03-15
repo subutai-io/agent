@@ -174,7 +174,11 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 			if snapshot != "" && strings.HasSuffix(snapshot, "@"+label) {
 				err = fs.RollbackToSnapshot(snapshot, forceRollback)
 				checkCondition(err == nil, func() {
-					log.Error("Failed to rollback to snapshot", err.Error())
+					errString := err.Error()
+					if strings.Contains(errString, "use '-r' to force deletion") {
+						errString = strings.Replace(errString, "use '-r' to force deletion", "use '-f' to force deletion", 1)
+					}
+					log.Error("Failed to rollback to snapshot ", errString)
 				})
 			}
 		}
@@ -183,7 +187,11 @@ func RollbackToSnapshot(container, partition, label string, forceRollback, stopC
 
 		err := fs.RollbackToSnapshot(snapshot, forceRollback)
 		checkCondition(err == nil, func() {
-			log.Error("Failed to rollback to snapshot", err.Error())
+			errString := err.Error()
+			if strings.Contains(errString, "use '-r' to force deletion") {
+				errString = strings.Replace(errString, "use '-r' to force deletion", "use '-f' to force deletion", 1)
+			}
+			log.Error("Failed to rollback to snapshot ", errString)
 		})
 	}
 
