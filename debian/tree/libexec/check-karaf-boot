@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# this script checks if Karaf has booted properly
+# in rare cases some of OSGi modules might fail to load properly causing all dependent modules to fail
+# this script restarts Karaf in such cases to attempt to fix problems caused by improper boot
+
+function checkNReboot(){
+
+    # make sure that management container is present and running
+    subutai ls i -n management | grep RUNNING > /dev/null
+
+    if [ $? -eq 0 ]; then
+
+        # check status of Karaf boot
+        statusCode=$(curl -so /dev/null -k -w "%{http_code}" https://localhost:8443/rest/health/ready)
+
+        # http code 500 means that Karaf booting failed
+        if [ "$statusCode" == 500 ]; then
+
+            # restart management service
+            subutai attach management "service management restart"
+        fi
+    fi
+}
+
+
+while true; do
+
+    checkNReboot;
+
+    sleep 300
+
+done
