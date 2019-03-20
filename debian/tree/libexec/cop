@@ -1,6 +1,6 @@
 #!/bin/sh
 
-KNOWN_UNITS="subutai-nginx subutai-ovs subutai-dnsmasq subutai-forwarding subutai-roaming subutai-p2p subutai subutai-rng"
+KNOWN_UNITS="subutai-nginx subutai-ovs subutai-dnsmasq subutai-bootcheck subutai-forwarding subutai-roaming subutai-p2p subutai subutai-rng"
 LOG_DIR=/var/log/subutai
 LOG_FILE=$LOG_DIR/cop.log
 NAME=subutai-cop
