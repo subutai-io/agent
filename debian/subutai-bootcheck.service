@@ -1,5 +1,6 @@
 [Unit]
 Description=Subutai Karaf Boot Check Service
+After=subutai.service
 
 [Service]
 Type=simple
