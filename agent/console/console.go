@@ -66,7 +66,7 @@ func (c Console) Heartbeats() {
 //returns true if Console is ready to operate
 //returns false if not approved or any error during checking status
 func (c Console) IsReady() bool {
-	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/v1/peer/ready")
+	resp, err := c.client.Get("https://" + path.Join(config.ManagementIP) + ":8443/rest/health/ready")
 	if err == nil {
 		defer c.Close(resp)
 		if resp.StatusCode == http.StatusOK {
