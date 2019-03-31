@@ -14,6 +14,7 @@ import (
 	"github.com/subutai-io/agent/agent/vars"
 	"text/tabwriter"
 	"strings"
+	"github.com/subutai-io/agent/lib/container"
 )
 
 var version = "unknown"
@@ -41,6 +42,9 @@ var (
 	listContainersDetails = listCmd.Command("info", "List containers info").Alias("i")
 	listName              = listCmd.Flag("name", "container/template name").Short('n').String()
 	listParents           = listCmd.Flag("parents", "list parents").Short('p').Bool()
+
+	existsCmd     = app.Command("exists", "Check if container/template exists, exit code 0 - exists, 1 - not found")
+	existsCmdName = existsCmd.Arg("name", "name of container/template").Required().String()
 
 	//attach command
 	/*
@@ -369,6 +373,10 @@ func main() {
 		cli.LxcList(*listName, false, false, true, *listParents)
 	case listAll.FullCommand():
 		cli.LxcList(*listName, true, true, false, *listParents)
+	case existsCmd.FullCommand():
+		if !container.LxcInstanceExists(*existsCmdName) {
+			os.Exit(1)
+		}
 	case daemonCmd.FullCommand():
 		config.InitAgentDebug()
 		agent.Start()
