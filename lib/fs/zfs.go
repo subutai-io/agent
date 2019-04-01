@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"github.com/pkg/errors"
 	"github.com/subutai-io/agent/config"
+	"time"
+	"fmt"
 )
 
 var zfsRootDataset string
@@ -83,7 +85,7 @@ func CreateDataset(dataset string) error {
 // Lists snapshots for dataset
 // Returns output of `zfs list -t snapshot -r {root}/{dataset}` command
 func ListSnapshots(dataset string) (string, error) {
-	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-o", "name,creation", "-r", path.Join(zfsRootDataset, dataset))
+	out, err := exec.Execute("zfs", "list", "-t", "snapshot", "-o", "name,:created", "-r", path.Join(zfsRootDataset, dataset))
 	if err != nil {
 		return "", errors.Errorf("Error listing snapshots for %s: %s %s", dataset, out, err.Error())
 	}
@@ -117,7 +119,7 @@ func RollbackToSnapshot(snapshot string, forceRollback bool) error {
 // Creates snapshot
 // e.g. CreateSnapshot("foo/rootfs@now")
 func CreateSnapshot(snapshot string, recursive bool) error {
-	args := []string{"snapshot"}
+	args := []string{"snapshot", "-o", ":created=" + getTimestamp()}
 	if recursive {
 		args = append(args, "-r")
 	}
@@ -272,4 +274,13 @@ func ConvertToBytes(input string) (int, error) {
 	num, err := strconv.ParseFloat(value, 64)
 	res := float64(multiplier) * num
 	return int(res), err
+}
+
+func getTimestamp() string {
+	t := time.Now()
+	unixNano := t.UnixNano()
+	umillisec := unixNano / int64(time.Millisecond)
+	return fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d:%d",
+		t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second(), umillisec)
 }
