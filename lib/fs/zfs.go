@@ -278,9 +278,8 @@ func ConvertToBytes(input string) (int, error) {
 
 func getTimestamp() string {
 	t := time.Now()
-	unixNano := t.UnixNano()
-	umillisec := unixNano / int64(time.Millisecond)
-	return fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d:%d",
+	umillisec := t.Nanosecond() / 1000000
+	return fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d.%d",
 		t.Year(), t.Month(), t.Day(),
 		t.Hour(), t.Minute(), t.Second(), umillisec)
 }
