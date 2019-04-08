@@ -74,6 +74,18 @@ func ensureGPGVersion() {
 	}
 }
 
+func EncryptFile(pathToFile, password string) error {
+	_, err := exec2.ExecuteNoLog(GPG, "--batch", "--passphrase", password, "--symmetric", "--cipher-algo", "AES256", pathToFile)
+
+	return err
+}
+
+func DecryptFile(pathToSrcFile, pathToDestFile, password string) error {
+	_, err := exec2.ExecuteNoLog(GPG, "--batch", "--passphrase", password, "--output", pathToDestFile, "--decrypt", pathToSrcFile)
+
+	return err
+}
+
 //ImportPk imports Public Key "gpg2 --import pubkey.key" to RH
 func ImportPk(k []byte) error {
 	tmpfile, err := ioutil.TempFile("", "subutai-epub")
