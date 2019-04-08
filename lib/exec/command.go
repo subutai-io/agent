@@ -8,7 +8,6 @@ import (
 	"github.com/subutai-io/agent/log"
 	"os"
 	"io"
-	"github.com/subutai-io/agent/config"
 )
 
 // executes command
@@ -20,7 +19,6 @@ func ExecB(command string, args ...string) ([]byte, error) {
 
 	cmd := exec.Command(command, args...)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "IPFS_PATH="+config.CDN.IpfsPath)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -40,13 +38,10 @@ func ExecB(command string, args ...string) ([]byte, error) {
 // executes command
 // returns stdout and nil if command executes successfully
 // returns stderr and error if command executes with error
-func Execute(command string, args ...string) (string, error) {
-
-	log.Debug("Executing command " + command + " " + strings.Join(args, " "))
+func ExecuteNoLog(command string, args ...string) (string, error) {
 
 	cmd := exec.Command(command, args...)
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "IPFS_PATH="+config.CDN.IpfsPath)
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -65,6 +60,16 @@ func Execute(command string, args ...string) (string, error) {
 	}
 
 	return out.String(), nil
+}
+
+// executes command
+// returns stdout and nil if command executes successfully
+// returns stderr and error if command executes with error
+func Execute(command string, args ...string) (string, error) {
+
+	log.Debug("Executing command " + command + " " + strings.Join(args, " "))
+
+	return ExecuteNoLog(command, args...)
 }
 
 // executes command using /bin/bash
