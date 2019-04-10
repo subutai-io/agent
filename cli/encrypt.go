@@ -28,6 +28,8 @@ func EncryptFile(pathToFile, password string) {
 	}
 
 	log.Check(log.ErrorLevel, "Encrypting file", gpg.EncryptFile(pathToFile, password))
+
+	log.Info("Encrypted file to " + pathToFile + ".gpg")
 }
 
 //gpg1 --batch --passphrase {pwd} --output {/path/to/file} --decrypt {/path/to/file}
@@ -53,4 +55,6 @@ func DecryptFile(pathToSrcFile, pathToDestFile, password string) {
 	}
 
 	log.Check(log.ErrorLevel, "Decrypting file", gpg.DecryptFile(pathToSrcFile, pathToDestFile, password))
+
+	log.Info("Decrypted file to " + pathToDestFile)
 }
