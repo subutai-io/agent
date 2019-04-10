@@ -300,6 +300,16 @@ var (
 	cdnUploadCmdFile  = cdnUploadCmd.Flag("file", "path to file to upload").Short('f').Required().String()
 	cndUploadCmdToken = cdnUploadCmd.Flag("token", "CDN token").Short('t').Required().String()
 
+	fileCmd                = app.Command("file", "Encrypt/decrypt files with password")
+	fileEncryptCmd         = fileCmd.Command("encrypt", "Encrypt file")
+	fileEncryptCmdPath     = fileEncryptCmd.Flag("source", "Source file to encrypt").Short('s').Required().String()
+	fileEncryptCmdPassword = fileEncryptCmd.Flag("password", "Password to use for encryption").Short('p').Required().String()
+
+	fileDecryptCmd           = fileCmd.Command("decrypt", "Decrypt file")
+	fileDecryptCmdSourcePath = fileDecryptCmd.Flag("source", "Source file to decrypt").Short('s').Required().String()
+	fileDecryptCmdTargetPath = fileDecryptCmd.Flag("target", "Target decrypted file").Short('t').String()
+	fileDecryptCmdPassword   = fileDecryptCmd.Flag("password", "Password to use for decryption").Short('p').Required().String()
+
 	//restart command
 	restartCmd          = app.Command("restart", "Restart Subutai container")
 	restartCmdContainer = restartCmd.Arg("name(s)", "container name(s)").Required().Strings()
@@ -496,6 +506,11 @@ func main() {
 
 	case cdnUploadCmd.FullCommand():
 		cli.UploadRawFile(*cdnUploadCmdFile, *cndUploadCmdToken)
+
+	case fileEncryptCmd.FullCommand():
+		cli.EncryptFile(*fileEncryptCmdPath, *fileEncryptCmdPassword)
+	case fileDecryptCmd.FullCommand():
+		cli.DecryptFile(*fileDecryptCmdSourcePath, *fileDecryptCmdTargetPath, *fileDecryptCmdPassword)
 
 	case metricsCmd.FullCommand():
 		fmt.Println(cli.GetHostMetrics(*metricsHost, *metricsStart, *metricsEnd))
