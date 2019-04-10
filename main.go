@@ -307,7 +307,7 @@ var (
 
 	fileDecryptCmd           = fileCmd.Command("decrypt", "Decrypt file")
 	fileDecryptCmdSourcePath = fileDecryptCmd.Flag("source", "Source file to decrypt").Short('s').Required().String()
-	fileDecryptCmdTargetPath = fileDecryptCmd.Flag("target", "Target decrypted file").Short('t').Required().String()
+	fileDecryptCmdTargetPath = fileDecryptCmd.Flag("target", "Target decrypted file").Short('t').String()
 	fileDecryptCmdPassword   = fileDecryptCmd.Flag("password", "Password to use for decryption").Short('p').Required().String()
 
 	//restart command
