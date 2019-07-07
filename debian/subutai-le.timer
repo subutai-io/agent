@@ -3,7 +3,7 @@ Description=LetsEncrypt certificates updater timer
 
 [Timer]
 OnBootSec=1h
-OnUnitActiveSec=1w
+OnUnitActiveSec=1d
 
 [Install]
 WantedBy=timers.target
