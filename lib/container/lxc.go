@@ -677,12 +677,14 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 			newconf = newconf + strings.TrimSpace(conf[i][0]) + " = " + strings.TrimSpace(conf[i][1]) + "\n"
 		}
 	}
-	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
+	err = ioutil.WriteFile(confPath, []byte(newconf), 0644)
+	log.Check(log.ErrorLevel, "Failed to write config", err)
+
+	return exec.Command("lxc-update-config", "-c", confPath).Run()
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
 func SetContainerConf(container string, conf [][]string) error {
-
 	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
 
 	return CreateContainerConf(confPath, conf)
@@ -862,6 +864,7 @@ func GetIp(name string) string {
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 
+	log.Info("GETTING IP")
 	listip, err := c.IPAddress(ContainerDefaultIface)
 	log.Check(log.DebugLevel, "Getting ip of container "+name, err)
 
