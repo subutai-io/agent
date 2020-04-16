@@ -90,14 +90,14 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 		if common.GetMajorVersion() < 3 {
 			container.SetContainerConf(child, [][]string{
 				{"lxc.network.flags", "up"},
-				{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.network.ipv4.address", fmt.Sprintf("%s/24", cont.Ip)},
 				{"lxc.network.ipv4.gateway", cont.Gateway},
 				{"#vlan_id", cont.Vlan},
 			})
 		} else {
 			container.SetContainerConf(child, [][]string{
 				{"lxc.net.0.flags", "up"},
-				{"lxc.net.0.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.net.0.ipv4.address", fmt.Sprintf("%s/24", cont.Ip)},
 				{"lxc.net.0.ipv4.gateway", cont.Gateway},
 				{"#vlan_id", cont.Vlan},
 			})
@@ -130,13 +130,13 @@ func LxcClone(parent, child, envID, addr, consoleSecret string) {
 		if common.GetMajorVersion() < 3 {
 			container.SetContainerConf(child, [][]string{
 				{"lxc.network.flags", "up"},
-				{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.network.ipv4.address", fmt.Sprintf("%s/24", cont.Ip)},
 				{"lxc.network.ipv4.gateway", cont.Gateway},
 			})
 		} else {
 			container.SetContainerConf(child, [][]string{
 				{"lxc.net.0.flags", "up"},
-				{"lxc.net.0.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.net.0.ipv4.address", fmt.Sprintf("%s/24", cont.Ip)},
 				{"lxc.net.0.ipv4.gateway", cont.Gateway},
 			})
 		}
