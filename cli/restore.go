@@ -1,22 +1,22 @@
 package cli
 
 import (
-	"strings"
-	"github.com/subutai-io/agent/lib/container"
+	"fmt"
 	"github.com/nightlyone/lockfile"
-	"time"
-	"github.com/subutai-io/agent/lib/common"
-	"github.com/subutai-io/agent/lib/fs"
-	"path"
 	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
-	"github.com/subutai-io/agent/log"
+	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/lib/gpg"
-	"fmt"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
+	"path"
 	"reflect"
 	"sort"
-	"github.com/subutai-io/agent/lib/net"
 	"strconv"
+	"strings"
+	"time"
 )
 
 //todo remove code duplicates from LxcClone and RestoreContainer by moving common part to lib
@@ -69,22 +69,41 @@ func RestoreContainer(containerName, envID, addr, consoleSecret string) {
 	mtu, err := net.GetP2pMtu()
 	log.Check(log.ErrorLevel, "Obtaining MTU", err)
 
-	err = container.SetContainerConf(containerName, [][]string{
-		{"lxc.network.hwaddr", mac},
-		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
-		{"lxc.network.mtu", strconv.Itoa(mtu)},
-		{"subutai.parent", parentParts[0]},
-		{"subutai.parent.owner", parentParts[1]},
-		{"subutai.parent.version", parentParts[2]},
-		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, containerName, "rootfs")},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "home") + " home none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "opt") + " opt none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "var") + " var none bind,rw 0 0"},
-		{"lxc.rootfs.backend", "zfs"}, //must be in template
-		{"lxc.utsname", containerName},
-		{"lxc.cgroup.memory.limit_in_bytes"},
-		{"lxc.cgroup.cpu.cfs_quota_us"},
-	})
+	if common.GetMajorVersion() < 3 {
+		err = container.SetContainerConf(containerName, [][]string{
+			{"lxc.network.hwaddr", mac},
+			{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
+			{"lxc.network.mtu", strconv.Itoa(mtu)},
+			{"subutai.parent", parentParts[0]},
+			{"subutai.parent.owner", parentParts[1]},
+			{"subutai.parent.version", parentParts[2]},
+			{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, containerName, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "var") + " var none bind,rw 0 0"},
+			{"lxc.rootfs.backend", "zfs"}, //must be in template
+			{"lxc.utsname", containerName},
+			{"lxc.cgroup.memory.limit_in_bytes"},
+			{"lxc.cgroup.cpu.cfs_quota_us"},
+		})
+	} else {
+		err = container.SetContainerConf(containerName, [][]string{
+			{"lxc.net.0.hwaddr", mac},
+			{"lxc.net.0.veth.pair", strings.Replace(mac, ":", "", -1)},
+			{"lxc.net.0.mtu", strconv.Itoa(mtu)},
+			{"subutai.parent", parentParts[0]},
+			{"subutai.parent.owner", parentParts[1]},
+			{"subutai.parent.version", parentParts[2]},
+			{"lxc.rootfs.path", "zfs:" + path.Join(config.Agent.LxcPrefix, containerName, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, containerName, "var") + " var none bind,rw 0 0"},
+			{"lxc.uts.name", containerName},
+			{"lxc.cgroup.memory.limit_in_bytes"},
+			{"lxc.cgroup.cpu.cfs_quota_us"},
+		})
+
+	}
 
 	gpg.GenerateKey(containerName)
 	if len(consoleSecret) != 0 {
@@ -101,12 +120,21 @@ func RestoreContainer(containerName, envID, addr, consoleSecret string) {
 		cont.Gateway = getOrGenerateGateway(addr)
 		cont.Vlan = ip[1]
 
-		container.SetContainerConf(containerName, [][]string{
-			{"lxc.network.flags", "up"},
-			{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
-			{"lxc.network.ipv4.gateway", cont.Gateway},
-			{"#vlan_id", cont.Vlan},
-		})
+		if common.GetMajorVersion() < 3 {
+			container.SetContainerConf(containerName, [][]string{
+				{"lxc.network.flags", "up"},
+				{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.network.ipv4.gateway", cont.Gateway},
+				{"#vlan_id", cont.Vlan},
+			})
+		} else {
+			container.SetContainerConf(containerName, [][]string{
+				{"lxc.net.0.flags", "up"},
+				{"lxc.net.0.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.net.0.ipv4.gateway", cont.Gateway},
+				{"#vlan_id", cont.Vlan},
+			})
+		}
 	} else {
 		//determine next free IP
 		freeIPs := make(map[string]bool)
@@ -132,12 +160,21 @@ func RestoreContainer(containerName, envID, addr, consoleSecret string) {
 		cont.Ip = keys[0].String()
 		cont.Gateway = "10.10.10.254"
 
-		container.SetContainerConf(containerName, [][]string{
-			{"lxc.network.flags", "up"},
-			{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
-			{"lxc.network.ipv4.gateway", cont.Gateway},
-			{"#vlan_id"},
-		})
+		if common.GetMajorVersion() < 3 {
+			container.SetContainerConf(containerName, [][]string{
+				{"lxc.network.flags", "up"},
+				{"lxc.network.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.network.ipv4.gateway", cont.Gateway},
+				{"#vlan_id"},
+			})
+		} else {
+			container.SetContainerConf(containerName, [][]string{
+				{"lxc.net.0.flags", "up"},
+				{"lxc.net.0.ipv4", fmt.Sprintf("%s/24", cont.Ip)},
+				{"lxc.net.0.ipv4.gateway", cont.Gateway},
+				{"#vlan_id"},
+			})
+		}
 	}
 
 	//changing from dhcp to manual
@@ -153,7 +190,11 @@ func RestoreContainer(containerName, envID, addr, consoleSecret string) {
 	//Security matters workaround. Need to change it in parent templates
 	container.DisableSSHPwd(containerName)
 
-	cont.Interface = container.GetProperty(containerName, "lxc.network.veth.pair")
+	if common.GetMajorVersion() < 3 {
+		cont.Interface = container.GetProperty(containerName, "lxc.network.veth.pair")
+	} else {
+		cont.Interface = container.GetProperty(containerName, "lxc.net.0.veth.pair")
+	}
 
 	log.Check(log.ErrorLevel, "Writing container metadata to database", db.SaveContainer(cont))
 

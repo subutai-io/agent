@@ -4,10 +4,10 @@ package monitor
 import (
 	"bufio"
 	"bytes"
+	exc "github.com/subutai-io/agent/lib/exec"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	exc "github.com/subutai-io/agent/lib/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -15,13 +15,13 @@ import (
 
 	"github.com/influxdata/influxdb/client/v2"
 
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/log"
 	"github.com/subutai-io/agent/agent/util"
-	"github.com/subutai-io/agent/lib/fs"
-	"path"
+	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/log"
+	"path"
 )
 
 var (
@@ -133,9 +133,13 @@ func cgroupStat(bp client.BatchPoints) {
 func netStat(bp client.BatchPoints) {
 	lxcnic := make(map[string]string)
 	files, err := ioutil.ReadDir(config.Agent.LxcPrefix)
+	keyname := "lxc.net.0.veth.pair"
+	if common.GetMajorVersion() < 3 {
+		keyname = "lxc.network.veth.pair"
+	}
 	if err == nil {
 		for _, f := range files {
-			lxcnic[container.GetProperty(f.Name(), "lxc.network.veth.pair")] = f.Name()
+			lxcnic[container.GetProperty(f.Name(), keyname)] = f.Name()
 		}
 	}
 

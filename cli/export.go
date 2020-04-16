@@ -6,22 +6,23 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"encoding/json"
+	"fmt"
+	"github.com/subutai-io/agent/agent/util"
 	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/lib/common"
 	"github.com/subutai-io/agent/lib/container"
 	"github.com/subutai-io/agent/lib/fs"
 	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/util"
-	"strings"
-	"path"
-	"regexp"
-	"encoding/json"
-	"mime/multipart"
 	"gopkg.in/cheggaaa/pb.v1"
 	"io"
-	"fmt"
+	"mime/multipart"
 	"net/http"
-	"time"
+	"path"
+	"regexp"
+	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -101,10 +102,10 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	var dst string
 	if newname != "" {
 		dst = path.Join(config.Agent.CacheDir, newname+
-			"-subutai-template_"+ version+ "_"+ runtime.GOARCH)
+			"-subutai-template_"+version+"_"+runtime.GOARCH)
 	} else {
 		dst = path.Join(config.Agent.CacheDir, name+
-			"-subutai-template_"+ version+ "_"+ runtime.GOARCH)
+			"-subutai-template_"+version+"_"+runtime.GOARCH)
 	}
 
 	os.MkdirAll(dst, 0755)
@@ -130,22 +131,41 @@ func LxcExport(name, newname, version, prefsize, token string, local bool) {
 	log.Check(log.ErrorLevel, "Copying config file", fs.Copy(src+"/config", dst+"/config"))
 
 	//update template config
-	templateConf := [][]string{
-		{"subutai.template.owner", owner},
-		{"subutai.template.version", version},
-		{"subutai.template.size", pSize},
-		{"lxc.network.ipv4.gateway"},
-		{"lxc.network.ipv4"},
-		{"lxc.network.veth.pair"},
-		{"lxc.network.hwaddr"},
-		{"lxc.network.mtu"},
-		{"#vlan_id"},
+	var templateConf [][]string
+	if common.GetMajorVersion() < 3 {
+		templateConf = [][]string{
+			{"subutai.template.owner", owner},
+			{"subutai.template.version", version},
+			{"subutai.template.size", pSize},
+			{"lxc.network.ipv4.gateway"},
+			{"lxc.network.ipv4"},
+			{"lxc.network.veth.pair"},
+			{"lxc.network.hwaddr"},
+			{"lxc.network.mtu"},
+			{"#vlan_id"},
+		}
+	} else {
+		templateConf = [][]string{
+			{"subutai.template.owner", owner},
+			{"subutai.template.version", version},
+			{"subutai.template.size", pSize},
+			{"lxc.net.0.ipv4.gateway"},
+			{"lxc.net.0.ipv4"},
+			{"lxc.net.0.veth.pair"},
+			{"lxc.net.0.hwaddr"},
+			{"lxc.net.0.mtu"},
+			{"#vlan_id"},
+		}
 	}
 
 	if newname != "" {
 		templateConf = append(templateConf, []string{"subutai.template", newname})
 		templateConf = append(templateConf, []string{"lxc.utsname", newname})
-		templateConf = append(templateConf, []string{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, newname, "rootfs")})
+		if common.GetMajorVersion() < 3 {
+			templateConf = append(templateConf, []string{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, newname, "rootfs")})
+		} else {
+			templateConf = append(templateConf, []string{"lxc.rootfs.path", "zfs:" + path.Join(config.Agent.LxcPrefix, newname, "rootfs")})
+		}
 		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "home") + " home none bind,rw 0 0"})
 		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "var") + " var none bind,rw 0 0"})
 		templateConf = append(templateConf, []string{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, newname, "opt") + " opt none bind,rw 0 0"})
