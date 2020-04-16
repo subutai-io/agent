@@ -2,29 +2,29 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/cavaliercoder/grab"
+	"github.com/nightlyone/lockfile"
+	"github.com/pkg/errors"
+	"github.com/subutai-io/agent/agent/util"
+	"github.com/subutai-io/agent/config"
+	"github.com/subutai-io/agent/db"
+	"github.com/subutai-io/agent/lib/common"
+	"github.com/subutai-io/agent/lib/container"
+	"github.com/subutai-io/agent/lib/exec"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/net"
+	"github.com/subutai-io/agent/log"
+	"gopkg.in/cheggaaa/pb.v1"
 	"io/ioutil"
-	"os"
-	"strings"
-	"time"
 	"net/http"
 	"net/url"
-	"github.com/nightlyone/lockfile"
-	"github.com/subutai-io/agent/config"
-	"github.com/subutai-io/agent/lib/container"
-	"github.com/subutai-io/agent/lib/gpg"
-	"github.com/subutai-io/agent/log"
-	"github.com/subutai-io/agent/agent/util"
-	"github.com/subutai-io/agent/lib/fs"
+	"os"
 	"path"
-	"github.com/subutai-io/agent/lib/exec"
 	"path/filepath"
-	"github.com/subutai-io/agent/lib/common"
-	"github.com/cavaliercoder/grab"
-	"fmt"
-	"gopkg.in/cheggaaa/pb.v1"
-	"github.com/pkg/errors"
-	"github.com/subutai-io/agent/db"
-	"github.com/subutai-io/agent/lib/net"
+	"strings"
+	"time"
 )
 
 const maxDownloadAttempts = 3
@@ -394,9 +394,7 @@ func downloadFromGateway(template Template) {
 	attempts := 1
 	var err error
 
-	for err = doDownload(template, templateUrl);
-		err != nil && attempts < maxDownloadAttempts;
-	err = doDownload(template, templateUrl) {
+	for err = doDownload(template, templateUrl); err != nil && attempts < maxDownloadAttempts; err = doDownload(template, templateUrl) {
 		attempts++
 	}
 
@@ -526,12 +524,22 @@ func downloadViaLocalIPFSNode(template Template) {
 
 func updateContainerConfig(templateName string) error {
 
-	return container.SetContainerConf(templateName, [][]string{
-		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "home") + " home none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "opt") + " opt none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "var") + " var none bind,rw 0 0"},
-	})
+	if common.GetMajorVersion() < 3 {
+		return container.SetContainerConf(templateName, [][]string{
+			{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "var") + " var none bind,rw 0 0"},
+		})
+	} else {
+		return container.SetContainerConf(templateName, [][]string{
+			// TODO: Check this line
+			{"lxc.rootfs.path", "zfs:" + path.Join(config.Agent.LxcPrefix, templateName, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, templateName, "var") + " var none bind,rw 0 0"},
+		})
+	}
 
 }
 
@@ -602,9 +610,16 @@ func initManagement(templateRef string) {
 	container.Clone(templateRef, container.Management)
 
 	container.SetContainerUID(container.Management)
-	container.SetContainerConf(container.Management, [][]string{
-		{"lxc.network.veth.pair", container.Management},
-	})
+	if common.GetMajorVersion() < 3 {
+		container.SetContainerConf(container.Management, [][]string{
+			{"lxc.network.veth.pair", container.Management},
+		})
+	} else {
+		container.SetContainerConf(container.Management, [][]string{
+			{"lxc.net.0.veth.pair", container.Management},
+		})
+
+	}
 	gpg.GenerateKey(container.Management)
 	container.SetDNS(container.Management)
 	container.SetManagementNet()
