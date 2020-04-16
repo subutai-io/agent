@@ -18,13 +18,14 @@ all: vet test build
 $(GODEP):
 	go get -u github.com/golang/dep/cmd/dep
 
-Gopkg.toml: $(GODEP)
-	$(GODEP_BIN) init
+#Gopkg.toml: $(GODEP)
+#	$(GODEP_BIN) init
 
 vendor:         ## Vendor the packages using dep
-vendor: $(GODEP) Gopkg.toml Gopkg.lock
-	@ echo "No vendor dir found. Fetching dependencies now..."
-	GOPATH=$(GOPATH):. $(GODEP_BIN) ensure
+	@echo "skip"
+#vendor: $(GODEP) Gopkg.toml Gopkg.lock
+#	@ echo "No vendor dir found. Fetching dependencies now..."
+#	GOPATH=$(GOPATH):. $(GODEP_BIN) ensure
 
 version:
 	@ echo $(VERSION)
