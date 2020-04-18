@@ -643,6 +643,10 @@ func QuotaNet(name string, size string) string {
 }
 
 func CreateContainerConf(confPath string, conf [][]string) error {
+	if common.GetMajorVersion() >= 3 {
+		err := exec.Command("lxc-update-config", "-c", confPath).Run()
+		log.Check(log.ErrorLevel, "Failed to upgrade lxc configuration", err)
+	}
 
 	file, err := os.OpenFile(confPath, os.O_CREATE|os.O_RDWR, 0644)
 	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
@@ -677,13 +681,7 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 			newconf = newconf + strings.TrimSpace(conf[i][0]) + " = " + strings.TrimSpace(conf[i][1]) + "\n"
 		}
 	}
-	err = ioutil.WriteFile(confPath, []byte(newconf), 0644)
-	if common.GetMajorVersion() < 3 {
-		return err
-	}
-	log.Check(log.ErrorLevel, "Failed to write config", err)
-
-	return exec.Command("lxc-update-config", "-c", confPath).Run()
+	return ioutil.WriteFile(confPath, []byte(newconf), 0644)
 }
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
