@@ -678,6 +678,9 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 		}
 	}
 	err = ioutil.WriteFile(confPath, []byte(newconf), 0644)
+	if common.GetMajorVersion() < 3 {
+		return err
+	}
 	log.Check(log.ErrorLevel, "Failed to write config", err)
 
 	return exec.Command("lxc-update-config", "-c", confPath).Run()
