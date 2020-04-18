@@ -867,7 +867,6 @@ func GetIp(name string) string {
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 
-	log.Info("GETTING IP")
 	listip, err := c.IPAddress(ContainerDefaultIface)
 	log.Check(log.DebugLevel, "Getting ip of container "+name, err)
 
