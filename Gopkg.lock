@@ -36,14 +36,6 @@
   version = "v2.1.2"
 
 [[projects]]
-  digest = "1:0f98f59e9a2f4070d66f0c9c39561f68fcd1dc837b22a852d28d0003aebd1b1e"
-  name = "github.com/boltdb/bolt"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
-  version = "v1.3.1"
-
-[[projects]]
   digest = "1:5a9184cd30af0ae7ed5f360f7bd8ecca71fd1df280258caae8cc5d43c70abf37"
   name = "github.com/cavaliercoder/grab"
   packages = ["."]
@@ -201,11 +193,11 @@
 
 [[projects]]
   branch = "v2"
-  digest = "1:2d129a7f163d575a89c6cb3d985116ea79bdd91965a80c40ebf176f496fca08b"
+  digest = "1:79279d27d7913a531d9741f6cddfbac9db739c76fdd3080a3ffad578009663e1"
   name = "gopkg.in/lxc/go-lxc.v2"
   packages = ["."]
   pruneopts = "UT"
-  revision = "0aadfc37157c2e3f0e63bedd10f8615e66e91cad"
+  revision = "79d3cbb2d58e61204c82bfa17d3f1bfca851210c"
 
 [[projects]]
   digest = "1:78d374b493e747afa9fbb2119687e3740a7fb8d0ebabddfef0a012593aaecbb3"
@@ -221,7 +213,6 @@
   input-imports = [
     "github.com/asdine/storm",
     "github.com/asdine/storm/q",
-    "github.com/boltdb/bolt",
     "github.com/cavaliercoder/grab",
     "github.com/fromkeith/gossdp",
     "github.com/influxdata/influxdb/client/v2",

@@ -5,6 +5,7 @@
 // +build linux,cgo
 
 #include <stdbool.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
@@ -52,6 +53,9 @@ bool go_lxc_want_close_all_fds(struct lxc_container *c, bool state) {
 }
 
 bool go_lxc_create(struct lxc_container *c, const char *t, const char *bdevtype, int flags, char * const argv[]) {
+	if (strncmp(t, "none", strlen(t)) == 0) {
+		return c->create(c, NULL, bdevtype, NULL, !!(flags & LXC_CREATE_QUIET), argv);
+	}
 	return c->create(c, t, bdevtype, NULL, !!(flags & LXC_CREATE_QUIET), argv);
 }
 
@@ -191,7 +195,12 @@ bool go_lxc_save_config(struct lxc_container *c, const char *alt_file) {
 }
 
 bool go_lxc_clone(struct lxc_container *c, const char *newname, const char *lxcpath, int flags, const char *bdevtype) {
-	return c->clone(c, newname, lxcpath, flags, bdevtype, NULL, 0, NULL) != NULL;
+	struct lxc_container *c2 = c->clone(c, newname, lxcpath, flags, bdevtype, NULL, 0, NULL);
+	if (c2 == NULL) {
+		return false;
+	}
+	lxc_container_put(c2);
+	return true;
 }
 
 int go_lxc_console_getfd(struct lxc_container *c, int ttynum) {

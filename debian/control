@@ -1,7 +1,7 @@
 Source: subutai-agent
 Section: utils
 Priority: optional
-Maintainer: Aron Xu <happyaron.xu@gmail.com>
+Maintainer: Lars Boegild Thomsen <lbthomsen@optdyn.com>
 Build-Depends: debhelper (>= 10),
                dh-golang,
                golang-any
@@ -12,7 +12,7 @@ XS-Go-Import-Path: github.com/subutai-io/agent
 Package: subutai
 Architecture: any
 Depends: gnupg1 | gnupg (<< 2.0.0~),
-         lxc,
+         lxc (>= 3.0.0),
          nsexec,
          rng-tools,
          subutai-nginx,
@@ -23,6 +23,5 @@ Depends: gnupg1 | gnupg (<< 2.0.0~),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: uidmap
-Suggests: ipfs
 Description: subutai agent
  project allows to turn a host into subutai peer and is used together with subutai console

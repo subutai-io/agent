@@ -19,15 +19,15 @@ import (
 	"github.com/subutai-io/agent/lib/net"
 	"github.com/subutai-io/agent/log"
 
-	"gopkg.in/lxc/go-lxc.v2"
-	"path"
-	"fmt"
 	"crypto/rand"
-	"time"
-	"hash/crc32"
+	"fmt"
 	"github.com/nightlyone/lockfile"
 	"github.com/subutai-io/agent/lib/common"
+	"gopkg.in/lxc/go-lxc.v2"
+	"hash/crc32"
 	"io"
+	"path"
+	"time"
 )
 
 const (
@@ -53,7 +53,7 @@ func IsTemplate(name string) bool {
 }
 
 func IsContainer(name string) bool {
-	return fs.DatasetExists(name+"/rootfs") && !fs.IsDatasetReadOnly(name + "/rootfs/")
+	return fs.DatasetExists(name+"/rootfs") && !fs.IsDatasetReadOnly(name+"/rootfs/")
 }
 
 // Templates returns list of all templates
@@ -470,20 +470,37 @@ func Clone(parent, child string) error {
 
 	parentParts := strings.Split(parent, ":")
 
-	err = SetContainerConf(child, [][]string{
-		{"lxc.network.hwaddr", mac},
-		{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
-		{"lxc.network.mtu", strconv.Itoa(mtu)},
-		{"subutai.parent", parentParts[0]},
-		{"subutai.parent.owner", parentParts[1]},
-		{"subutai.parent.version", parentParts[2]},
-		{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, child, "rootfs")},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "home") + " home none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "opt") + " opt none bind,rw 0 0"},
-		{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "var") + " var none bind,rw 0 0"},
-		{"lxc.rootfs.backend", "zfs"}, //must be in template
-		{"lxc.utsname", child},
-	})
+	if common.GetMajorVersion() < 3 {
+		err = SetContainerConf(child, [][]string{
+			{"lxc.network.hwaddr", mac},
+			{"lxc.network.veth.pair", strings.Replace(mac, ":", "", -1)},
+			{"lxc.network.mtu", strconv.Itoa(mtu)},
+			{"subutai.parent", parentParts[0]},
+			{"subutai.parent.owner", parentParts[1]},
+			{"subutai.parent.version", parentParts[2]},
+			{"lxc.rootfs", path.Join(config.Agent.LxcPrefix, child, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "var") + " var none bind,rw 0 0"},
+			{"lxc.rootfs.backend", "zfs"}, //must be in template
+			{"lxc.utsname", child},
+		})
+	} else {
+		err = SetContainerConf(child, [][]string{
+			{"lxc.net.0.hwaddr", mac},
+			{"lxc.net.0.veth.pair", strings.Replace(mac, ":", "", -1)},
+			{"lxc.net.0.mtu", strconv.Itoa(mtu)},
+			{"subutai.parent", parentParts[0]},
+			{"subutai.parent.owner", parentParts[1]},
+			{"subutai.parent.version", parentParts[2]},
+			{"lxc.rootfs.path", "zfs:" + path.Join(config.Agent.LxcPrefix, child, "rootfs")},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "home") + " home none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "opt") + " opt none bind,rw 0 0"},
+			{"lxc.mount.entry", path.Join(config.Agent.LxcPrefix, child, "var") + " var none bind,rw 0 0"},
+			{"lxc.uts.name", child},
+		})
+
+	}
 	if err != nil {
 		return err
 	}
@@ -553,7 +570,7 @@ func QuotaCPU(name string, size string) int {
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
 	cfsPeriod := 100000
-	var quota float32;
+	var quota float32
 	if size != "" {
 		tmp, err := strconv.Atoi(size)
 		log.Check(log.DebugLevel, "Parsing quota size", err)
@@ -614,7 +631,11 @@ func QuotaNet(name string, size string) string {
 		defer lxc.Release(c)
 	}
 	log.Check(log.DebugLevel, "Looking for container: "+name, err)
-	nic := GetConfigItem(c.ConfigFileName(), "lxc.network.veth.pair")
+	option := "lxc.net.0.veth.pair"
+	if common.GetMajorVersion() < 3 {
+		option = "lxc.network.veth.pair"
+	}
+	nic := GetConfigItem(c.ConfigFileName(), option)
 	if size != "" {
 		SetContainerConf(name, [][]string{{"subutai.network.ratelimit", size}})
 	}
@@ -622,6 +643,10 @@ func QuotaNet(name string, size string) string {
 }
 
 func CreateContainerConf(confPath string, conf [][]string) error {
+	if common.GetMajorVersion() >= 3 {
+		err := exec.Command("lxc-update-config", "-c", confPath).Run()
+		log.Check(log.ErrorLevel, "Failed to upgrade lxc configuration", err)
+	}
 
 	file, err := os.OpenFile(confPath, os.O_CREATE|os.O_RDWR, 0644)
 	if log.Check(log.DebugLevel, "Opening container config "+confPath, err) {
@@ -661,7 +686,6 @@ func CreateContainerConf(confPath string, conf [][]string) error {
 
 // SetContainerConf sets any parameter in the configuration file of the Subutai container.
 func SetContainerConf(container string, conf [][]string) error {
-
 	confPath := path.Join(config.Agent.LxcPrefix, container, "config")
 
 	return CreateContainerConf(confPath, conf)
@@ -694,10 +718,18 @@ func GetContainerUID(container string) string {
 func SetContainerUID(c string) (string, error) {
 	uid := GetContainerUID(c)
 
-	SetContainerConf(c, [][]string{
-		{"lxc.id_map", "u 0 " + uid + " 65536"},
-		{"lxc.id_map", "g 0 " + uid + " 65536"},
-	})
+	if common.GetMajorVersion() < 3 {
+		SetContainerConf(c, [][]string{
+			{"lxc.id_map", "u 0 " + uid + " 65536"},
+			{"lxc.id_map", "g 0 " + uid + " 65536"},
+		})
+	} else {
+		SetContainerConf(c, [][]string{
+			{"lxc.idmap", "u 0 " + uid + " 65536"},
+			{"lxc.idmap", "g 0 " + uid + " 65536"},
+		})
+
+	}
 
 	s, err := os.Stat(path.Join(config.Agent.LxcPrefix, c, "rootfs"))
 	if log.Check(log.DebugLevel, "Reading container rootfs stat", err) {

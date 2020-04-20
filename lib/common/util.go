@@ -1,15 +1,17 @@
 package common
 
 import (
-	"github.com/subutai-io/agent/log"
-	"runtime"
-	"reflect"
-	"github.com/nightlyone/lockfile"
-	"io/ioutil"
 	"fmt"
-	"strings"
+	"github.com/nightlyone/lockfile"
+	"github.com/subutai-io/agent/log"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"reflect"
+	"runtime"
+	"strconv"
+	"strings"
 )
 
 func RunNRecover(g func()) {
@@ -52,4 +54,23 @@ func LockFile(name string, command string) (lockfile.Lockfile, error) {
 	}
 
 	return lock, nil
+}
+
+func GetMajorVersion() uint16 {
+	output, err := exec.Command("lxc-info", "--version").Output()
+	if err != nil {
+		log.Check(log.ErrorLevel, "Failed to get lxc version: ", err)
+		return 0
+	}
+	parts := strings.Split(string(output), ".")
+	if len(parts) > 0 {
+		version, err := strconv.Atoi(parts[0])
+		if err != nil {
+			log.Check(log.ErrorLevel, "Failed to convert lxc version ", err)
+			return 0
+		}
+		return uint16(version)
+	}
+
+	return 0
 }
