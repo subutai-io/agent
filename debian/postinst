@@ -16,3 +16,7 @@ if systemctl is-active --quiet ipfs.service; then
     ipfs bootstrap add /dnsaddr/eu1.s.optdyn.com/ipfs/QmUZFuJ31ctYGxYFDtKzDBXmpmiBQWZGyqQChL7RwQNitV
     ipfs bootstrap add /dnsaddr/us1.s.optdyn.com/ipfs/QmdL6K8gqGT2BRUEGtcnRGTCyGVV5H7QiYqPLzvgMcLpxo
 fi
+
+# Restart apparmor
+systemctl restart apparmor
+
