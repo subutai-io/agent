@@ -22,14 +22,18 @@ override_dh_auto_install:
 	dh_auto_install -- --no-source
 	mv debian/subutai/usr/bin/agent debian/subutai/usr/bin/subutai
 	mkdir -p debian/subutai/etc/subutai/
+	mkdir -p debian/subutai/etc/apparmor.d/lxc
 	mkdir -p debian/subutai/var/lib/subutai/
 	mkdir -p debian/subutai/usr/sbin
 	mkdir -p debian/subutai/usr/lib/subutai/libexec
 	mkdir -p debian/subutai/usr/lib/subutai/etc
+	mkdir -p debian/subutai/usr/share/subutai/config
 	mkdir -p debian/subutai/usr/share/bash-completion/completions
 	mkdir -p debian/subutai/lib/systemd/system
 	cp debian/tree/agent.conf debian/subutai/etc/subutai/
 	cp debian/tree/agent.conf debian/subutai/usr/lib/subutai/etc/
+	cp debian/tree/lxc-default-subutai debian/subutai/etc/apparmor.d/lxc/
+	cp debian/tree/subutai.conf debian/subutai/usr/share/subutai/config/
 	cp debian/tree/libexec/* debian/subutai/usr/lib/subutai/libexec/
 	cp debian/tree/ssh.pem debian/subutai/var/lib/subutai/
 	cp debian/tree/sbin/* debian/subutai/usr/sbin/
