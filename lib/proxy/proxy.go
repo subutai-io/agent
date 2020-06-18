@@ -1,26 +1,26 @@
 package proxy
 
 import (
-	"github.com/nightlyone/lockfile"
-	"time"
-	"strings"
-	"github.com/subutai-io/agent/lib/gpg"
 	"fmt"
-	"os"
-	"io/ioutil"
-	"path/filepath"
-	"sort"
+	"github.com/nightlyone/lockfile"
+	"github.com/pkg/errors"
+	"github.com/subutai-io/agent/agent/util"
+	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/db"
 	"github.com/subutai-io/agent/lib/common"
-	"github.com/subutai-io/agent/lib/net"
-	"github.com/pkg/errors"
-	"github.com/subutai-io/agent/lib/fs"
-	"strconv"
-	"path"
-	"github.com/subutai-io/agent/config"
 	"github.com/subutai-io/agent/lib/exec"
-	"github.com/subutai-io/agent/agent/util"
+	"github.com/subutai-io/agent/lib/fs"
+	"github.com/subutai-io/agent/lib/gpg"
+	"github.com/subutai-io/agent/lib/net"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
 
 //todo split this file into types, snippets,
@@ -66,7 +66,9 @@ server {
 
     {well-known}
 
-	return 301 https://$host:{port}$request_uri;  # enforce https
+	location / {
+		return 301 https://$host:{port}$request_uri;  # enforce https
+	}
 }
 
 `
@@ -200,8 +202,7 @@ func FindProxiedServers(tag, socket string) ([]db.ProxiedServer, error) {
 func CreateProxy(protocol, domain, loadBalancing, tag string, port int, redirect80Port, sslBackend bool, certPath string, http2 bool) error {
 	var err error = nil
 	var lock lockfile.Lockfile
-	for lock, err = common.LockFile("port", "proxy");
-		err != nil; lock, err = common.LockFile("port", "proxy") {
+	for lock, err = common.LockFile("port", "proxy"); err != nil; lock, err = common.LockFile("port", "proxy") {
 
 		time.Sleep(time.Second * 1)
 	}
@@ -428,8 +429,7 @@ func AddProxiedServer(tag, socket string) error {
 
 	var err error = nil
 	var lock lockfile.Lockfile
-	for lock, err = common.LockFile("port", "server");
-		err != nil; lock, err = common.LockFile("port", "server") {
+	for lock, err = common.LockFile("port", "server"); err != nil; lock, err = common.LockFile("port", "server") {
 		time.Sleep(time.Second * 1)
 	}
 	defer lock.Unlock()
@@ -846,7 +846,7 @@ func figureOutDomainFolderName(domain string) (string, error) {
 	//collect all matching directory names
 	var res []string
 	for _, f := range files {
-		if f.IsDir() && ( validCertDirName.MatchString(f.Name())) {
+		if f.IsDir() && (validCertDirName.MatchString(f.Name())) {
 			res = append(res, filepath.Join(f.Name()))
 		}
 	}
